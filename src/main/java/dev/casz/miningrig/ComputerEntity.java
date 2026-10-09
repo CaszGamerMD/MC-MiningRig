@@ -37,6 +37,8 @@ public final class ComputerEntity extends BlockEntity {
     public void setDepth(int value) { depth = Math.max(1, Math.min(256, value)); stopForSetting(); }
     public void setCircle(boolean value) { circle = value; stopForSetting(); }
     private void stopForSetting() { running = false; status = Status.STOPPED; setChanged(); }
+    public String screenStatus() { return status.display; }
+    public boolean running() { return running; }
     public String description() {
         return "Mining Rig | " + status.display + " | " + (circle ? "Circle" : "Square")
                 + " r=" + radius + " depth=" + depth + (linked ? " | Linked" : " | No drill");

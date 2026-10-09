@@ -1,6 +1,6 @@
 # Caszual Mining Rig (Fabric 26.2)
 
-A first playable, **unverified** implementation of a configurable mining machine for Minecraft Java 26.2 with Fabric API. Work is under way on a richer in-world screen and polished machine models.
+A first compiled, **not yet in-game verified** implementation of a configurable mining machine for Minecraft Java 26.2 with Fabric API. A first-pass in-world computer status screen is rendered on the face of the machine; a dedicated configuration GUI and polished 3D models are next.
 
 ## Current prototype controls
 
@@ -29,4 +29,4 @@ Ready, Mining, Manually stopped, Job done, Out of bits, Out of range of a collec
 
 This repository targets **Minecraft 26.2, Fabric Loader 0.19.5, Fabric API 0.161.0+26.2, Java 25, Gradle 9.7.0**. You can run `gradle build` with Gradle 9.7.0 and a Java 25 JDK. The GitHub Actions workflow uses these versions and uploads the compiled artifacts after a successful build.
 
-**Status:** source authored, compilation has not yet been verified. Do not treat as a published game-ready release.
+**Status:** Gradle compilation has passed on GitHub Actions. Runtime/in-game behavior has not yet been verified; do not treat as a fully tested release.

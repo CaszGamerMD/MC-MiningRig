@@ -14,6 +14,9 @@
   "entrypoints": {
     "main": [
       "dev.casz.miningrig.MiningRig"
+    ],
+    "client": [
+      "dev.casz.miningrig.client.MiningRigClient"
     ]
   },
   "depends": {
