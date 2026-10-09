@@ -6,9 +6,7 @@
     "MM"
   ],
   "key": {
-    "M": {
-      "item": "minecraft:iron_ingot"
-    }
+    "M": "minecraft:iron_ingot"
   },
   "result": {
     "id": "miningrig:iron_bit",

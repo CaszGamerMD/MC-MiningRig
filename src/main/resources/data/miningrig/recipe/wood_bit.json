@@ -6,9 +6,7 @@
     "MM"
   ],
   "key": {
-    "M": {
-      "tag": "minecraft:planks"
-    }
+    "M": "#minecraft:planks"
   },
   "result": {
     "id": "miningrig:wood_bit",

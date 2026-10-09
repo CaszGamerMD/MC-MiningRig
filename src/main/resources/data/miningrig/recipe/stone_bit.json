@@ -6,9 +6,7 @@
     "MM"
   ],
   "key": {
-    "M": {
-      "item": "minecraft:cobblestone"
-    }
+    "M": "minecraft:cobblestone"
   },
   "result": {
     "id": "miningrig:stone_bit",

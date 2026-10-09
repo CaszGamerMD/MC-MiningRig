@@ -6,9 +6,7 @@
     "MM"
   ],
   "key": {
-    "M": {
-      "item": "minecraft:netherite_ingot"
-    }
+    "M": "minecraft:netherite_ingot"
   },
   "result": {
     "id": "miningrig:netherite_bit",
