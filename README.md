@@ -27,6 +27,6 @@ Ready, Mining, Manually stopped, Job done, Out of bits, Out of range of a collec
 
 ## Build
 
-This repository targets **Minecraft 26.2, Fabric Loader 0.19.5, Fabric API 0.161.0+26.2, Java 25, Gradle 9.5.1**. You can run `gradle build` with Gradle 9.5.1 and a Java 25 JDK. The GitHub Actions workflow uses these versions and uploads the compiled artifacts after a successful build.
+This repository targets **Minecraft 26.2, Fabric Loader 0.19.5, Fabric API 0.161.0+26.2, Java 25, Gradle 9.7**. You can run `gradle build` with Gradle 9.7 and a Java 25 JDK. The GitHub Actions workflow uses these versions and uploads the compiled artifacts after a successful build.
 
 **Status:** source authored, compilation has not yet been verified. Do not treat as a published game-ready release.
