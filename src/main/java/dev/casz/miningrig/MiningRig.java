@@ -59,7 +59,7 @@ public final class MiningRig implements ModInitializer {
                 new Item.Properties().durability(durability).enchantable(14));
     }
     @Override public void onInitialize() {
-        CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.REDSTONE).register(tab -> {
+        CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.REDSTONE_BLOCKS).register(tab -> {
             tab.accept(COMPUTER); tab.accept(DRILL); tab.accept(COORDINATOR); tab.accept(LINKER);
             tab.accept(WOOD_BIT); tab.accept(STONE_BIT); tab.accept(IRON_BIT);
             tab.accept(GOLD_BIT); tab.accept(DIAMOND_BIT); tab.accept(NETHERITE_BIT);
