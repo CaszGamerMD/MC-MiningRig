@@ -29,12 +29,12 @@ public final class CoordinatorBlock extends BaseEntityBlock {
             player.sendSystemMessage(Component.literal("Collection Coordinator: "+collector.filledSlots()+"/27 slots used. Hoppers can extract; use Rig Linker to configure wireless output."));
         return InteractionResult.SUCCESS;
     }
-    @Override protected void onRemove(BlockState state,Level level,BlockPos pos,BlockState next,boolean moved) {
-        if (!state.is(next.getBlock()) && level.getBlockEntity(pos) instanceof CoordinatorEntity entity && !level.isClientSide()) {
+    @Override protected void affectNeighborsAfterRemoval(BlockState state, net.minecraft.server.level.ServerLevel level, BlockPos pos, boolean moved) {
+        if (level.getBlockEntity(pos) instanceof CoordinatorEntity entity && !level.isClientSide()) {
             for(int i=0;i<entity.getContainerSize();i++) {
                 if(!entity.getItem(i).isEmpty()) popResource(level,pos,entity.getItem(i));
             }
         }
-        super.onRemove(state,level,pos,next,moved);
+        super.affectNeighborsAfterRemoval(state,level,pos,moved);
     }
 }
