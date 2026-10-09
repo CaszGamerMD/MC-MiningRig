@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "miningrig:block/collection_coordinator"
+    }
+  }
+}

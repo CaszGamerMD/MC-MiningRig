@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "MM",
+    "MM"
+  ],
+  "key": {
+    "M": {
+      "item": "minecraft:cobblestone"
+    }
+  },
+  "result": {
+    "id": "miningrig:stone_bit",
+    "count": 1
+  }
+}

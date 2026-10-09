@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "MM",
+    "MM"
+  ],
+  "key": {
+    "M": {
+      "item": "minecraft:netherite_ingot"
+    }
+  },
+  "result": {
+    "id": "miningrig:netherite_bit",
+    "count": 1
+  }
+}

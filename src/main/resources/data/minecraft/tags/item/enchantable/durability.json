@@ -1,0 +1,11 @@
+{
+  "replace": false,
+  "values": [
+    "miningrig:wood_bit",
+    "miningrig:stone_bit",
+    "miningrig:iron_bit",
+    "miningrig:gold_bit",
+    "miningrig:diamond_bit",
+    "miningrig:netherite_bit"
+  ]
+}

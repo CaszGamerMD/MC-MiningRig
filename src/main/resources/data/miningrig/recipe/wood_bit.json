@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "MM",
+    "MM"
+  ],
+  "key": {
+    "M": {
+      "tag": "minecraft:planks"
+    }
+  },
+  "result": {
+    "id": "miningrig:wood_bit",
+    "count": 1
+  }
+}

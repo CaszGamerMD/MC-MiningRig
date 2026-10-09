@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "alarm=false": {
+      "model": "miningrig:block/mining_computer"
+    },
+    "alarm=true": {
+      "model": "miningrig:block/mining_computer_alarm"
+    }
+  }
+}

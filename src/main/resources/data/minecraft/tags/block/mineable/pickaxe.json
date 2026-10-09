@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "miningrig:mining_drill",
+    "miningrig:mining_computer",
+    "miningrig:collection_coordinator"
+  ]
+}

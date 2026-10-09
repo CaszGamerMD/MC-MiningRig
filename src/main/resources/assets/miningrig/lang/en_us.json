@@ -1,0 +1,12 @@
+{
+  "block.miningrig.mining_computer": "Mining Computer",
+  "block.miningrig.mining_drill": "Mining Drill",
+  "block.miningrig.collection_coordinator": "Collection Coordinator",
+  "item.miningrig.rig_linker": "Rig Linker",
+  "item.miningrig.wood_bit": "Wooden Drill Bit",
+  "item.miningrig.stone_bit": "Stone Drill Bit",
+  "item.miningrig.iron_bit": "Iron Drill Bit",
+  "item.miningrig.gold_bit": "Golden Drill Bit",
+  "item.miningrig.diamond_bit": "Diamond Drill Bit",
+  "item.miningrig.netherite_bit": "Netherite Drill Bit"
+}

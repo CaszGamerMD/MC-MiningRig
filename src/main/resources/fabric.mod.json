@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "miningrig",
+  "version": "${version}",
+  "name": "Caszual Mining Rig",
+  "description": "A remotely configured, layer-by-layer mining drill with replaceable drill bits and wireless collection.",
+  "authors": [
+    "CaszGamerMD"
+  ],
+  "contact": {
+    "sources": "https://github.com/CaszGamerMD/MC-MiningRig"
+  },
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "dev.casz.miningrig.MiningRig"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~26.2",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}
