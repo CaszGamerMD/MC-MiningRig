@@ -101,6 +101,9 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         }
     }
     public CoordinatorEntity nearest(ServerLevel world,Direction dir){
+        // An attached non-CC inventory occupies this face: it is one-way
+        // Filler/Wall/Output, never also a through-storage wireless path.
+        if(external(world,dir)!=null)return null;
         for(int n=1;n<=20;n++){
             BlockPos at=worldPosition.relative(dir,n);
             if(!world.hasChunkAt(at))return null;
