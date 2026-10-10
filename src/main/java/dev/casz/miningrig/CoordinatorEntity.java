@@ -30,9 +30,11 @@ public final class CoordinatorEntity extends BlockEntity implements Container, M
     private final NonNullList<ItemStack> items=NonNullList.withSize(SLOTS,ItemStack.EMPTY);
     // OFF / IN / OUT, defaults to IN to avoid loops until a player selects outgoing faces.
     private final int[] mode={1,1,1,1,1,1};
-    private int wirelessMask,adjacentMask;
+    private int wirelessMask,adjacentMask,drillMask;
     private ItemStack inFlight=ItemStack.EMPTY;
     private BlockPos flightTarget;
+    private BlockPos flightOrigin;
+    private boolean fromDrill;
     private long flightStart;
     private int flightDuration;
     @Nullable private Display.ItemDisplay visual;
@@ -40,9 +42,9 @@ public final class CoordinatorEntity extends BlockEntity implements Container, M
     private int page;
 
     private final ContainerData data=new ContainerData(){
-        @Override public int get(int i){return i<6?mode[i]:i==6?wirelessMask|adjacentMask:i==7?stored():i==8?adjacentMask:page;}
+        @Override public int get(int i){return i<6?mode[i]:i==6?wirelessMask|adjacentMask:i==7?stored():i==8?adjacentMask:i==9?page:drillMask;}
         @Override public void set(int i,int v){if(i<6)mode[i]=Math.max(0,Math.min(2,v));else if(i==9)page=Math.max(0,Math.min(7,v));}
-        @Override public int getCount(){return 10;}
+        @Override public int getCount(){return 11;}
     };
     public CoordinatorEntity(BlockPos pos,BlockState state){super(MiningRig.COORDINATOR_ENTITY,pos,state);}
     public int stored(){return RigStorage.count(items,0);}
@@ -64,6 +66,15 @@ public final class CoordinatorEntity extends BlockEntity implements Container, M
         }
         return null;
     }
+    // Only a drill directly BELOW this coordinator can send upward to it.
+    private DrillEntity drillBelow(ServerLevel world){
+        for(int distance=1;distance<=20;distance++){
+            BlockPos pos=worldPosition.below(distance);
+            if(!world.hasChunkAt(pos))return null;
+            if(world.getBlockEntity(pos) instanceof DrillEntity drill)return drill;
+        }
+        return null;
+    }
     private void refresh(ServerLevel world){
         int w=0,a=0;
         for(Direction dir:Direction.values()){
@@ -73,30 +84,42 @@ public final class CoordinatorEntity extends BlockEntity implements Container, M
             if(world.hasChunkAt(p) && world.getBlockEntity(p) instanceof Container
                 && !(world.getBlockEntity(p) instanceof CoordinatorEntity))a|=bit;
         }
-        if(w!=wirelessMask||a!=adjacentMask){wirelessMask=w;adjacentMask=a;setChanged();}
+        int d=drillBelow(world)==null?0:1<<Direction.DOWN.get3DDataValue();
+        if(w!=wirelessMask||a!=adjacentMask||d!=drillMask){
+            wirelessMask=w;adjacentMask=a;drillMask=d;setChanged();
+        }
     }
     public static void tick(Level level,BlockPos pos,BlockState state,CoordinatorEntity cc){
         if(!(level instanceof ServerLevel world))return;
         long time=world.getGameTime();
         if(time%10==0)cc.refresh(world);
-        if(time%2==0)cc.collectAdjacentDrill(world);
+        if(time%2==0 && cc.inFlight.isEmpty())cc.collectDrillBelow(world,time);
         if(!cc.inFlight.isEmpty())cc.advance(world,time);
         else if(time%5==0 && !cc.outputToContainer(world))cc.dispatch(world,time);
     }
-    private void collectAdjacentDrill(ServerLevel world){
-        if(freeStorage()==0)return;
-        for(Direction side:Direction.values()){
-            if(mode[side.get3DDataValue()]!=1)continue;
-            BlockPos next=worldPosition.relative(side);
-            if(!world.hasChunkAt(next)||!(world.getBlockEntity(next) instanceof DrillEntity drill))continue;
-            ItemStack sample=drill.peekForCollector();
-            if(sample.isEmpty())continue;
-            int n=Math.min(sample.getCount(),freeStorage());
-            if(!canReceive(List.of(sample.copyWithCount(n))))continue;
-            ItemStack taken=drill.takeForCollector(n);
-            if(!taken.isEmpty())receive(List.of(taken));
-            break;
-        }
+    /**
+     * Directional radio pickup is built into the Collection Coordinator.
+     * No connector item, no pipe, and no X/Z offset: drill must be below.
+     */
+    private void collectDrillBelow(ServerLevel world,long now){
+        if(mode[Direction.DOWN.get3DDataValue()]!=1 || freeStorage()==0)return;
+        DrillEntity drill=drillBelow(world);
+        if(drill==null)return;
+        ItemStack peek=drill.peekForCollector();
+        if(peek.isEmpty())return;
+        int size=Math.min(peek.getCount(),freeStorage());
+        if(size<=0 || !canReceive(List.of(peek.copyWithCount(size))))return;
+        ItemStack cargo=drill.takeForCollector(size);
+        if(cargo.isEmpty())return;
+        inFlight=cargo.copy();
+        flightOrigin=drill.getBlockPos().immutable();
+        flightTarget=worldPosition.immutable();
+        fromDrill=true;
+        flightStart=now;
+        int distance=flightTarget.getY()-flightOrigin.getY();
+        flightDuration=Math.max(3,(int)Math.ceil(distance*2.5));
+        spawn(world);
+        setChanged();
     }
     private boolean outputToContainer(ServerLevel world){
         for(Direction side:Direction.values()){
@@ -144,6 +167,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container, M
                 ItemStack stack=items.get(i);
                 if(stack.isEmpty()||!dest.canReceive(List.of(stack)))continue;
                 inFlight=stack.copy();items.set(i,ItemStack.EMPTY);
+                flightOrigin=worldPosition.immutable();fromDrill=false;
                 flightTarget=dest.worldPosition.immutable();flightStart=time;
                 int distance=Math.abs(worldPosition.getX()-flightTarget.getX())+
                     Math.abs(worldPosition.getY()-flightTarget.getY())+
@@ -158,27 +182,36 @@ public final class CoordinatorEntity extends BlockEntity implements Container, M
         Display.ItemDisplay item=new Display.ItemDisplay(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getValue(net.minecraft.resources.Identifier.withDefaultNamespace("item_display")),world);
         item.setItemStack(inFlight.copyWithCount(1));
         item.setNoGravity(true);
-        item.setPos(worldPosition.getX()+.5,worldPosition.getY()+.6,worldPosition.getZ()+.5);
+        BlockPos origin=flightOrigin==null?worldPosition:flightOrigin;
+        item.setPos(origin.getX()+.5,origin.getY()+.6,origin.getZ()+.5);
         world.addFreshEntity(item);
         visual=item;
     }
     private void advance(ServerLevel world,long time){
         if(flightTarget==null || !world.hasChunkAt(flightTarget))return;
+        BlockPos origin=flightOrigin==null?worldPosition:flightOrigin;
         double part=Math.min(1,Math.max(0,(time-flightStart)/(double)Math.max(1,flightDuration)));
         if(part<1){
             spawn(world);
-            if(visual!=null)visual.setPos(worldPosition.getX()+.5+(flightTarget.getX()-worldPosition.getX())*part,
-                    worldPosition.getY()+.55+(flightTarget.getY()-worldPosition.getY())*part+.12*Math.sin(Math.PI*part),
-                    worldPosition.getZ()+.5+(flightTarget.getZ()-worldPosition.getZ())*part);
+            if(visual!=null)visual.setPos(origin.getX()+.5+(flightTarget.getX()-origin.getX())*part,
+                    origin.getY()+.55+(flightTarget.getY()-origin.getY())*part+.12*Math.sin(Math.PI*part),
+                    origin.getZ()+.5+(flightTarget.getZ()-origin.getZ())*part);
             return;
         }
         ItemStack cargo=inFlight.copy();
         if(!(world.getBlockEntity(flightTarget) instanceof CoordinatorEntity receiver)
                 || !receiver.receive(List.of(cargo))) {
-            if(!receive(List.of(cargo)))Block.popResource(world,worldPosition,cargo);
+            // Failed deliveries are returned to the sender or safely ejected, never voided.
+            boolean returned=false;
+            if(fromDrill){
+                DrillEntity drill=drillBelow(world);
+                if(drill!=null && drill.canReceive(List.of(cargo)))
+                    returned=drill.receive(List.of(cargo));
+            } else returned=receive(List.of(cargo));
+            if(!returned)Block.popResource(world,worldPosition,cargo);
         }
         if(visual!=null)visual.discard();
-        visual=null;inFlight=ItemStack.EMPTY;flightTarget=null;setChanged();
+        visual=null;inFlight=ItemStack.EMPTY;flightTarget=null;flightOrigin=null;fromDrill=false;setChanged();
     }
     public void dropContents(){
         if(dropped || level==null || level.isClientSide())return;
@@ -226,6 +259,8 @@ public final class CoordinatorEntity extends BlockEntity implements Container, M
         if(!inFlight.isEmpty()){
             out.store("Transit",ItemStack.CODEC,inFlight);
             out.putLong("TransitTarget",flightTarget.asLong());
+            out.putLong("TransitOrigin",(flightOrigin==null?worldPosition:flightOrigin).asLong());
+            out.putBoolean("TransitFromDrill",fromDrill);
             out.putLong("TransitStart",flightStart);out.putInt("TransitDuration",flightDuration);
         }
     }
@@ -235,6 +270,8 @@ public final class CoordinatorEntity extends BlockEntity implements Container, M
         inFlight=in.read("Transit",ItemStack.CODEC).orElse(ItemStack.EMPTY);
         if(!inFlight.isEmpty()){
             flightTarget=BlockPos.of(in.getLongOr("TransitTarget",0));
+            flightOrigin=BlockPos.of(in.getLongOr("TransitOrigin",worldPosition.asLong()));
+            fromDrill=in.getBooleanOr("TransitFromDrill",false);
             flightStart=in.getLongOr("TransitStart",0);
             flightDuration=Math.max(3,in.getIntOr("TransitDuration",50));
         }
