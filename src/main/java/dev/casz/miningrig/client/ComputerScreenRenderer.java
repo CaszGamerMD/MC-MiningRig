@@ -43,7 +43,7 @@ public final class ComputerScreenRenderer implements BlockEntityRenderer<Compute
                                  CameraRenderState cameraState) {
         matrices.pushPose();
         // Computer model has a screen on its northern face, z = 0.
-        matrices.translate(0.5, 0.69, -0.009);
+        matrices.translate(0.5, 1.37, -0.009);
         matrices.mulPose(Axis.YP.rotationDegrees(180f));
         matrices.scale(1f / 128, 1f / 128, 1f / 128);
         draw(queue, matrices, state, "MINING RIG", 0, 0xff90efff);
