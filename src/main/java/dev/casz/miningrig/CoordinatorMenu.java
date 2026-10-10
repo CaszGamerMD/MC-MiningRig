@@ -24,7 +24,7 @@ public final class CoordinatorMenu extends AbstractContainerMenu {
         addDataSlots(data);
         inventory.startOpen(player.player);
         for(int i=0;i<27;i++) {
-            addSlot(new Slot(inventory,i,8+(i%9)*18,58+(i/9)*18) {
+            addSlot(new Slot(inventory,i,8+(i%9)*18,88+(i/9)*18) {
                 @Override public boolean mayPlace(ItemStack stack) {
                     return coordinator.canPlaceItem(getContainerSlot(),stack);
                 }
@@ -33,7 +33,7 @@ public final class CoordinatorMenu extends AbstractContainerMenu {
                 }
             });
         }
-        addStandardInventorySlots(player,8,130);
+        addStandardInventorySlots(player,8,166);
     }
     public int mode(Direction side){return data.get(side.get3DDataValue());}
     public boolean connected(Direction side){return ((data.get(6)>>>side.get3DDataValue())&1)!=0;}
@@ -45,6 +45,11 @@ public final class CoordinatorMenu extends AbstractContainerMenu {
         if(buttonId==6 || buttonId==7){
             data.set(9,Math.max(0,Math.min(7,data.get(9)+(buttonId==7?1:-1))));
             broadcastChanges();return true;
+        }
+        if(buttonId>=8&&buttonId<14){
+            if(coordinator instanceof PagedRigContainer view)
+                view.coordinatorToggleWallBehavior(Direction.from3DDataValue(buttonId-8));
+            return true;
         }
         if(buttonId<0 || buttonId>=6)return false;
         if(coordinator instanceof PagedRigContainer view) {

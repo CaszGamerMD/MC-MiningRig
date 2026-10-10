@@ -89,7 +89,15 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         setChanged();return true;
     }
     public void cycle(Direction direction){
-        int i=direction.get3DDataValue();mode[i]=(mode[i]+1)%5;setChanged();
+        int i=direction.get3DDataValue();
+        mode[i]=switch(mode[i]){case 0->1;case 1->2;case 2,3->4;default->0;};
+        setChanged();
+    }
+    public void toggleWallPreference(Direction direction){
+        int i=direction.get3DDataValue();
+        if(mode[i]==2||mode[i]==3){
+            mode[i]=mode[i]==2?3:2;setChanged();
+        }
     }
     public CoordinatorEntity nearest(ServerLevel world,Direction dir){
         for(int n=1;n<=20;n++){
