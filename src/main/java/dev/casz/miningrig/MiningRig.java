@@ -13,6 +13,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ToolMaterial;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
@@ -48,15 +49,15 @@ public final class MiningRig implements ModInitializer {
             FabricBlockEntityTypeBuilder.create(CoordinatorEntity::new, COORDINATOR).build());
 
     public static final Item LINKER = item("rig_linker", RigLinker::new, new Item.Properties().stacksTo(1));
-    public static final Item WOOD_BIT = bit("wood_bit", 59, 0, 2);
-    public static final Item STONE_BIT = bit("stone_bit", 131, 1, 4);
-    public static final Item IRON_BIT = bit("iron_bit", 250, 2, 6);
-    public static final Item GOLD_BIT = bit("gold_bit", 32, 0, 12);
-    public static final Item DIAMOND_BIT = bit("diamond_bit", 1561, 3, 8);
-    public static final Item NETHERITE_BIT = bit("netherite_bit", 2031, 4, 9);
-    private static Item bit(String name, int durability, int rank, float speed) {
+    public static final Item WOOD_BIT = bit("wood_bit", 59, 0, 2, ToolMaterial.WOOD);
+    public static final Item STONE_BIT = bit("stone_bit", 131, 1, 4, ToolMaterial.STONE);
+    public static final Item IRON_BIT = bit("iron_bit", 250, 2, 6, ToolMaterial.IRON);
+    public static final Item GOLD_BIT = bit("gold_bit", 32, 0, 12, ToolMaterial.GOLD);
+    public static final Item DIAMOND_BIT = bit("diamond_bit", 1561, 3, 8, ToolMaterial.DIAMOND);
+    public static final Item NETHERITE_BIT = bit("netherite_bit", 2031, 4, 9, ToolMaterial.NETHERITE);
+    private static Item bit(String name, int durability, int rank, float speed, ToolMaterial material) {
         return item(name, properties -> new DrillBit(properties, rank, speed),
-                new Item.Properties().durability(durability).enchantable(14));
+                new Item.Properties().pickaxe(material, 1.0f, -2.8f).durability(durability).enchantable(14));
     }
     @Override public void onInitialize() {
         RigMenus.initialize();
