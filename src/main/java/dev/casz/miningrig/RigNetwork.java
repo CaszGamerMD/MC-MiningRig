@@ -103,7 +103,8 @@ public final class RigNetwork {
         BlockState state=item.getBlock().defaultBlockState();
         return !state.hasBlockEntity() && !state.isAir()
             && state.getFluidState().isEmpty()
-            && state.getDestroySpeed(null,null)>=0;
+            && !state.is(MiningRig.DRILL) && !state.is(MiningRig.COORDINATOR)
+            && !state.is(MiningRig.COMPUTER);
     }
     /**
      * Pull up to three blocks per request from the closest available input.
