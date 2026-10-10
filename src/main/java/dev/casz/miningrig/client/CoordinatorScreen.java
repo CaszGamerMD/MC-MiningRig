@@ -24,6 +24,12 @@ public final class CoordinatorScreen extends AbstractContainerScreen<Coordinator
             }).bounds(leftPos+5+index*28,topPos+22,27,20).build();
             buttons.put(side,addRenderableWidget(b));
         }
+        addRenderableWidget(Button.builder(Component.literal("<"), b->{
+            if(minecraft.gameMode!=null)minecraft.gameMode.handleInventoryButtonClick(menu.containerId,6);
+        }).bounds(leftPos+128,topPos+113,19,16).build());
+        addRenderableWidget(Button.builder(Component.literal(">"), b->{
+            if(minecraft.gameMode!=null)minecraft.gameMode.handleInventoryButtonClick(menu.containerId,7);
+        }).bounds(leftPos+150,topPos+113,19,16).build());
     }
     @Override protected void containerTick(){
         super.containerTick();
@@ -44,7 +50,13 @@ public final class CoordinatorScreen extends AbstractContainerScreen<Coordinator
     }
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mouseX,int mouseY,float delta){
         super.extractRenderState(g,mouseX,mouseY,delta);
-        g.text(font,"ITEMS "+menu.stored()+"/192",leftPos+7,topPos+110,0xff9fe5ff,false);
-        g.text(font,"I=in  O=out  -=off",leftPos+7,topPos+44,0xffffffff,false);
+        g.text(font,"ITEMS "+menu.stored()+"/192",leftPos+7,topPos+117,0xff9fe5ff,false);
+        g.text(font,"PG "+(menu.page()+1)+"/8",leftPos+89,topPos+117,0xffffffff,false);
+        for(Direction side:Direction.values()){
+            int x=leftPos+5+side.get3DDataValue()*28;
+            int color=menu.containerSide(side)?0xffffb853:menu.connected(side)?0xff67e89b:0xff96555a;
+            g.fill(x,topPos+42,x+26,topPos+45,color);
+        }
+        g.text(font,"I=in  O=out  -=off",leftPos+7,topPos+47,0xffffffff,false);
     }
 }
