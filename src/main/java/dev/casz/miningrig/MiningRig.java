@@ -43,6 +43,7 @@ public final class MiningRig implements ModInitializer {
     }
 
     public static final Block COMPUTER = block("mining_computer", ComputerBlock::new);
+    public static final Block COMPUTER_UPPER = machinePart("mining_computer_upper",ComputerUpperBlock::new);
     public static final Block DRILL = block("mining_drill", DrillBlock::new);
     public static final Block DRILL_UPPER = machinePart("mining_drill_upper",DrillUpperBlock::new);
     public static final Block COORDINATOR = block("collection_coordinator", CoordinatorBlock::new);
