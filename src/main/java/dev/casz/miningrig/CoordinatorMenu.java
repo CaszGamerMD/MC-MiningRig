@@ -15,7 +15,7 @@ import net.minecraft.core.Direction;
 public final class CoordinatorMenu extends AbstractContainerMenu {
     private final Container coordinator;
     private final ContainerData data;
-    public CoordinatorMenu(int id,Inventory player) { this(id,player,new SimpleContainer(27),new SimpleContainerData(9)); }
+    public CoordinatorMenu(int id,Inventory player) { this(id,player,new SimpleContainer(27),new SimpleContainerData(10)); }
     public CoordinatorMenu(int id,Inventory player,Container inventory,ContainerData data) {
         super(RigMenus.COORDINATOR,id);
         checkContainerSize(inventory,27);
@@ -26,12 +26,10 @@ public final class CoordinatorMenu extends AbstractContainerMenu {
         for(int i=0;i<27;i++) {
             addSlot(new Slot(inventory,i,8+(i%9)*18,58+(i/9)*18) {
                 @Override public boolean mayPlace(ItemStack stack) {
-                    return !(stack.getItem() instanceof DrillBit) &&
-                        (coordinator instanceof CoordinatorEntity cc ? cc.freeStorage()>0 : true);
+                    return coordinator.canPlaceItem(getContainerSlot(),stack);
                 }
                 @Override public int getMaxStackSize(ItemStack stack) {
-                    return coordinator instanceof CoordinatorEntity cc
-                        ? Math.min(stack.getMaxStackSize(),cc.freeStorage()+getItem().getCount()) : stack.getMaxStackSize();
+                    return Math.min(stack.getMaxStackSize(),coordinator.getMaxStackSize(stack)+getItem().getCount());
                 }
             });
         }
@@ -41,9 +39,17 @@ public final class CoordinatorMenu extends AbstractContainerMenu {
     public boolean connected(Direction side){return ((data.get(6)>>>side.get3DDataValue())&1)!=0;}
     public boolean containerSide(Direction side){return ((data.get(8)>>>side.get3DDataValue())&1)!=0;}
     public int stored(){return data.get(7);}
+    public int page(){return data.get(9);}
     @Override public boolean clickMenuButton(Player player,int buttonId) {
+        if(buttonId==6 || buttonId==7){
+            data.set(9,Math.max(0,Math.min(7,data.get(9)+(buttonId==7?1:-1))));
+            broadcastChanges();return true;
+        }
         if(buttonId<0 || buttonId>=6)return false;
-        if(coordinator instanceof CoordinatorEntity cc)cc.cycle(Direction.from3DDataValue(buttonId));
+        if(coordinator instanceof PagedRigContainer view) {
+            // Only the authoritative server entity changes the face mode.
+            view.coordinatorCycle(Direction.from3DDataValue(buttonId));
+        }
         return true;
     }
     @Override public boolean stillValid(Player player){return coordinator.stillValid(player);}
