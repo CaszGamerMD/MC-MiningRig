@@ -69,7 +69,7 @@ Protected Mining Drills, both drill halves, Computers, and Collection Coordinato
 
 ### Compact visual item transport
 
-Drill-to-CC and CC-to-CC wireless flights now carry **no more than 3 individual items per packet**, even when those are three different item types. Each visible ItemDisplay uses the **GROUND presentation at one-quarter scale**, has no pickup hitbox, and remains an animation only. CC-to-adjacent-output transfers also limit each operation to 3 items. Multiple flights still run concurrently, maintaining high throughput; they retain their full cargo in NBT until safely delivered.
+Drill-to-CC and CC-to-CC wireless flights now carry **no more than 3 individual items per packet**, even when those are three different item types. Each visible ItemDisplay uses the **GROUND presentation at one-quarter scale**, has no pickup hitbox, and remains an animation only. CC-to-adjacent-output transfers also limit each operation to 3 items. Multiple flights still run concurrently: up to **four 3-item pickups (12 items) per game tick** from a drill and **eight 3-item wireless sends (24 items) per tick** per CC, before receiver capacity and chunk availability are considered. Display entities are capped at **48 per coordinator** to protect rendering performance; packets beyond that cap still travel and deliver safely. They retain their full cargo in NBT until delivered.
 
 While mining, the drill's footprint, computer and **already-discovered CC network corridors and adjacent inventories** use temporary simulation chunk tickets; tickets are released on stop. As before, network discovery must encounter loaded chunks when starting.
 
