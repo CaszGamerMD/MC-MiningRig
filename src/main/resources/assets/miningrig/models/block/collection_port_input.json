@@ -1,40 +1,74 @@
 {
   "textures": {
-    "metal": "minecraft:block/iron_block",
-    "rim": "minecraft:block/exposed_copper",
-    "dark": "minecraft:block/black_concrete",
-    "particle": "minecraft:block/iron_block"
+    "steel": "minecraft:block/iron_block",
+    "dark": "minecraft:block/polished_deepslate",
+    "trim": "minecraft:block/polished_blackstone_bricks",
+    "black": "minecraft:block/black_concrete",
+    "edge": "minecraft:block/polished_blackstone",
+    "bolt": "minecraft:block/smooth_stone",
+    "cyan": "minecraft:block/cyan_concrete",
+    "glow": "minecraft:block/light_blue_concrete",
+    "particle": "minecraft:block/polished_deepslate"
   },
   "elements": [
     {
       "from": [
-        6,
-        6,
-        2
+        3.4,
+        3.4,
+        0.13
       ],
       "to": [
-        10,
-        10,
-        5
+        12.6,
+        12.6,
+        0.31
       ],
       "faces": {
         "north": {
-          "texture": "#metal"
-        },
-        "south": {
-          "texture": "#metal"
+          "texture": "#trim"
         },
         "east": {
-          "texture": "#metal"
+          "texture": "#trim"
         },
         "west": {
-          "texture": "#metal"
+          "texture": "#trim"
         },
         "up": {
-          "texture": "#metal"
+          "texture": "#trim"
         },
         "down": {
-          "texture": "#metal"
+          "texture": "#trim"
+        }
+      }
+    },
+    {
+      "from": [
+        4.2,
+        4.2,
+        -0.15
+      ],
+      "to": [
+        11.8,
+        11.8,
+        0.12
+      ],
+      "faces": {
+        "north": {
+          "texture": "#steel"
+        },
+        "south": {
+          "texture": "#steel"
+        },
+        "east": {
+          "texture": "#steel"
+        },
+        "west": {
+          "texture": "#steel"
+        },
+        "up": {
+          "texture": "#steel"
+        },
+        "down": {
+          "texture": "#steel"
         }
       }
     },
@@ -42,63 +76,31 @@
       "from": [
         5,
         5,
-        1
+        -0.58
       ],
       "to": [
         11,
         11,
-        3
+        -0.16
       ],
       "faces": {
         "north": {
-          "texture": "#rim"
+          "texture": "#edge"
         },
         "south": {
-          "texture": "#rim"
+          "texture": "#edge"
         },
         "east": {
-          "texture": "#rim"
+          "texture": "#edge"
         },
         "west": {
-          "texture": "#rim"
+          "texture": "#edge"
         },
         "up": {
-          "texture": "#rim"
+          "texture": "#edge"
         },
         "down": {
-          "texture": "#rim"
-        }
-      }
-    },
-    {
-      "from": [
-        4.5,
-        4.5,
-        0.75
-      ],
-      "to": [
-        11.5,
-        11.5,
-        1.8
-      ],
-      "faces": {
-        "north": {
-          "texture": "#metal"
-        },
-        "south": {
-          "texture": "#metal"
-        },
-        "east": {
-          "texture": "#metal"
-        },
-        "west": {
-          "texture": "#metal"
-        },
-        "up": {
-          "texture": "#metal"
-        },
-        "down": {
-          "texture": "#metal"
+          "texture": "#edge"
         }
       }
     },
@@ -106,63 +108,36 @@
       "from": [
         5.6,
         5.6,
-        0.45
+        -0.8
       ],
       "to": [
         10.4,
         10.4,
-        0.8
+        -0.59
       ],
       "faces": {
         "north": {
-          "texture": "#dark"
-        },
-        "south": {
-          "texture": "#dark"
-        },
-        "east": {
-          "texture": "#dark"
-        },
-        "west": {
-          "texture": "#dark"
-        },
-        "up": {
-          "texture": "#dark"
-        },
-        "down": {
-          "texture": "#dark"
+          "texture": "#black"
         }
       }
     },
     {
       "from": [
-        5.3,
-        9.7,
-        0.65
-      ],
-      "to": [
+        4.55,
         10.7,
-        10.1,
-        1.2
+        -0.61
+      ],
+      "to": [
+        11.45,
+        11.3,
+        -0.42
       ],
       "faces": {
         "north": {
-          "texture": "#rim"
-        },
-        "south": {
-          "texture": "#rim"
-        },
-        "east": {
-          "texture": "#rim"
-        },
-        "west": {
-          "texture": "#rim"
+          "texture": "#bolt"
         },
         "up": {
-          "texture": "#rim"
-        },
-        "down": {
-          "texture": "#rim"
+          "texture": "#bolt"
         }
       }
     }
