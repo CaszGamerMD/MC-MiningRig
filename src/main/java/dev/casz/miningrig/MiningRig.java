@@ -48,17 +48,18 @@ public final class MiningRig implements ModInitializer {
             FabricBlockEntityTypeBuilder.create(CoordinatorEntity::new, COORDINATOR).build());
 
     public static final Item LINKER = item("rig_linker", RigLinker::new, new Item.Properties().stacksTo(1));
-    public static final Item WOOD_BIT = bit("wood_bit", 59, 0);
-    public static final Item STONE_BIT = bit("stone_bit", 131, 1);
-    public static final Item IRON_BIT = bit("iron_bit", 250, 2);
-    public static final Item GOLD_BIT = bit("gold_bit", 32, 0);
-    public static final Item DIAMOND_BIT = bit("diamond_bit", 1561, 3);
-    public static final Item NETHERITE_BIT = bit("netherite_bit", 2031, 4);
-    private static Item bit(String name, int durability, int rank) {
-        return item(name, properties -> new DrillBit(properties, rank),
+    public static final Item WOOD_BIT = bit("wood_bit", 59, 0, 2);
+    public static final Item STONE_BIT = bit("stone_bit", 131, 1, 4);
+    public static final Item IRON_BIT = bit("iron_bit", 250, 2, 6);
+    public static final Item GOLD_BIT = bit("gold_bit", 32, 0, 12);
+    public static final Item DIAMOND_BIT = bit("diamond_bit", 1561, 3, 8);
+    public static final Item NETHERITE_BIT = bit("netherite_bit", 2031, 4, 9);
+    private static Item bit(String name, int durability, int rank, float speed) {
+        return item(name, properties -> new DrillBit(properties, rank, speed),
                 new Item.Properties().durability(durability).enchantable(14));
     }
     @Override public void onInitialize() {
+        RigMenus.initialize();
         CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.REDSTONE_BLOCKS).register(tab -> {
             tab.accept(COMPUTER); tab.accept(DRILL); tab.accept(COORDINATOR); tab.accept(LINKER);
             tab.accept(WOOD_BIT); tab.accept(STONE_BIT); tab.accept(IRON_BIT);
