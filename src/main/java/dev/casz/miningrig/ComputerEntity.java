@@ -205,6 +205,10 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public static void tick(Level level,BlockPos pos,BlockState state,ComputerEntity computer){
         if(!(level instanceof ServerLevel server))return;
         long now=server.getGameTime();
+        // Give machines placed by v0.3.2 their clickable upper target when
+        // the space is clear, without overwriting a player-built block.
+        if(now%20==0 && server.getBlockState(pos.above()).isAir())
+            server.setBlock(pos.above(),MiningRig.COMPUTER_UPPER.defaultBlockState(),Block.UPDATE_ALL);
         computer.syncActiveChunks(server);
         for(int i=0;i<MAX_DRILLS;i++){
             if(!computer.running[i])continue;
