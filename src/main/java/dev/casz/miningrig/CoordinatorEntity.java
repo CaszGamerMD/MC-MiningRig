@@ -148,7 +148,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container, M
     }
     private void spawn(ServerLevel world){
         if(visual!=null && visual.isAlive())return;
-        Display.ItemDisplay item=new Display.ItemDisplay(EntityType.ITEM_DISPLAY,world);
+        Display.ItemDisplay item=new Display.ItemDisplay(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getValue(net.minecraft.resources.Identifier.withDefaultNamespace("item_display")),world);
         item.setItemStack(inFlight.copyWithCount(1));
         item.setNoGravity(true);
         item.setPos(worldPosition.getX()+.5,worldPosition.getY()+.6,worldPosition.getZ()+.5);
