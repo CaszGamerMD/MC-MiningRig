@@ -37,18 +37,8 @@ public final class RigLinker extends Item {
             } else player.sendSystemMessage(Component.literal("Select a drill first."));
             return InteractionResult.SUCCESS;
         }
-        if(target instanceof CoordinatorEntity destination) {
-            if(source!=null && source.world.equals(world.dimension()) &&
-               world.getBlockEntity(source.pos) instanceof CoordinatorEntity origin &&
-               !source.pos.equals(pos)) {
-                if(origin.link(pos)) {
-                    player.sendSystemMessage(Component.literal("Wireless link "+source.pos.toShortString()+" -> "+pos.toShortString()));
-                    START.remove(player.getUUID());
-                } else player.sendSystemMessage(Component.literal("Link failed: same axis, 1-20 blocks, and no loops required."));
-            } else {
-                START.put(player.getUUID(),new Selection(world.dimension(),pos.immutable()));
-                player.sendSystemMessage(Component.literal("Selected coordinator "+pos.toShortString()+". Click its destination."));
-            }
+        if(target instanceof CoordinatorEntity) {
+            player.sendSystemMessage(Component.literal("Coordinators automatically discover their first neighbor on each axis within 20 blocks. Empty-hand right-click for I/O settings."));
             return InteractionResult.SUCCESS;
         }
         return InteractionResult.PASS;
