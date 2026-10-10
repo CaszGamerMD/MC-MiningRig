@@ -1,6 +1,9 @@
 package dev.casz.miningrig;
 
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+import net.minecraft.world.level.ChunkPos;
 import java.util.UUID;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
@@ -47,6 +50,21 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     private final boolean[] circles={true,true,true,true};
     private int selected, activeSlot;
     private long lastBroadcast;
+    private void syncActiveChunks(ServerLevel server){
+        Set<ChunkPos> desired=new HashSet<>();
+        boolean active=false;
+        for(int i=0;i<MAX_DRILLS;i++){
+            if(!running[i] || positions[i]==null)continue;
+            active=true;
+            RigChunkTickets.cover(desired,positions[i],radii[i]);
+        }
+        // The remote controller must also tick when nobody is nearby.
+        if(active)desired.add(new ChunkPos(worldPosition.getX()>>4,worldPosition.getZ()>>4));
+        RigChunkTickets.sync(server,worldPosition,desired);
+    }
+    private void syncIfServer(){
+        if(level instanceof ServerLevel server)syncActiveChunks(server);
+    }
 
     public ComputerEntity(BlockPos pos,BlockState state){super(MiningRig.COMPUTER_ENTITY,pos,state);}
     public boolean belongsTo(ComputerMenu menu){return menu.computer()==this;}
@@ -70,7 +88,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     private void settingsChanged(){
         running[selected]=false;
         if(!tokens[selected].isEmpty())statuses[selected]=Status.STOPPED;
-        setChanged();
+        setChanged();syncIfServer();
     }
     /** Called on computer interaction while holding the drill block item. */
     public int registerItem(ServerLevel world,ItemStack stack){
@@ -116,7 +134,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public void unlink(int index){
         if(index<0||index>=MAX_DRILLS)return;
         tokens[index]="";positions[index]=null;running[index]=false;
-        statuses[index]=Status.READY;nicknames[index]="Drill "+(index+1);setChanged();
+        statuses[index]=Status.READY;nicknames[index]="Drill "+(index+1);setChanged();syncIfServer();
     }
     public void toggle(){toggle(selected);}
     public void toggle(int slot){
@@ -124,20 +142,21 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         if(running[slot]){running[slot]=false;statuses[slot]=Status.STOPPED;}
         else if(tokens[slot].isEmpty()||positions[slot]==null)
             statuses[slot]=tokens[slot].isEmpty()?Status.NO_DRILL:Status.WAITING;
-        else if(level!=null && level.hasChunkAt(positions[slot])
-                && level.getBlockEntity(positions[slot]) instanceof DrillEntity){
+        else if(level instanceof ServerLevel){
+            // Request the footprint even when a paired remote chunk is not yet loaded.
+            // If no drill exists once it loads, the next server tick reports NO_DRILL.
             running[slot]=true;statuses[slot]=Status.RUNNING;
         }else statuses[slot]=Status.NO_DRILL;
-        setChanged();
+        setChanged();syncIfServer();
     }
     public void stop(Status reason){stop(activeSlot,reason);}
     public void stop(int slot,Status reason){
         if(slot<0||slot>=MAX_DRILLS)return;
-        running[slot]=false;statuses[slot]=reason;setChanged();
+        running[slot]=false;statuses[slot]=reason;setChanged();syncIfServer();
     }
     public void moved(BlockPos oldPos,BlockPos newPos){
         for(int i=0;i<MAX_DRILLS;i++)
-            if(oldPos.equals(positions[i])){positions[i]=newPos.immutable();setChanged();}
+            if(oldPos.equals(positions[i])){positions[i]=newPos.immutable();setChanged();syncIfServer();}
     }
     public String screenStatus(){
         int active=0,alerts=0;
@@ -186,6 +205,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public static void tick(Level level,BlockPos pos,BlockState state,ComputerEntity computer){
         if(!(level instanceof ServerLevel server))return;
         long now=server.getGameTime();
+        computer.syncActiveChunks(server);
         for(int i=0;i<MAX_DRILLS;i++){
             if(!computer.running[i])continue;
             BlockPos drillPos=computer.positions[i];
@@ -201,6 +221,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             Status result=drill.mineTick(server,computer);
             if(result!=Status.RUNNING)computer.stop(i,result);
         }
+        computer.syncActiveChunks(server);
         if(now%10==0){
             boolean alarm=false;
             for(int i=0;i<MAX_DRILLS;i++){
@@ -233,6 +254,10 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                     ServerPlayNetworking.send(player,new ComputerStatePayload(computer.snapshot(server)));
             }
         }
+    }
+    @Override public void setRemoved(){
+        if(level instanceof ServerLevel server)RigChunkTickets.release(server,worldPosition);
+        super.setRemoved();
     }
     @Override public Component getDisplayName(){return Component.literal("Caszual Mining Rig Computer");}
     @Nullable @Override public AbstractContainerMenu createMenu(int id,Inventory inventory,Player player){

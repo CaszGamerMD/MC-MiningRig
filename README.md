@@ -1,6 +1,6 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.3.0 — four-drill mining console**
+**Version 0.3.1 — active-drill chunk loading and high-throughput collection**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
@@ -39,6 +39,9 @@ A drill has **three independently working bit slots** (wood, stone, iron, gold, 
 - Right-click drill holding a drill bit: install into a free slot.
 - Drills stop when there are no working bits, when their buffer reaches 64 items, when digging encounters a protected/unbreakable or unharvestable block, or when the job is complete.
 - The computer tracks the drill's changing Y coordinate as it moves.
+- **While mining is active**, each drill requests temporary simulation chunk tickets for every chunk its configured mining footprint intersects (radius 1–12). Its **Mining Computer's own chunk** stays active as well, so remote computer ticks do not stop when players walk away.
+- **When stopped**, finished, blocked, out of bits, out of storage, unlinked, or when the computer is destroyed, all tickets belonging to that rig are released. Tickets are reference-counted across active computer owners, so one rig cannot release another rig's chunk.
+- Tickets are **temporary, not vanilla permanent force-loaded chunks**. After a full server restart, a computer must first be loaded normally to resume a saved running job; once it ticks it reapplies the working-area tickets.
 
 ## Collection Coordinator
 
@@ -46,13 +49,15 @@ One Collection Coordinator block handles all wireless item routing. Its internal
 
 - CC ↔ CC automatically detects the first coordinator on each cardinal direction up to **20 blocks**, and its six directional GUI controls can select **IN/OUT/OFF**.
 - Drill → CC can transfer wirelessly to a coordinator **directly above the drill** at matching X/Z coordinates, up to **20 blocks** vertically. Set the coordinator's DOWN side to IN; it glows blue when the drill is detected.
-- Items visibly float as a non-interactable item display. A 20-block hop takes approximately 2.5 seconds.
+- Items visibly float as non-interactable item displays. A 20-block hop still takes approximately 2.5 seconds.
+- **Pipelined throughput:** each packet can transport up to **64 items of mixed types** while showing one representative floating item. The coordinator can pull **up to 64 mined items every server tick**, dispatch **up to 4 wireless packets (256 items) per tick**, and attempt **32 direct-inventory insertion operations per tick**, when inventory space, destination chunk loading, and receiving containers allow. The 2.5-second animation does **not** serialize transfers one at a time.
+- Up to **128 packets may be in flight per coordinator**. Their contents and destinations are saved with the coordinator and drop on its destruction. A blocked/full destination holds packets rather than deleting cargo; backpressure still eventually stops a drill if downstream storage cannot accept items.
 - Adjacent chests and inventories accept items directly from a CC OUT side, without wireless transport.
 
 ## Developer build
 
 Minecraft **26.2**, Fabric Loader **0.19.5**, Fabric API **0.161.0+26.2**, Java **25**, Gradle **9.7.0**, Loom **1.18.3**.
 
-Run `gradle build` using Java 25; or download the `caszual-mining-rig-0.3.0.jar` inside the `miningrig-26.2` artifact in the most recent successful GitHub Actions workflow.
+Run `gradle build` using Java 25; or download the `caszual-mining-rig-0.3.1.jar` inside the `miningrig-26.2` artifact in the most recent successful GitHub Actions workflow.
 
 **Status:** GitHub Actions compile verification is used, but it does *not* test actual Minecraft interaction, server permissions, chunk reloads, or multiplayer naming/GUI synchronization. Test in a backed-up world and treat this as a development build until in-game verified.
