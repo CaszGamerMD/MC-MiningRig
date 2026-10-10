@@ -1,0 +1,40 @@
+{
+  "model": {
+    "type": "minecraft:select",
+    "property": "minecraft:custom_model_data",
+    "cases": [
+      {
+        "when": "red",
+        "model": {
+          "type": "minecraft:model",
+          "model": "miningrig:item/mining_tablet_red"
+        }
+      },
+      {
+        "when": "yellow",
+        "model": {
+          "type": "minecraft:model",
+          "model": "miningrig:item/mining_tablet_yellow"
+        }
+      },
+      {
+        "when": "green",
+        "model": {
+          "type": "minecraft:model",
+          "model": "miningrig:item/mining_tablet_green"
+        }
+      },
+      {
+        "when": "dark",
+        "model": {
+          "type": "minecraft:model",
+          "model": "miningrig:item/mining_tablet_dark"
+        }
+      }
+    ],
+    "fallback": {
+      "type": "minecraft:model",
+      "model": "miningrig:item/mining_tablet_dark"
+    }
+  }
+}

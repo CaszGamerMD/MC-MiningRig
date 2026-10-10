@@ -1,0 +1,108 @@
+{
+  "variants": {
+    "facing=north,lamp=dark": {
+      "model": "miningrig:block/mining_tablet_dark",
+      "y": 0
+    },
+    "facing=north,lamp=green": {
+      "model": "miningrig:block/mining_tablet_green",
+      "y": 0
+    },
+    "facing=north,lamp=yellow": {
+      "model": "miningrig:block/mining_tablet_yellow",
+      "y": 0
+    },
+    "facing=north,lamp=red": {
+      "model": "miningrig:block/mining_tablet_red",
+      "y": 0
+    },
+    "facing=south,lamp=dark": {
+      "model": "miningrig:block/mining_tablet_dark",
+      "y": 180
+    },
+    "facing=south,lamp=green": {
+      "model": "miningrig:block/mining_tablet_green",
+      "y": 180
+    },
+    "facing=south,lamp=yellow": {
+      "model": "miningrig:block/mining_tablet_yellow",
+      "y": 180
+    },
+    "facing=south,lamp=red": {
+      "model": "miningrig:block/mining_tablet_red",
+      "y": 180
+    },
+    "facing=east,lamp=dark": {
+      "model": "miningrig:block/mining_tablet_dark",
+      "y": 90
+    },
+    "facing=east,lamp=green": {
+      "model": "miningrig:block/mining_tablet_green",
+      "y": 90
+    },
+    "facing=east,lamp=yellow": {
+      "model": "miningrig:block/mining_tablet_yellow",
+      "y": 90
+    },
+    "facing=east,lamp=red": {
+      "model": "miningrig:block/mining_tablet_red",
+      "y": 90
+    },
+    "facing=west,lamp=dark": {
+      "model": "miningrig:block/mining_tablet_dark",
+      "y": 270
+    },
+    "facing=west,lamp=green": {
+      "model": "miningrig:block/mining_tablet_green",
+      "y": 270
+    },
+    "facing=west,lamp=yellow": {
+      "model": "miningrig:block/mining_tablet_yellow",
+      "y": 270
+    },
+    "facing=west,lamp=red": {
+      "model": "miningrig:block/mining_tablet_red",
+      "y": 270
+    },
+    "facing=up,lamp=dark": {
+      "model": "miningrig:block/mining_tablet_dark",
+      "x": 90,
+      "y": 0
+    },
+    "facing=up,lamp=green": {
+      "model": "miningrig:block/mining_tablet_green",
+      "x": 90,
+      "y": 0
+    },
+    "facing=up,lamp=yellow": {
+      "model": "miningrig:block/mining_tablet_yellow",
+      "x": 90,
+      "y": 0
+    },
+    "facing=up,lamp=red": {
+      "model": "miningrig:block/mining_tablet_red",
+      "x": 90,
+      "y": 0
+    },
+    "facing=down,lamp=dark": {
+      "model": "miningrig:block/mining_tablet_dark",
+      "x": 270,
+      "y": 0
+    },
+    "facing=down,lamp=green": {
+      "model": "miningrig:block/mining_tablet_green",
+      "x": 270,
+      "y": 0
+    },
+    "facing=down,lamp=yellow": {
+      "model": "miningrig:block/mining_tablet_yellow",
+      "x": 270,
+      "y": 0
+    },
+    "facing=down,lamp=red": {
+      "model": "miningrig:block/mining_tablet_red",
+      "x": 270,
+      "y": 0
+    }
+  }
+}
