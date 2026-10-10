@@ -8,7 +8,7 @@ import net.minecraft.world.entity.player.Inventory;
 
 public final class DrillScreen extends AbstractContainerScreen<DrillMenu> {
     public DrillScreen(DrillMenu menu,Inventory player,Component title) {
-        super(menu,player,title); imageWidth=176;imageHeight=184;
+        super(menu,player,title,176,184);
         inventoryLabelY=90;titleLabelY=7;
     }
     @Override public void extractBackground(GuiGraphicsExtractor g,int mouseX,int mouseY,float delta){
