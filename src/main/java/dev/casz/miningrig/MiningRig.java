@@ -25,7 +25,7 @@ public final class MiningRig implements ModInitializer {
     private static Block block(String name, Function<BlockBehaviour.Properties, Block> factory) {
         BlockItemId key = BlockItemId.create(id(name), id(name));
         Block block = Registry.register(BuiltInRegistries.BLOCK, key.block(),
-                factory.apply(BlockBehaviour.Properties.of().strength(4.0f).requiresCorrectToolForDrops().setId(key.block())));
+                factory.apply(BlockBehaviour.Properties.of().strength(4.0f).noOcclusion().requiresCorrectToolForDrops().setId(key.block())));
         Registry.register(BuiltInRegistries.ITEM, key.item(),
                 new BlockItem(block, new Item.Properties().useBlockDescriptionPrefix()
                         .stacksTo(name.equals("mining_drill")?1:64).setId(key.item())));

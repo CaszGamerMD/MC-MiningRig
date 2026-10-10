@@ -34,6 +34,8 @@ public final class ComputerScreenRenderer implements BlockEntityRenderer<Compute
                                             @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay) {
         BlockEntityRenderer.super.extractRenderState(entity, state, partialTick, cameraPos, crumblingOverlay);
         state.message = entity.screenStatus();
+        // A north-facing glass surface must not display back-facing text.
+        state.frontVisible = cameraPos.z < entity.getBlockPos().getZ()+0.15;
         state.running = entity.running();
         state.radius = entity.selectedRadius();
         state.depth = entity.selectedDepth();
@@ -41,9 +43,11 @@ public final class ComputerScreenRenderer implements BlockEntityRenderer<Compute
     }
     @Override public void submit(ComputerScreenRenderState state, PoseStack matrices, SubmitNodeCollector queue,
                                  CameraRenderState cameraState) {
+        if(!state.frontVisible)return;
         matrices.pushPose();
-        // Computer model has a screen on its northern face, z = 0.
-        matrices.translate(0.5, 1.37, -0.009);
+        // The actual black display surface is z=2.4/16, not the outside of the block.
+        // Keep the text a fraction of a pixel in front of it, depth-tested.
+        matrices.translate(0.5, 1.33, 2.4/16.0-0.002);
         matrices.mulPose(Axis.YP.rotationDegrees(180f));
         matrices.scale(1f / 128, 1f / 128, 1f / 128);
         draw(queue, matrices, state, "MINING RIG", 0, 0xff90efff);
@@ -74,6 +78,6 @@ public final class ComputerScreenRenderer implements BlockEntityRenderer<Compute
     private void draw(SubmitNodeCollector queue, PoseStack pose, ComputerScreenRenderState state,
                       String label, float y, int color) {
         queue.submitText(pose, -font.width(label) / 2f, y, Component.literal(label).getVisualOrderText(),
-                false, Font.DisplayMode.SEE_THROUGH, state.lightCoords, color, 0, 0);
+                false, Font.DisplayMode.NORMAL, state.lightCoords, color, 0, 0);
     }
 }

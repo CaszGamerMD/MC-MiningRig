@@ -56,7 +56,8 @@ public final class ComputerBlock extends BaseEntityBlock {
             }
             return InteractionResult.SUCCESS;
         }
-        return InteractionResult.PASS;
+        if(!level.isClientSide())player.openMenu(computer);
+        return InteractionResult.SUCCESS;
     }
     @Override protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
                                                           Player player, BlockHitResult hit) {

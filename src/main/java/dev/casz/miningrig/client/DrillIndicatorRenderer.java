@@ -36,18 +36,20 @@ public final class DrillIndicatorRenderer implements BlockEntityRenderer<DrillEn
     @Override public void submit(DrillIndicatorRenderState state,PoseStack pose,SubmitNodeCollector queue,
                                   CameraRenderState camera){
         // Repeated on all four cone faces; visible regardless of drill orientation.
-        final float[] x={0.5f,1.019f,0.5f,-.019f};
-        final float[] z={-.019f,.5f,1.019f,.5f};
+        // The collar is [2,11,2] -> [14,14,14]. Place indicators just
+        // outside its four actual surfaces instead of at empty block edges.
+        final float[] x={.5f,14/16f+.009f,.5f,2/16f-.009f};
+        final float[] z={2/16f-.009f,.5f,14/16f+.009f,.5f};
         final float[] rotations={180f,90f,0f,270f};
         for(int side=0;side<4;side++){
             pose.pushPose();
-            pose.translate(x[side],.825,z[side]);
+            pose.translate(x[side],.815,z[side]);
             pose.mulPose(Axis.YP.rotationDegrees(rotations[side]));
             pose.scale(.0125f,.0125f,.0125f);
             for(int lane=0;lane<3;lane++){
                 String dot="●";
                 queue.submitText(pose,(lane-1)*18-font.width(dot)/2f,0,
-                    Component.literal(dot).getVisualOrderText(),false,Font.DisplayMode.SEE_THROUGH,
+                    Component.literal(dot).getVisualOrderText(),false,Font.DisplayMode.NORMAL,
                     state.lightCoords,state.colors[lane],0,0);
             }
             pose.popPose();
