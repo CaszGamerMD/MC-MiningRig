@@ -26,6 +26,12 @@ final class DrillSealing {
     private int cautionTicks;
     boolean warning(){return !fluidSpots.isEmpty()||pending!=null||cautionTicks>0;}
     boolean fallback(){return wallFallback;}
+    void retryWallSource(ServerLevel world,DrillEntity drill){
+        // When a continuing Walls input is refilled, restore ALWAYS on
+        // the next untouched layer rather than staying in AIR forever.
+        if(wallFallback && RigNetwork.hasAvailable(world,drill,true))
+            wallFallback=false;
+    }
     static boolean contains(ComputerEntity computer,int x,int z,boolean expanded){
         int radius=computer.radius()+(expanded?1:0);
         return computer.circle()?x*x+z*z<=radius*radius:
