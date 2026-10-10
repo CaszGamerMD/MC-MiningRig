@@ -1,32 +1,65 @@
-# Caszual Mining Rig (Fabric 26.2)
+# Caszual Mining Rig — Minecraft Java 26.2 / Fabric
 
-A first compiled, **not yet in-game verified** implementation of a configurable mining machine for Minecraft Java 26.2 with Fabric API. A first-pass in-world computer status screen is rendered on the face of the machine; a dedicated configuration GUI and polished 3D models are next.
+A configurable layer-mining drill with three independent enchantable bits and a directional network of collection coordinators. **This branch is a working-source prototype: CI compilation is checked, but Minecraft runtime and server protection compatibility are not yet fully verified.** Keep a backup of the test world.
 
-## Current prototype controls
+## New system overview
 
-1. Craft/place the **Mining Drill** at the intended top-center of the excavation.
-2. Craft/place a **Mining Computer**, a **Collection Coordinator** (aligned on an X/Y/Z axis with the drill, 1–20 blocks away), a drill bit, and a **Rig Linker**.
-3. With the Rig Linker, right-click the **drill**, then the **computer** to pair them wirelessly.
-4. Install a bit by right-clicking the drill with the bit. **Sneak + empty-hand right-click** on the drill to remove a bit. All six material types have pickaxe durability.
-5. At the computer, right-click with a **stick** to raise radius, **bone** to raise depth, **lapis lazuli** to toggle circle/square. **Sneak** while using the stick/bone to decrease the value. Radius 1–12, depth 1–256.
-6. **Empty-hand right-click** computer to start/stop. **Sneak + empty-hand click** to inspect status without toggling. The footprint perimeter has floating particles. Computer's indicator blinks red when halted for an error/status.
-7. The drill mines a block roughly every 8 ticks and moves down by one block after scanning each footprint layer. It saves bit, cursor, and completed layers so a reload does not restart the job.
-8. Coordinator collects up to **27 item stacks**. Attach a hopper to extract. To configure a directed wireless path, use the Rig Linker on **source coordinator**, then **destination coordinator**. Each hop requires identical two coordinates and <=20 blocks along the remaining axis; cyclic links are rejected.
+| Block | Job |
+| --- | --- |
+| Mining Computer | Sets drill depth and radius, circle/square mode; starts/stops drilling; announces status on its face; flashes red if halted. |
+| Mining Drill | Mined layers physically lower the drill on Y. Holds up to **3 bits** and **64 mined items** total, with 8 pages for mixed blocks. |
+| Collection Coordinator | One block handles both collection and wireless transfer. Holds up to **192 individual items total**, with 8 pages of mixed storage. Discovers the first CC up to 20 blocks along each of six cardinal directions. |
 
-## Current statuses
+### Drill interface
 
-Ready, Mining, Manually stopped, Job done, Out of bits, Out of range of a collector, Unable to break block, Collector storage full, No linked drill.
+Empty-hand right-click the drill to open its inventory. Three dedicated top slots hold any mix of wooden, stone, iron, gold, diamond or netherite drill bits; the other slots show mined items. Use the **< / >** page buttons to browse all 64 inventory positions. You can also right-click with a bit to install into the first empty bit socket.
 
-## Scope and safety
+Each equipped bit independently targets **one block at a time**, with per-tick mining progress based on the block's hardness and the bit material's ideal-tool speed. All three bits work concurrently. Efficiency speeds up digging; Unbreaking reduces wear; Fortune and Silk Touch feed through Minecraft's normal block-loot calculation. Bits have the durability and harvesting tier of their corresponding vanilla pickaxe.
 
-- Actual placement, damage, collection and block removal run only on the server. Drill stops at unbreakable blocks, block entities and incorrect bit harvest tiers. It won't force-load chunks.
-- Silk Touch and Fortune information is passed to the vanilla loot generation with the drill bit as tool. Durability currently decreases by 1 for each mined block (Unbreaking behavior still needs testing/implementation).
-- **Not yet delivered:** a clickable dedicated computer GUI, dynamic text drawn on the computer face, durable line-outline client renderer, detailed custom textures/3D animations, survival game-test verification, complete world-claim/protection integration, energy/power system.
-- Because the drill is physically relocated by removing/replacing its block, test in a **backed-up world** before running it on a server.
-- If a coordinator fills, the job halts rather than discarding mined loot. An outgoing wireless link can send its contents to another coordinator; final destination is accessible to hoppers.
+The drill **automatically stops** when there are no working bits, its internal storage is full, or it reaches the programmed depth. A forbidden/unbreakable tile or unavailable chunk pauses the work for safety. After a completed layer, the drill block descends one Y level; stored bit wear, inventory, and mining cursor follow the block.
 
-## Build
+### Coordinator inventory & I/O panel
 
-This repository targets **Minecraft 26.2, Fabric Loader 0.19.5, Fabric API 0.161.0+26.2, Java 25, Gradle 9.7.0**. You can run `gradle build` with Gradle 9.7.0 and a Java 25 JDK. The GitHub Actions workflow uses these versions and uploads the compiled artifacts after a successful build.
+Empty-hand right-click a Collection Coordinator to open its inventory and six-direction control row. The coordinator accepts up to **192 total items**, *not* 192 stacks. Mixed item types are retained in paginated storage. Hoppers can still interact with the actual inventory. Contents and any in-flight cargo are dropped when the block is player-broken.
 
-**Status:** Gradle compilation has passed on GitHub Actions. Runtime/in-game behavior has not yet been verified; do not treat as a fully tested release.
+The first other coordinator discovered along each axis within 20 blocks is the automatic wireless partner for that side. Blocks in between don't have to be cleared, but both chunks must be loaded. No Rig Linker is required for coordinator-to-coordinator connections.
+
+Buttons are ordered **Down, Up, North, South, West, East**. Repeated clicking cycles **IN → OUT → OFF → IN**. The line beneath each side indicates **green** for wireless coordinator, **gold** for an adjacent inventory/container, or **red** for no valid neighbor. The adjacent receiver CC face must be set to **IN**; the sending face must be set to **OUT**.
+
+When moving a stack wirelessly, its representative block/item floats through the world in an **untouchable ItemDisplay** rather than instantly teleporting. Travel duration is scaled to 2.5 seconds for 20 blocks (50 game ticks). Cargo is recorded in source data until arrival so chunk unloading doesn't erase the stack. A destination unable to accept the cargo returns it to the sender, or ejects it when no storage is available.
+
+**Only CC-to-CC links are wireless.** A coordinator can automatically accept items from a drill **directly adjacent** on a side configured as **IN**. A side set to **OUT** can insert items into an adjacent chest or other compatible container directly, without a wireless animation. This respects container sided-insertion rules where supported. **The drill does not transmit wirelessly**.
+
+**Current practical limitation:** once the drill descends away from a stationary adjacent coordinator, it will mine into its internal 64-item store. A longer-term mechanical collection attachment or pipe will be useful for deeper uninterrupted operations.
+
+### Computer setup
+
+Use the Rig Linker on a Mining Drill, then on its Mining Computer to pair them (this is the *only* manual wireless pairing). Use a **stick** to increase radius, a **bone** to increase depth, and **lapis lazuli** to change circle/square footprint. Sneak with stick/bone to decrease the value.
+
+- Radius: 1–12 blocks from drill center.
+- Depth: 1–256 layers below the drill's original Y.
+- Empty-hand right-click computer: start/stop.
+- Sneak + empty-hand right-click computer: inspect status without toggling.
+- Floating particles show the currently selected surface outline.
+- Computer screen shows progress/status, flashing red on stopped/error/completed states.
+
+### Recipes
+
+Drill bits are crafted from **four matching materials in a 2×2 square**. All six materials match Minecraft's corresponding pickaxes. The Mining Computer, Mining Drill, Collection Coordinator, and Rig Linker have ordinary crafting-table recipes available in the project recipe JSON.
+
+## Build and compatibility
+
+Target: Minecraft **26.2**, Fabric Loader **0.19.5**, Fabric API **0.161.0+26.2**, Java **25**, Gradle **9.7.0**, Loom **1.18.3**.
+
+Run `gradle build` with those prerequisites. The GitHub Actions workflow uploads the compiled jar under **Actions → newest passing Fabric 26.2 Build → Artifacts → miningrig-26.2**.
+
+### To verify in-game next
+
+- Player survival/creative break drops, hopper and furnace insertion, UI paging/shift-click and multiple mixed stacks.
+- Fortune/Silk Touch/Unbreaking consistency with all vanilla and modded loot tables.
+- Drill relocation/stop/restart across chunk unloads and server restarts.
+- Floating ItemDisplay appearance while traveling 20 blocks, and cargo recovery on chunk unload/break.
+- Red warning light visibility and multi-player menu synchronization.
+- Modded block protection/claims and server profiling; current mining intentionally refuses block entities.
+
+This is a **draft release, not yet an in-game verified stable jar**.
