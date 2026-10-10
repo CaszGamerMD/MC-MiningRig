@@ -25,7 +25,7 @@ import net.minecraft.world.level.storage.ValueOutput;
 import org.jetbrains.annotations.Nullable;
 
 public final class CoordinatorEntity extends BlockEntity implements Container, MenuProvider {
-    private static final int CAPACITY=192, SLOTS=27;
+    private static final int CAPACITY=192, SLOTS=192;
     private final NonNullList<ItemStack> items=NonNullList.withSize(SLOTS,ItemStack.EMPTY);
     // OFF / IN / OUT, defaults to IN to avoid loops until a player selects outgoing faces.
     private final int[] mode={1,1,1,1,1,1};
@@ -36,11 +36,12 @@ public final class CoordinatorEntity extends BlockEntity implements Container, M
     private int flightDuration;
     @Nullable private Display.ItemDisplay visual;
     private boolean dropped;
+    private int page;
 
     private final ContainerData data=new ContainerData(){
-        @Override public int get(int i){return i<6?mode[i]:i==6?wirelessMask|adjacentMask:i==7?stored():adjacentMask;}
-        @Override public void set(int i,int v){if(i<6)mode[i]=Math.max(0,Math.min(2,v));}
-        @Override public int getCount(){return 9;}
+        @Override public int get(int i){return i<6?mode[i]:i==6?wirelessMask|adjacentMask:i==7?stored():i==8?adjacentMask:page;}
+        @Override public void set(int i,int v){if(i<6)mode[i]=Math.max(0,Math.min(2,v));else if(i==9)page=Math.max(0,Math.min(7,v));}
+        @Override public int getCount(){return 10;}
     };
     public CoordinatorEntity(BlockPos pos,BlockState state){super(MiningRig.COORDINATOR_ENTITY,pos,state);}
     public int stored(){return RigStorage.count(items,0);}
@@ -211,7 +212,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container, M
     @Override public void clearContent(){for(int i=0;i<SLOTS;i++)items.set(i,ItemStack.EMPTY);setChanged();}
     @Override public Component getDisplayName(){return Component.literal("Collection Coordinator");}
     @Nullable @Override public AbstractContainerMenu createMenu(int id,Inventory inventory,Player player){
-        return new CoordinatorMenu(id,inventory,this,data);
+        return new CoordinatorMenu(id,inventory,new PagedRigContainer(this,data,9,0,27),data);
     }
     @Override protected void saveAdditional(ValueOutput out){
         super.saveAdditional(out);ContainerHelper.saveAllItems(out,items);
