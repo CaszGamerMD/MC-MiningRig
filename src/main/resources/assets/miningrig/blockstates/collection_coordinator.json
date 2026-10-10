@@ -1,7 +1,117 @@
 {
-  "variants": {
-    "": {
-      "model": "miningrig:block/collection_coordinator"
+  "multipart": [
+    {
+      "apply": {
+        "model": "miningrig:block/collection_coordinator"
+      }
+    },
+    {
+      "when": {
+        "down": "in"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_input",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "out"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_output",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "up": "in"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_input",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "up": "out"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_output",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "north": "in"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_input",
+        "y": 0
+      }
+    },
+    {
+      "when": {
+        "north": "out"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_output",
+        "y": 0
+      }
+    },
+    {
+      "when": {
+        "south": "in"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_input",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "south": "out"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_output",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "in"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_input",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "west": "out"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_output",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "east": "in"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_input",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "east": "out"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_output",
+        "y": 90
+      }
     }
-  }
+  ]
 }
