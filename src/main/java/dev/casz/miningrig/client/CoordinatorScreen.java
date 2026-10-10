@@ -55,10 +55,18 @@ public final class CoordinatorScreen extends AbstractContainerScreen<Coordinator
         g.text(font,"PG "+(menu.page()+1)+"/8",leftPos+89,topPos+117,0xffffffff,false);
         for(Direction side:Direction.values()){
             int x=leftPos+5+side.get3DDataValue()*28;
-            int color=menu.drillSide(side)?0xff65b9ff:menu.containerSide(side)?0xffffb853:menu.connected(side)?0xff67e89b:0xff96555a;
+            int mode=menu.mode(side);
+            int color=switch(mode){
+                case 1->0xffff4747;  // red: filler storage
+                case 2,3->0xffffd34f; // yellow: walls storage
+                case 4->0xff45df72;   // green: output
+                case 5->0xff39e8dd;   // teal: drill or coordinator link
+                default->0xff454f57;   // disconnected / not configured
+            };
             g.fill(x,topPos+42,x+26,topPos+45,color);
         }
-        g.text(font,"I=in  O=out  -=off",leftPos+7,topPos+47,0xffffffff,false);
-        if(menu.drillSide(Direction.DOWN))g.text(font,"DRILL",leftPos+135,topPos+7,0xff65b9ff,false);
+        g.text(font,"F: filler  Wp: walls/pause",leftPos+6,topPos+46,0xffffffff,false);
+        g.text(font,"Wc: walls/continue   O: output",leftPos+6,topPos+52,0xffc1d4dd,false);
+        if(menu.drillSide(Direction.DOWN))g.text(font,"DRILL",leftPos+135,topPos+7,0xff39e8dd,false);
     }
 }
