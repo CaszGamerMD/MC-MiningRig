@@ -32,10 +32,13 @@ import org.jetbrains.annotations.Nullable;
  * Flights remain in NBT until receiver inventory accepts their entire payload.
  */
 public final class CoordinatorEntity extends BlockEntity implements Container,MenuProvider {
-    private static final int CAPACITY=192,SLOTS=192,PACKET_SIZE=64;
-    private static final int MAX_FLIGHTS=128,OUTBOUND_PER_TICK=4,CONTAINER_ACTIONS_PER_TICK=32;
+    private static final int CAPACITY=192,SLOTS=192,PACKET_SIZE=3;
+    private static final int MAX_FLIGHTS=256,COLLECT_PER_TICK=4,OUTBOUND_PER_TICK=8,
+        CONTAINER_ACTIONS_PER_TICK=32,MAX_DISPLAY_ENTITIES=48;
     private final NonNullList<ItemStack> items=NonNullList.withSize(SLOTS,ItemStack.EMPTY);
-    private final int[] mode={1,1,1,1,1,1};
+    // 0 unconfigured, 1 filler input, 2 wall input (pause), 3 wall input (continue), 4 output.
+    // CC links and the upward drill link need no direction setting.
+    private final int[] mode={0,0,0,0,0,0};
     private int wirelessMask,adjacentMask,drillMask,page;
     private boolean dropped;
     private final List<Flight> flights=new ArrayList<>();
@@ -56,17 +59,29 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     }
     private final ContainerData data=new ContainerData(){
         @Override public int get(int i){
-            return i<6?mode[i]:i==6?wirelessMask|adjacentMask
+            return i<6?(((wirelessMask|drillMask)&(1<<i))!=0?5:mode[i]):i==6?wirelessMask|adjacentMask
                 :i==7?stored():i==8?adjacentMask:i==9?page:drillMask;
         }
         @Override public void set(int i,int v){
-            if(i<6)mode[i]=Math.max(0,Math.min(2,v));
+            if(i<6)mode[i]=Math.max(0,Math.min(4,v));
             else if(i==9)page=Math.max(0,Math.min(7,v));
         }
         @Override public int getCount(){return 11;}
     };
     public CoordinatorEntity(BlockPos pos,BlockState state){super(MiningRig.COORDINATOR_ENTITY,pos,state);}
-    public boolean acceptsDrillFromBelow(){return mode[Direction.DOWN.get3DDataValue()]==1;}
+    public boolean acceptsDrillFromBelow(){return true;}
+    public int portMode(Direction side){return mode[side.get3DDataValue()];}
+    public boolean isFillerInput(Direction side){return portMode(side)==RigNetwork.FILLER;}
+    public boolean isWallInput(Direction side){
+        return portMode(side)==RigNetwork.WALL_PAUSE||portMode(side)==RigNetwork.WALL_CONTINUE;
+    }
+    @Nullable public Container external(ServerLevel world,Direction side){
+        BlockPos at=worldPosition.relative(side);
+        if(!world.hasChunkAt(at))return null;
+        if(!(world.getBlockEntity(at) instanceof Container container)
+                || container instanceof CoordinatorEntity || container instanceof DrillEntity)return null;
+        return container;
+    }
     public int stored(){return RigStorage.count(items,0);}
     public int freeStorage(){return CAPACITY-stored();}
     public boolean canReceive(List<ItemStack> cargo){return RigStorage.canInsert(items,0,CAPACITY,cargo);}
@@ -75,9 +90,20 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         setChanged();return true;
     }
     public void cycle(Direction direction){
-        int i=direction.get3DDataValue();mode[i]=(mode[i]+1)%3;setChanged();
+        int i=direction.get3DDataValue();
+        mode[i]=switch(mode[i]){case 0->1;case 1->2;case 2,3->4;default->0;};
+        setChanged();
     }
-    private CoordinatorEntity nearest(ServerLevel world,Direction dir){
+    public void toggleWallPreference(Direction direction){
+        int i=direction.get3DDataValue();
+        if(mode[i]==2||mode[i]==3){
+            mode[i]=mode[i]==2?3:2;setChanged();
+        }
+    }
+    public CoordinatorEntity nearest(ServerLevel world,Direction dir){
+        // An attached non-CC inventory occupies this face: it is one-way
+        // Filler/Wall/Output, never also a through-storage wireless path.
+        if(external(world,dir)!=null)return null;
         for(int n=1;n<=20;n++){
             BlockPos at=worldPosition.relative(dir,n);
             if(!world.hasChunkAt(at))return null;
@@ -111,10 +137,11 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         BlockState visualState=getBlockState();
         for(Direction side:Direction.values()){
             int index=side.get3DDataValue(),bit=1<<index;
-            boolean connected=((w|a|d)&bit)!=0;
-            CoordinatorBlock.PortVisual appearance=!connected||mode[index]==0
-                ?CoordinatorBlock.PortVisual.OFF
-                :mode[index]==1?CoordinatorBlock.PortVisual.IN:CoordinatorBlock.PortVisual.OUT;
+            boolean link=((w|d)&bit)!=0;
+            boolean outside=(a&bit)!=0;
+            CoordinatorBlock.PortVisual appearance=link?CoordinatorBlock.PortVisual.IN
+                :(!outside||mode[index]==0)?CoordinatorBlock.PortVisual.OFF
+                :mode[index]==RigNetwork.OUTPUT?CoordinatorBlock.PortVisual.OUT:CoordinatorBlock.PortVisual.IN;
             visualState=visualState.setValue(CoordinatorBlock.PORTS[index],appearance);
         }
         if(visualState!=getBlockState())
@@ -128,7 +155,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         // Adjacent container output does not consume wireless travel bandwidth.
         for(int n=0;n<CONTAINER_ACTIONS_PER_TICK;n++)
             if(!cc.outputToContainer(world))break;
-        cc.collectDrillBelow(world,now);
+        for(int n=0;n<COLLECT_PER_TICK;n++)cc.collectDrillBelow(world,now);
         for(int n=0;n<OUTBOUND_PER_TICK;n++)
             if(!cc.dispatch(world,now))break;
     }
@@ -167,13 +194,19 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         Flight flight=new Flight(cargo,origin,target,fromDrill,now,
             Math.max(3,(int)Math.ceil(distance*2.5)));
         flights.add(flight);
-        spawn(world,flight);
+        if(liveDisplays()<MAX_DISPLAY_ENTITIES)spawn(world,flight);
         setChanged();
     }
     private void collectDrillBelow(ServerLevel world,long now){
-        if(!acceptsDrillFromBelow()||flights.size()>=MAX_FLIGHTS)return;
+        if(flights.size()>=MAX_FLIGHTS)return;
         // Reserve room for every packet already traveling upward into this CC.
-        int budget=Math.min(PACKET_SIZE,Math.max(0,freeStorage()-inboundFromDrill()));
+        // Outbound is twice as fast as inbound, and active route packets do
+        // not occupy the 192-item LOCAL inventory until actually delivered.
+        // Backpressure still applies when there is no configured exit.
+        boolean route=RigNetwork.hasOutputHere(world,this)
+            || RigNetwork.nextTowardOutput(world,this)!=null;
+        int budget=route?PACKET_SIZE:
+            Math.min(PACKET_SIZE,Math.max(0,freeStorage()-inboundFromDrill()));
         if(budget==0)return;
         DrillEntity drill=drillBelow(world);
         if(drill==null)return;
@@ -184,7 +217,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     }
     private boolean outputToContainer(ServerLevel world){
         for(Direction side:Direction.values()){
-            if(mode[side.get3DDataValue()]!=2)continue;
+            if(mode[side.get3DDataValue()]!=RigNetwork.OUTPUT)continue;
             BlockPos next=worldPosition.relative(side);
             if(!world.hasChunkAt(next))continue;
             if(!(world.getBlockEntity(next) instanceof Container destination)
@@ -203,7 +236,8 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
                     if(!existing.isEmpty()&&!ItemStack.isSameItemSameComponents(existing,item))continue;
                     int room=Math.min(Math.min(item.getMaxStackSize(),64),destination.getMaxStackSize(item))
                         -existing.getCount();
-                    int count=Math.min(room,item.getCount());
+                    // The same 3-item dispatch size applies to output inventories.
+                    int count=Math.min(PACKET_SIZE,Math.min(room,item.getCount()));
                     if(count<=0)continue;
                     if(existing.isEmpty())destination.setItem(slot,item.copyWithCount(count));
                     else {existing.grow(count);destination.setChanged();}
@@ -217,29 +251,34 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     }
     private boolean dispatch(ServerLevel world,long now){
         if(stored()==0||flights.size()>=MAX_FLIGHTS)return false;
-        for(Direction side:Direction.values()){
-            if(mode[side.get3DDataValue()]!=2)continue;
-            BlockPos adjacent=worldPosition.relative(side);
-            if(world.hasChunkAt(adjacent)&&world.getBlockEntity(adjacent) instanceof Container container
-                    && !(container instanceof CoordinatorEntity))continue;
-            CoordinatorEntity target=nearest(world,side);
-            if(target==null||target.mode[side.getOpposite().get3DDataValue()]!=1)continue;
-            List<ItemStack> cargo=peek(this,0,PACKET_SIZE);
-            if(cargo.isEmpty()||!target.canReceive(cargo))continue;
-            List<ItemStack> taken=take(this,0,PACKET_SIZE);
-            if(taken.isEmpty())return false;
-            startFlight(world,taken,worldPosition,target.worldPosition,false,now);
-            return true;
-        }
-        return false;
+        // Only route along a shortest path to a configured output, avoiding
+        // the ping-pong loops that occurred with freely bidirectional CCs.
+        CoordinatorEntity next=RigNetwork.nextTowardOutput(world,this);
+        if(next==null)return false;
+        List<ItemStack> cargo=peek(this,0,PACKET_SIZE);
+        if(cargo.isEmpty()||!next.canReceive(cargo))return false;
+        List<ItemStack> taken=take(this,0,PACKET_SIZE);
+        if(taken.isEmpty())return false;
+        startFlight(world,taken,worldPosition,next.worldPosition,false,now);
+        return true;
+    }
+    private int liveDisplays(){
+        int count=0;
+        for(Flight flight:flights)if(flight.visual!=null&&flight.visual.isAlive())count++;
+        return count;
     }
     private void spawn(ServerLevel world,Flight flight){
+        if(flight.visual==null && liveDisplays()>=MAX_DISPLAY_ENTITIES)return;
         if(flight.visual!=null&&flight.visual.isAlive())return;
         if(flight.cargo.isEmpty())return;
         Display.ItemDisplay item=new Display.ItemDisplay(
             net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getValue(
                 net.minecraft.resources.Identifier.withDefaultNamespace("item_display")),world);
         item.setItemStack(flight.cargo.get(0).copyWithCount(1));
+        item.setItemTransform(net.minecraft.world.item.ItemDisplayContext.GROUND);
+        item.setTransformation(new com.mojang.math.Transformation(
+            new org.joml.Vector3f(0,0,0),new org.joml.Quaternionf(),
+            new org.joml.Vector3f(.25f,.25f,.25f),new org.joml.Quaternionf()));
         item.setNoGravity(true);
         item.setPos(flight.origin.getX()+.5,flight.origin.getY()+.6,flight.origin.getZ()+.5);
         world.addFreshEntity(item);
@@ -320,7 +359,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     }
     @Override protected void saveAdditional(ValueOutput out){
         super.saveAdditional(out);ContainerHelper.saveAllItems(out,items);
-        for(int i=0;i<6;i++)out.putInt("Face"+i,mode[i]);
+        for(int i=0;i<6;i++)out.putInt("Port"+i,mode[i]);
         out.putInt("FlightCount",flights.size());
         for(int i=0;i<flights.size();i++){
             Flight f=flights.get(i);
@@ -339,7 +378,10 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         super.loadAdditional(in);ContainerHelper.loadAllItems(in,items);
         for(Flight flight:flights)flight.discard();
         flights.clear();
-        for(int i=0;i<6;i++)mode[i]=Math.max(0,Math.min(2,in.getIntOr("Face"+i,1)));
+        for(int i=0;i<6;i++){
+            int old=in.getIntOr("Face"+i,1);
+            mode[i]=Math.max(0,Math.min(4,in.getIntOr("Port"+i,old==2?RigNetwork.OUTPUT:0)));
+        }
         for(int i=0;i<Math.min(MAX_FLIGHTS,in.getIntOr("FlightCount",0));i++){
             String key="Flight"+i;
             List<ItemStack> cargo=new ArrayList<>();

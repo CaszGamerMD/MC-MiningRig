@@ -22,6 +22,9 @@ public final class PagedRigContainer implements Container {
         if(visibleSlot<pinned)return visibleSlot;
         return start+Math.max(0,pageData.get(pageField))*visible+(visibleSlot-pinned);
     }
+    public void coordinatorToggleWallBehavior(net.minecraft.core.Direction side){
+        if(backing instanceof CoordinatorEntity cc)cc.toggleWallPreference(side);
+    }
     public void coordinatorCycle(net.minecraft.core.Direction side){
         if(backing instanceof CoordinatorEntity cc)cc.cycle(side);
     }

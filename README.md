@@ -1,6 +1,6 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.3.3 — GUI interaction, model-depth and terrain-occlusion fixes**
+**Version 0.4.0 — drill-controlled collection networks, fluid sealing, wall building**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
@@ -30,6 +30,54 @@ Every drill has its **own** settings, running flag, error state, and tracked pos
 ### ETA caveat
 
 ETA is shown as an estimate, not a guaranteed finish time. It begins with approximate tool speed and becomes based on actual per-cell progress after digging. It shows `--` if no usable bit is present, and zero when the configured depth has finished.
+
+## v0.4.0: automatic CC networks, filler inputs and walling
+
+This development build replaces the old coordinator IN/OUT six-port network-direction logic with **automatic bidirectional CC-to-CC links**. CCs still communicate along the six cardinal axes (up to 20 blocks) but route packets toward a configured external output without creating ping-pong loops.
+
+### Color-coded connection editor
+
+Right-click a CC and select one of its six direction boxes: **U, D, N, S, E, W**. The box shows the connection's role:
+
+| Color | Connection |
+| --- | --- |
+| Teal | Auto-linked drill or neighboring CC |
+| Red | External inventory: Filler input |
+| Yellow | External inventory: Wall input |
+| Green | External inventory: Output |
+| Gray | Disconnected or unassigned |
+
+For an attached non-CC chest/container, click **Type** to cycle **Unassigned → Filler → Wall → Output**. When set to Wall, click **When Empty** to switch between **Pause** and **Continue**. Connected CC links are automatic and cannot be manually marked as item-direction-only; attached non-CC inventories are always one-way.
+
+Filler and wall inputs are **never automatically vacuumed**. A drill requests specific blocks as needed, and the network tries the **closest stocked input container first**, then other inputs in the same discovered CC component. Outputs are identified by CC faces set to Output. A drill must have an accessible Filler input and Output and, in Always mode, a Wall input **before starting**. Removing them mid-operation halts the drill with an error.
+
+### Fluid and wall behavior
+
+Each working layer is scanned for fluids inside the mining region and **up to one block outside** its selected boundary. When fluid is seen, the drill suspends its excavation, requests solid filler blocks from the network, and replaces source/flowing fluid. It waits **8 game ticks after each placement** to check that a full solid block remains; if sand/gravel fell, or fluid moved away leaving air, it fills again. It will not proceed while unsealed fluid spots remain. If all configured Filler input containers run out while fluid remains, the computer reports **Out of Filler / Fluid in hole**. Upon recovery, the computer's indicator can briefly blink yellow as a fluid caution.
+
+The Mining Computer's **Wall** button cycles its per-drill **Wall the Hole** setting:
+
+- **Off:** Only repair actual fluid locations and nearby fluid boundaries.
+- **Air:** After each layer, fill every air/fluid opening in the one-block-wide outer wall with Filler blocks.
+- **Always:** Excavate one block beyond the chosen selection on every layer, then build the boundary using the separate Wall input.
+  - **Wall → Pause:** If all wall inputs are exhausted, halt with **Out of Walls**.
+  - **Wall → Continue:** Fall back to Air-style filling using Filler stock. The next untouched layer checks whether Wall material has been replenished.
+
+When the drill descends, **bit ownership and stored items move to the next block before the old block is replaced**, preventing the moving block from dropping/duplicating its bits. This is an important regression to check during gameplay.
+
+Protected Mining Drills, both drill halves, Computers, and Collection Coordinators are ignored rather than mined. Unbreakable/unharvestable blocks remain blocking obstacles.
+
+### Compact visual item transport
+
+Drill-to-CC and CC-to-CC wireless flights now carry **no more than 3 individual items per packet**, even when those are three different item types. Each visible ItemDisplay uses the **GROUND presentation at one-quarter scale**, has no pickup hitbox, and remains an animation only. CC-to-adjacent-output transfers also limit each operation to 3 items. Multiple flights still run concurrently: up to **four 3-item pickups (12 items) per game tick** from a drill and **eight 3-item wireless sends (24 items) per tick** per CC, before receiver capacity and chunk availability are considered. Display entities are capped at **48 per coordinator** to protect rendering performance; packets beyond that cap still travel and deliver safely. They retain their full cargo in NBT until delivered.
+
+While mining, the drill's footprint, computer and **already-discovered CC network corridors and adjacent inventories** use temporary simulation chunk tickets; tickets are released on stop. As before, network discovery must encounter loaded chunks when starting.
+
+### Important early-development limitations
+
+- **Inputs are consumed directly by the requesting drill from a network-connected input inventory.** The visible flight animation currently covers mined-item output (drill→CC→CC), not the reverse Filler/Wall request. No unsent filler supply is buffered at the drill; it requests one block just before placing it.
+- Fluid sealing currently checks one horizontal layer at a time and does not actively drain source liquids outside the one-block boundary.
+- Minecraft in-game behavior (especially fluid updates, falling-block placement, multiplayer and moving-machine drops) has **not** been verified by a compiled build alone; test on a backed-up world.
 
 ## v0.3.3 visual and interaction fixes
 
@@ -74,6 +122,6 @@ One Collection Coordinator block handles all wireless item routing. Its internal
 
 Minecraft **26.2**, Fabric Loader **0.19.5**, Fabric API **0.161.0+26.2**, Java **25**, Gradle **9.7.0**, Loom **1.18.3**.
 
-Run `gradle build` using Java 25; or download the `caszual-mining-rig-0.3.3.jar` inside the `miningrig-26.2` artifact in the most recent successful GitHub Actions workflow.
+Run `gradle build` using Java 25; or download the `caszual-mining-rig-0.4.0.jar` inside the `miningrig-26.2` artifact in the most recent successful GitHub Actions workflow.
 
 **Status:** GitHub Actions compile verification is used, but it does *not* test actual Minecraft interaction, server permissions, chunk reloads, or multiplayer naming/GUI synchronization. Test in a backed-up world and treat this as a development build until in-game verified.

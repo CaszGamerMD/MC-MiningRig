@@ -1,9 +1,15 @@
 {
   "variants": {
-    "alarm=false": {
+    "alarm=false,warn=false": {
       "model": "miningrig:block/mining_computer"
     },
-    "alarm=true": {
+    "alarm=true,warn=false": {
+      "model": "miningrig:block/mining_computer_alarm"
+    },
+    "alarm=false,warn=true": {
+      "model": "miningrig:block/mining_computer_warning"
+    },
+    "alarm=true,warn=true": {
       "model": "miningrig:block/mining_computer_alarm"
     }
   }
