@@ -157,6 +157,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         if(fluid!=null)return fluid;
         if(!hasWorkingBits())return ComputerEntity.Status.OUT_OF_BITS;
         if(freeStorage()==0)return ComputerEntity.Status.FULL;
+        if(cursor==0 && assigned[0]<0 && assigned[1]<0 && assigned[2]<0)
+            sealing.retryWallSource(world,this);
         if(!initialized){startY=worldPosition.getY();initialized=true;}
         boolean expanded=computer.wallMode()==2&&!sealing.fallback();
         int r=computer.radius()+(expanded?1:0),edge=2*r+1,total=edge*edge;
