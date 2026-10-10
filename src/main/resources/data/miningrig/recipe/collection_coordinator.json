@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "CRC",
+    "CHC",
+    "CRC"
+  ],
+  "key": {
+    "C": "minecraft:copper_ingot",
+    "R": "minecraft:redstone",
+    "H": "minecraft:chest"
+  },
+  "result": {
+    "id": "miningrig:collection_coordinator",
+    "count": 1
+  }
+}

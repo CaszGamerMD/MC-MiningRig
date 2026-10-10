@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "miningrig",
+  "version": "${version}",
+  "name": "Caszual Mining Rig",
+  "description": "Caszual Mining Rig: command up to four named, remotely operated drills with independent progress, ETA, and wireless collection.",
+  "authors": [
+    "CaszGamerMD"
+  ],
+  "contact": {
+    "sources": "https://github.com/CaszGamerMD/MC-MiningRig"
+  },
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "dev.casz.miningrig.MiningRig"
+    ],
+    "client": [
+      "dev.casz.miningrig.client.MiningRigClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~26.2",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}

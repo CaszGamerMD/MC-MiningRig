@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "MM",
+    "MM"
+  ],
+  "key": {
+    "M": "minecraft:gold_ingot"
+  },
+  "result": {
+    "id": "miningrig:gold_bit",
+    "count": 1
+  }
+}
