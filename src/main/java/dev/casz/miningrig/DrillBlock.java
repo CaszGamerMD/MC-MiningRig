@@ -4,6 +4,9 @@ import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -20,6 +23,21 @@ public final class DrillBlock extends BaseEntityBlock {
     public DrillBlock(Properties properties){super(properties);}
     @Override protected MapCodec<? extends BaseEntityBlock> codec(){return simpleCodec(DrillBlock::new);}
     @Override protected RenderShape getRenderShape(BlockState state){return RenderShape.MODEL;}
+    @Nullable @Override public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level,BlockState state,BlockEntityType<T> type){
+        return level.isClientSide()?null:createTickerHelper(type,MiningRig.DRILL_ENTITY,DrillEntity::tick);
+    }
+    @Override public void setPlacedBy(Level level,BlockPos pos,BlockState state,@Nullable LivingEntity placer,ItemStack stack){
+        super.setPlacedBy(level,pos,state,placer,stack);
+        if(!(level instanceof ServerLevel server))return;
+        DrillBinding.Link link=DrillBinding.read(stack);
+        if(link==null || !link.dimension().equals(server.dimension().identifier().toString()))return;
+        if(level.getBlockEntity(pos) instanceof DrillEntity drill){
+            drill.applyBinding(link);
+            if(server.hasChunkAt(link.computer()) &&
+                    server.getBlockEntity(link.computer()) instanceof ComputerEntity computer)
+                computer.placed(link.token(),pos);
+        }
+    }
     @Nullable @Override public BlockEntity newBlockEntity(BlockPos pos,BlockState state){return new DrillEntity(pos,state);}
     @Override protected InteractionResult useItemOn(ItemStack stack,BlockState state,Level level,BlockPos pos,
                                             Player player,InteractionHand hand,BlockHitResult hit){
@@ -36,10 +54,7 @@ public final class DrillBlock extends BaseEntityBlock {
     }
     @Override protected InteractionResult useWithoutItem(BlockState state,Level level,BlockPos pos,Player player,BlockHitResult hit){
         if(!level.isClientSide() && level.getBlockEntity(pos) instanceof DrillEntity drill){
-            if(player.isShiftKeyDown() && level instanceof ServerLevel server){
-                RigPairing.select(server,player,pos);
-                player.sendSystemMessage(Component.literal("Drill selected. Sneak-right-click your Mining Computer with an empty hand."));
-            }else player.openMenu(drill);
+            player.openMenu(drill);
         }
         return InteractionResult.SUCCESS;
     }

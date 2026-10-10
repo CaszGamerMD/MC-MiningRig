@@ -47,6 +47,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container, M
         @Override public int getCount(){return 11;}
     };
     public CoordinatorEntity(BlockPos pos,BlockState state){super(MiningRig.COORDINATOR_ENTITY,pos,state);}
+    public boolean acceptsDrillFromBelow(){return mode[Direction.DOWN.get3DDataValue()]==1;}
     public int stored(){return RigStorage.count(items,0);}
     public int freeStorage(){return CAPACITY-stored();}
     public boolean canReceive(List<ItemStack> cargo){return RigStorage.canInsert(items,0,CAPACITY,cargo);}
