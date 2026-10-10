@@ -53,6 +53,13 @@ public final class ComputerBlock extends BaseEntityBlock {
     }
     public static InteractionResult handleItem(ItemStack stack,Level level,BlockPos pos,Player player) {
         if (!(level.getBlockEntity(pos) instanceof ComputerEntity computer)) return InteractionResult.PASS;
+        if(stack.is(MiningRig.TABLET)){
+            if(level instanceof ServerLevel server){
+                TabletLink.write(stack,TabletLink.of(server,computer));
+                player.sendSystemMessage(Component.literal("Tablet paired with Mining Computer at "+pos.toShortString()));
+            }
+            return InteractionResult.SUCCESS;
+        }
         if(stack.is(MiningRig.DRILL.asItem())){
             if(level instanceof net.minecraft.server.level.ServerLevel server){
                 int slot=computer.registerItem(server,stack);

@@ -9,16 +9,31 @@ import org.jetbrains.annotations.Nullable;
 /** Networked computer console; status text is synchronized through ComputerStatePayload. */
 public final class ComputerMenu extends AbstractContainerMenu {
     @Nullable private final ComputerEntity computer;
+    private final boolean remote;
+    @Nullable private final net.minecraft.server.level.ServerLevel remoteLevel;
+    @Nullable private final net.minecraft.core.BlockPos remotePos;
     public ComputerMenu(int id,Inventory inventory){this(id,inventory,null);}
     public ComputerMenu(int id,Inventory inventory,@Nullable ComputerEntity computer){
-        super(RigMenus.COMPUTER,id);this.computer=computer;
+        this(id,inventory,computer,false,null,null);
+    }
+    public ComputerMenu(int id,Inventory inventory,@Nullable ComputerEntity computer,boolean remote,
+            @Nullable net.minecraft.server.level.ServerLevel remoteLevel,
+            @Nullable net.minecraft.core.BlockPos remotePos){
+        super(RigMenus.COMPUTER,id);this.computer=computer;this.remote=remote;
+        this.remoteLevel=remoteLevel;this.remotePos=remotePos;
+    }
+    public boolean remote(){return remote;}
+    @Override public void removed(Player player){
+        super.removed(player);
+        if(remote && remoteLevel!=null && remotePos!=null && !player.level().isClientSide())
+            TabletAccess.release(remoteLevel,remotePos);
     }
     @Nullable public ComputerEntity computer(){return computer;}
     @Override public boolean stillValid(Player player){
         return computer==null ||
             (computer.getLevel()!=null && computer.getLevel().getBlockEntity(computer.getBlockPos())==computer
-            && player.distanceToSqr(computer.getBlockPos().getX()+.5,
-                computer.getBlockPos().getY()+.5,computer.getBlockPos().getZ()+.5)<=64);
+            && (remote || player.distanceToSqr(computer.getBlockPos().getX()+.5,
+                computer.getBlockPos().getY()+.5,computer.getBlockPos().getZ()+.5)<=64));
     }
     @Override public boolean clickMenuButton(Player player,int id){
         if(computer==null)return id>=0&&id<=36;

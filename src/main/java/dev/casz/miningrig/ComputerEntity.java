@@ -55,6 +55,13 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     private final int[] wallModes={0,0,0,0};
     private int selected, activeSlot;
     private long lastBroadcast;
+    private String tabletId;
+    public String tabletIdentity(){
+        if(tabletId==null || tabletId.isBlank()){
+            tabletId=UUID.randomUUID().toString();setChanged();
+        }
+        return tabletId;
+    }
     private void syncActiveChunks(ServerLevel server){
         Set<ChunkPos> desired=new HashSet<>();
         boolean active=false;
@@ -305,6 +312,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     @Override protected void saveAdditional(ValueOutput out){
         super.saveAdditional(out);
         out.putInt("Selected",selected);
+        if(tabletId!=null)out.putString("TabletIdentity",tabletId);
         for(int i=0;i<MAX_DRILLS;i++){
             out.putString("Token"+i,tokens[i]);
             out.putString("Name"+i,nicknames[i]);
@@ -319,6 +327,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     }
     @Override protected void loadAdditional(ValueInput in){
         super.loadAdditional(in);
+        tabletId=in.getStringOr("TabletIdentity","");
         selected=Math.max(0,Math.min(MAX_DRILLS-1,in.getIntOr("Selected",0)));
         activeSlot=selected;
         for(int i=0;i<MAX_DRILLS;i++){

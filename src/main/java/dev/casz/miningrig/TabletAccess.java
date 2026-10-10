@@ -53,7 +53,7 @@ public final class TabletAccess {
         return 1;
     }
     private static void acquire(ServerLevel world,BlockPos pos){
-        ChunkPos key=new ChunkPos(pos);
+        ChunkPos key=new ChunkPos(pos.getX()>>4,pos.getZ()>>4);
         var map=SESSIONS.computeIfAbsent(world,w->new HashMap<>());
         int n=map.getOrDefault(key,0);
         if(n==0)world.getChunkSource().addTicketWithRadius(SESSION,key,0);
