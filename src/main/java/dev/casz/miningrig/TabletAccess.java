@@ -62,7 +62,7 @@ public final class TabletAccess {
     public static void release(ServerLevel world,BlockPos pos){
         Map<ChunkPos,Integer> map=SESSIONS.get(world);
         if(map==null)return;
-        ChunkPos key=new ChunkPos(pos);
+        ChunkPos key=new ChunkPos(pos.getX()>>4,pos.getZ()>>4);
         int n=map.getOrDefault(key,0);
         if(n<=1){map.remove(key);world.getChunkSource().removeTicketWithRadius(SESSION,key,0);}
         else map.put(key,n-1);
@@ -73,7 +73,7 @@ public final class TabletAccess {
             player.sendSystemMessage(Component.literal("Unlinked tablet. Right-click a Mining Computer with it."));
             return;
         }
-        ServerLevel world=dimension(player.getServer(),link.dimension());
+        ServerLevel world=dimension(((ServerLevel)player.level()).getServer(),link.dimension());
         if(world==null){player.sendSystemMessage(Component.literal("Computer dimension unavailable."));return;}
         acquire(world,link.computer());
         ComputerEntity computer=find(player.getServer(),link,true);

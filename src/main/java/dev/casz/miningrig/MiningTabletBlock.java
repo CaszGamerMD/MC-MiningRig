@@ -22,7 +22,7 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.DirectionProperty;
+
 import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
@@ -36,7 +36,7 @@ public final class MiningTabletBlock extends BaseEntityBlock {
         @Override public String getSerializedName(){return label;}
         public static Lamp from(int index){return values()[Math.max(0,Math.min(3,index))];}
     }
-    public static final DirectionProperty FACING=BlockStateProperties.FACING;
+    public static final EnumProperty<Direction> FACING=BlockStateProperties.FACING;
     public static final EnumProperty<Lamp> LAMP=EnumProperty.create("lamp",Lamp.class);
     public MiningTabletBlock(Properties properties){
         super(properties);
