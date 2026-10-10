@@ -26,13 +26,14 @@ import org.jetbrains.annotations.Nullable;
 
 public final class ComputerBlock extends BaseEntityBlock {
     public static final BooleanProperty ALARM = BooleanProperty.create("alarm");
+    public static final BooleanProperty WARN = BooleanProperty.create("warn");
     public ComputerBlock(Properties properties) {
         super(properties);
-        registerDefaultState(defaultBlockState().setValue(ALARM, false));
+        registerDefaultState(defaultBlockState().setValue(ALARM, false).setValue(WARN,false));
     }
     @Override protected MapCodec<? extends BaseEntityBlock> codec() { return simpleCodec(ComputerBlock::new); }
     @Override protected void createBlockStateDefinition(StateDefinition.Builder<net.minecraft.world.level.block.Block, BlockState> builder) {
-        builder.add(ALARM);
+        builder.add(ALARM,WARN);
     }
     @Override protected RenderShape getRenderShape(BlockState state) { return RenderShape.MODEL; }
     @Nullable @Override public BlockState getStateForPlacement(BlockPlaceContext context){

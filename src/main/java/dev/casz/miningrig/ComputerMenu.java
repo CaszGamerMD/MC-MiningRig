@@ -30,6 +30,7 @@ public final class ComputerMenu extends AbstractContainerMenu {
         else if(id==32)computer.setDepth(computer.selectedDepth()-1);
         else if(id==33)computer.setDepth(computer.selectedDepth()+1);
         else if(id==34)computer.setCircle(!computer.selectedCircle());
+        else if(id==35)computer.setWallMode(computer.selectedWallMode()+1);
         else return false;
         broadcastChanges();return true;
     }

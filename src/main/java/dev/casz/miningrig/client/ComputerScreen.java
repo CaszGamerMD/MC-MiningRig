@@ -13,7 +13,7 @@ import net.minecraft.world.entity.player.Inventory;
 
 /** Four readable drill status cards, with controls and a text box to rename selected drill. */
 public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
-    private final String[][] rows=new String[4][8];
+    private final String[][] rows=new String[4][9];
     private int selected;
     private EditBox rename;
     private boolean initial=true;
@@ -21,7 +21,7 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
         super(menu,player,title,360,294);
         titleLabelY=8;inventoryLabelY=290;
         for(int i=0;i<4;i++){
-            rows[i]=new String[]{"0","Drill "+(i+1),"Not placed","Empty","-1","2","12","O"};
+            rows[i]=new String[]{"0","Drill "+(i+1),"Not placed","Empty","-1","2","12","O","0"};
         }
     }
     private void click(int id){
@@ -40,9 +40,11 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
         addRenderableWidget(Button.builder(Component.literal("R+"),b->click(31)).bounds(leftPos+46,topPos+223,36,18).build());
         addRenderableWidget(Button.builder(Component.literal("D-"),b->click(32)).bounds(leftPos+91,topPos+223,36,18).build());
         addRenderableWidget(Button.builder(Component.literal("D+"),b->click(33)).bounds(leftPos+129,topPos+223,36,18).build());
-        addRenderableWidget(Button.builder(Component.literal("Shape"),b->click(34)).bounds(leftPos+178,topPos+223,55,18).build());
+        addRenderableWidget(Button.builder(Component.literal("Shape"),b->click(34)).bounds(leftPos+171,topPos+223,43,18).build());
+        addRenderableWidget(Button.builder(Component.literal("Wall"),b->click(35))
+            .bounds(leftPos+216,topPos+223,55,18).build());
         addRenderableWidget(Button.builder(Component.literal("Unlink"),b->click(20+selected))
-            .bounds(leftPos+245,topPos+223,103,18).build());
+            .bounds(leftPos+274,topPos+223,74,18).build());
         rename=new EditBox(font,leftPos+8,topPos+261,236,19,Component.literal("Drill nickname"));
         rename.setMaxLength(24);rename.setValue(rows[selected][1]);
         addRenderableWidget(rename);
@@ -60,7 +62,7 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
             selected=next;initial=false;
             for(int i=0;i<4;i++){
                 String[] entry=lines[i+1].split("\t",-1);
-                if(entry.length>=8)rows[i]=Arrays.copyOf(entry,8);
+                if(entry.length>=9)rows[i]=Arrays.copyOf(entry,9);
             }
             if(changed && rename!=null)rename.setValue(rows[selected][1]);
         }catch(NumberFormatException ignored){}
@@ -98,7 +100,7 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
             g.text(font,eta(r[4]),leftPos+140,y+24,0xff8bffae,false);
         }
         g.text(font,"Selected: R "+rows[selected][5]+" | D "+rows[selected][6]
-            +" | "+(rows[selected][7].equals("O")?"Circle":"Square"),leftPos+9,topPos+207,0xffffffff,false);
+            +" | "+(rows[selected][7].equals("O")?"Circle":"Square")+" | Wall: "+switch(rows[selected][8]){case "1"->"Air";case "2"->"Always";default->"Off";},leftPos+9,topPos+207,0xffffffff,false);
         g.text(font,"Nickname for selected drill:",leftPos+9,topPos+250,0xffbde4f5,false);
     }
 }
