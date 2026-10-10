@@ -27,7 +27,8 @@ public final class MiningRig implements ModInitializer {
         Block block = Registry.register(BuiltInRegistries.BLOCK, key.block(),
                 factory.apply(BlockBehaviour.Properties.of().strength(4.0f).requiresCorrectToolForDrops().setId(key.block())));
         Registry.register(BuiltInRegistries.ITEM, key.item(),
-                new BlockItem(block, new Item.Properties().useBlockDescriptionPrefix().setId(key.item())));
+                new BlockItem(block, new Item.Properties().useBlockDescriptionPrefix()
+                        .stacksTo(name.equals("mining_drill")?1:64).setId(key.item())));
         return block;
     }
     private static Item item(String name, Function<Item.Properties, Item> factory, Item.Properties properties) {
@@ -60,6 +61,7 @@ public final class MiningRig implements ModInitializer {
     }
     @Override public void onInitialize() {
         RigMenus.initialize();
+        RigNetworking.initialize();
         CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.REDSTONE_BLOCKS).register(tab -> {
             tab.accept(COMPUTER); tab.accept(DRILL); tab.accept(COORDINATOR);
             tab.accept(WOOD_BIT); tab.accept(STONE_BIT); tab.accept(IRON_BIT);

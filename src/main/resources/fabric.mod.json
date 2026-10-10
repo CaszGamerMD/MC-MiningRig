@@ -3,7 +3,7 @@
   "id": "miningrig",
   "version": "${version}",
   "name": "Caszual Mining Rig",
-  "description": "A remotely configured, layer-by-layer mining drill with replaceable drill bits and wireless collection.",
+  "description": "Caszual Mining Rig: command up to four named, remotely operated drills with independent progress, ETA, and wireless collection.",
   "authors": [
     "CaszGamerMD"
   ],

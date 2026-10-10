@@ -38,6 +38,15 @@ public final class ComputerBlock extends BaseEntityBlock {
     @Override protected InteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
                                                       Player player, InteractionHand hand, BlockHitResult hit) {
         if (!(level.getBlockEntity(pos) instanceof ComputerEntity computer)) return InteractionResult.PASS;
+        if(stack.is(MiningRig.DRILL.asItem())){
+            if(level instanceof net.minecraft.server.level.ServerLevel server){
+                int slot=computer.registerItem(server,stack);
+                player.sendSystemMessage(Component.literal(slot<0
+                    ? "Computer already controls four drills. Unlink one in the computer UI first."
+                    : "Drill linked in computer slot "+(slot+1)+". Place this drill to report its coordinates."));
+            }
+            return InteractionResult.SUCCESS;
+        }
         if (stack.is(Items.STICK) || stack.is(Items.BONE) || stack.is(Items.LAPIS_LAZULI)) {
             if (!level.isClientSide()) {
                 if (stack.is(Items.STICK)) computer.setRadius(computer.radius() + (player.isShiftKeyDown() ? -1 : 1));
@@ -49,16 +58,10 @@ public final class ComputerBlock extends BaseEntityBlock {
         }
         return InteractionResult.PASS;
     }
-    @Override protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
-        if (level.getBlockEntity(pos) instanceof ComputerEntity computer && !level.isClientSide()) {
-            if (player.isShiftKeyDown() && level instanceof net.minecraft.server.level.ServerLevel server){
-                boolean linked=RigPairing.linkSelected(server,player,computer);
-                player.sendSystemMessage(Component.literal(linked
-                    ? "Mining Computer linked to selected drill."
-                    : "No selected drill. Sneak-right-click the drill first."));
-            } else computer.toggle();
-            player.sendSystemMessage(Component.literal(computer.description()));
-        }
+    @Override protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
+                                                          Player player, BlockHitResult hit) {
+        if(!level.isClientSide() && level.getBlockEntity(pos) instanceof ComputerEntity computer)
+            player.openMenu(computer);
         return InteractionResult.SUCCESS;
     }
 }

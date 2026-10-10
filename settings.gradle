@@ -5,4 +5,4 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-rootProject.name = 'mc-miningrig'
+rootProject.name = 'caszual-mining-rig'
