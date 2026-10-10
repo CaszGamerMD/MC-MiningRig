@@ -153,6 +153,16 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     public ComputerEntity.Status mineTick(ServerLevel world,ComputerEntity computer) {
         if(completedLayers>=computer.depth())return ComputerEntity.Status.DONE;
         workTicks++;
+        // If the CC spine or its required inventories disappear while a rig is
+        // running, do not mine indefinitely into an isolated 64-item buffer.
+        if(world.getGameTime()%20==0){
+            if(RigNetwork.members(world,this).isEmpty())return ComputerEntity.Status.NO_COLLECTOR;
+            if(!RigNetwork.hasOutput(world,this))return ComputerEntity.Status.NO_OUTPUT;
+            if(!RigNetwork.hasInput(world,this,false))return ComputerEntity.Status.NO_FILLER_CONTAINER;
+            if(computer.wallMode()==2&&!sealing.fallback()
+                    && !RigNetwork.hasInput(world,this,true))
+                return ComputerEntity.Status.NO_WALL_CONTAINER;
+        }
         ComputerEntity.Status fluid=sealing.beforeMining(world,this,computer);
         if(fluid!=null)return fluid;
         if(!hasWorkingBits())return ComputerEntity.Status.OUT_OF_BITS;
