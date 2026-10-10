@@ -138,7 +138,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
             assigned[lane]=-1;progress[lane]=0;
             // Enchanted Unbreaking tips consume durability only on a successful roll.
             int unbreaking=enchantmentLevel(world,bit,Enchantments.UNBREAKING);
-            if(world.random.nextInt(unbreaking+1)==0){
+            if(world.getRandom().nextInt(unbreaking+1)==0){
                 int wear=bit.getDamageValue()+1;
                 if(wear>=bit.getMaxDamage())items.set(lane,ItemStack.EMPTY);
                 else bit.setDamageValue(wear);
