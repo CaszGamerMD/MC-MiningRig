@@ -32,16 +32,17 @@ import org.jetbrains.annotations.Nullable;
  * Storage is nine visible stacks but is limited to 64 individual items total.
  */
 public final class DrillEntity extends BlockEntity implements Container, MenuProvider {
-    public static final int BIT_SLOTS=3, SLOT_COUNT=12, CAPACITY=64;
+    public static final int BIT_SLOTS=3, SLOT_COUNT=67, CAPACITY=64;
     private final NonNullList<ItemStack> items=NonNullList.withSize(SLOT_COUNT,ItemStack.EMPTY);
     private final int[] assigned={-1,-1,-1};
     private final float[] progress=new float[BIT_SLOTS];
     private int startY, completedLayers, cursor;
     private boolean initialized, relocating, contentsDropped;
+    private int page;
     private final ContainerData menuData=new ContainerData() {
-        @Override public int get(int index) {return index==0?stored():0;}
-        @Override public void set(int index,int value) {}
-        @Override public int getCount() {return 1;}
+        @Override public int get(int index) {return index==0?stored():index==1?page:0;}
+        @Override public void set(int index,int value) {if(index==1)page=Math.max(0,Math.min(7,value));}
+        @Override public int getCount() {return 2;}
     };
 
     public DrillEntity(BlockPos pos,BlockState state){super(MiningRig.DRILL_ENTITY,pos,state);}
@@ -218,7 +219,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     @Override public void clearContent(){for(int i=0;i<SLOT_COUNT;i++)items.set(i,ItemStack.EMPTY);setChanged();}
     @Override public Component getDisplayName(){return Component.literal("Mining Drill");}
     @Nullable @Override public AbstractContainerMenu createMenu(int id,Inventory playerInventory,Player player) {
-        return new DrillMenu(id,playerInventory,this,menuData);
+        return new DrillMenu(id,playerInventory,new PagedRigContainer(this,menuData,1,3,9),menuData);
     }
     @Override protected void saveAdditional(ValueOutput out){
         super.saveAdditional(out);
