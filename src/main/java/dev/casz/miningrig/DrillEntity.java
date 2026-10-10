@@ -39,6 +39,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private int startY, completedLayers, cursor;
     private boolean initialized, relocating, contentsDropped;
     private int page;
+    private final DrillSealing sealing=new DrillSealing();
+    public boolean fluidWarning(){return sealing.warning();}
     private long workTicks;
     private String linkedToken="";
     private BlockPos computerPos;
@@ -151,10 +153,13 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     public ComputerEntity.Status mineTick(ServerLevel world,ComputerEntity computer) {
         if(completedLayers>=computer.depth())return ComputerEntity.Status.DONE;
         workTicks++;
+        ComputerEntity.Status fluid=sealing.beforeMining(world,this,computer);
+        if(fluid!=null)return fluid;
         if(!hasWorkingBits())return ComputerEntity.Status.OUT_OF_BITS;
         if(freeStorage()==0)return ComputerEntity.Status.FULL;
         if(!initialized){startY=worldPosition.getY();initialized=true;}
-        int r=computer.radius(),edge=2*r+1,total=edge*edge;
+        boolean expanded=computer.wallMode()==2&&!sealing.fallback();
+        int r=computer.radius()+(expanded?1:0),edge=2*r+1,total=edge*edge;
         int active=0;
         for(int lane=0;lane<BIT_SLOTS;lane++){
             ItemStack bit=items.get(lane);
@@ -166,11 +171,11 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
             if(assigned[lane]<0){
                 while(cursor<total){
                     int index=cursor++,dx=index%edge-r,dz=index/edge-r;
-                    if(!computer.contains(dx,dz))continue;
+                    if(!DrillSealing.contains(computer,dx,dz,expanded))continue;
                     BlockPos p=worldPosition.offset(dx,-1,dz);
                     if(p.getY()<world.getMinY())return ComputerEntity.Status.DONE;
                     if(!world.hasChunkAt(p)){cursor--;return ComputerEntity.Status.BLOCKED;}
-                    if(world.getBlockState(p).isAir())continue;
+                    if(world.getBlockState(p).isAir()||DrillSealing.immune(world.getBlockState(p)))continue;
                     assigned[lane]=index;break;
                 }
             }
@@ -179,10 +184,10 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
             BlockPos p=worldPosition.offset(dx,-1,dz);
             if(!world.hasChunkAt(p))return ComputerEntity.Status.BLOCKED;
             BlockState state=world.getBlockState(p);
-            if(state.isAir()){assigned[lane]=-1;progress[lane]=0;continue;}
-            if(state.getDestroySpeed(world,p)<0 || state.hasBlockEntity() || !drillBit.canMine(state)
-                || state.is(MiningRig.DRILL) || state.is(MiningRig.COMPUTER)
-                || state.is(MiningRig.COORDINATOR) || state.is(MiningRig.DRILL_UPPER))
+            if(state.isAir()||DrillSealing.immune(state)){
+                assigned[lane]=-1;progress[lane]=0;continue;
+            }
+            if(state.getDestroySpeed(world,p)<0 || state.hasBlockEntity() || !drillBit.canMine(state))
                 return ComputerEntity.Status.BLOCKED;
             progress[lane]+=speed(world,bit,state);
             if(progress[lane]<1.0f)continue;
@@ -203,6 +208,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         if(active==0)return ComputerEntity.Status.OUT_OF_BITS;
         if(cursor>=total){
             for(int lane=0;lane<BIT_SLOTS;lane++)if(assigned[lane]>=0)return ComputerEntity.Status.RUNNING;
+            ComputerEntity.Status walls=sealing.afterMining(world,this,computer);
+            if(walls!=null)return walls;
             return descend(world,computer);
         }
         return ComputerEntity.Status.RUNNING;
@@ -235,6 +242,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         moved.linkedToken=linkedToken;moved.computerPos=computerPos;
         moved.computerDimension=computerDimension;
         moved.linkConfirmed=linkConfirmed;
+        sealing.copyTo(moved.sealing);
+        moved.sealing.nextLayer();
         moved.setChanged();
         // Ownership has transferred: source must be genuinely EMPTY before
         // callbacks run for the block at the previous position.
@@ -300,6 +309,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         out.putInt("StartY",startY);out.putInt("Layers",completedLayers);
         out.putInt("Cursor",cursor);out.putBoolean("Initialized",initialized);
         out.putLong("WorkTicks",workTicks);
+        sealing.save(out);
         if(computerPos!=null){
             out.putLong("Supervisor",computerPos.asLong());
             out.putString("SupervisorDimension",computerDimension);
@@ -319,6 +329,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         startY=in.getIntOr("StartY",worldPosition.getY());completedLayers=in.getIntOr("Layers",0);
         cursor=in.getIntOr("Cursor",0);initialized=in.getBooleanOr("Initialized",false);
         workTicks=in.getLongOr("WorkTicks",0);
+        sealing.load(in);
         computerPos=in.getLong("Supervisor").isPresent()
             ? BlockPos.of(in.getLongOr("Supervisor",0)):null;
         computerDimension=in.getStringOr("SupervisorDimension","");
