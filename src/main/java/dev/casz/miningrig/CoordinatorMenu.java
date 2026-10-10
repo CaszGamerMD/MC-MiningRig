@@ -15,7 +15,7 @@ import net.minecraft.core.Direction;
 public final class CoordinatorMenu extends AbstractContainerMenu {
     private final Container coordinator;
     private final ContainerData data;
-    public CoordinatorMenu(int id,Inventory player) { this(id,player,new SimpleContainer(27),new SimpleContainerData(10)); }
+    public CoordinatorMenu(int id,Inventory player) { this(id,player,new SimpleContainer(27),new SimpleContainerData(11)); }
     public CoordinatorMenu(int id,Inventory player,Container inventory,ContainerData data) {
         super(RigMenus.COORDINATOR,id);
         checkContainerSize(inventory,27);
@@ -37,6 +37,7 @@ public final class CoordinatorMenu extends AbstractContainerMenu {
     }
     public int mode(Direction side){return data.get(side.get3DDataValue());}
     public boolean connected(Direction side){return ((data.get(6)>>>side.get3DDataValue())&1)!=0;}
+    public boolean drillSide(Direction side){return ((data.get(10)>>>side.get3DDataValue())&1)!=0;}
     public boolean containerSide(Direction side){return ((data.get(8)>>>side.get3DDataValue())&1)!=0;}
     public int stored(){return data.get(7);}
     public int page(){return data.get(9);}
