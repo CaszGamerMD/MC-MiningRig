@@ -226,7 +226,8 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
                     if(!existing.isEmpty()&&!ItemStack.isSameItemSameComponents(existing,item))continue;
                     int room=Math.min(Math.min(item.getMaxStackSize(),64),destination.getMaxStackSize(item))
                         -existing.getCount();
-                    int count=Math.min(room,item.getCount());
+                    // The same 3-item dispatch size applies to output inventories.
+                    int count=Math.min(PACKET_SIZE,Math.min(room,item.getCount()));
                     if(count<=0)continue;
                     if(existing.isEmpty())destination.setItem(slot,item.copyWithCount(count));
                     else {existing.grow(count);destination.setChanged();}
