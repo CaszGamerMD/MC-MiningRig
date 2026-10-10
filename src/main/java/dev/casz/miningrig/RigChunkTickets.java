@@ -22,36 +22,36 @@ public final class RigChunkTickets {
     private static final TicketType ACTIVE=Registry.register(
         BuiltInRegistries.TICKET_TYPE,MiningRig.id("active_mining_chunk"),
         new TicketType(TicketType.NO_TIMEOUT,TicketType.FLAG_LOADING|TicketType.FLAG_SIMULATION));
-    private static final Map<ServerLevel, Map<BlockPos,Set<Long>>> OWNERS=new WeakHashMap<>();
+    private static final Map<ServerLevel, Map<BlockPos,Set<ChunkPos>>> OWNERS=new WeakHashMap<>();
 
     public static void initialize() {}
 
-    private static boolean usedByOther(Map<BlockPos,Set<Long>> perOwner,BlockPos owner,long chunk){
+    private static boolean usedByOther(Map<BlockPos,Set<ChunkPos>> perOwner,BlockPos owner,ChunkPos chunk){
         for(var entry:perOwner.entrySet())
             if(!entry.getKey().equals(owner)&&entry.getValue().contains(chunk))return true;
         return false;
     }
-    public static void sync(ServerLevel world,BlockPos computer,Set<Long> requested){
-        Map<BlockPos,Set<Long>> owners=OWNERS.computeIfAbsent(world,k->new HashMap<>());
+    public static void sync(ServerLevel world,BlockPos computer,Set<ChunkPos> requested){
+        Map<BlockPos,Set<ChunkPos>> owners=OWNERS.computeIfAbsent(world,k->new HashMap<>());
         BlockPos key=computer.immutable();
-        Set<Long> old=owners.getOrDefault(key,Set.of());
-        for(long chunk:requested){
+        Set<ChunkPos> old=owners.getOrDefault(key,Set.of());
+        for(ChunkPos chunk:requested){
             if(!old.contains(chunk)&&!usedByOther(owners,key,chunk))
-                world.getChunkSource().addTicketWithRadius(ACTIVE,new ChunkPos(chunk),0);
+                world.getChunkSource().addTicketWithRadius(ACTIVE,chunk,0);
         }
-        for(long chunk:old){
+        for(ChunkPos chunk:old){
             if(!requested.contains(chunk)&&!usedByOther(owners,key,chunk))
-                world.getChunkSource().removeTicketWithRadius(ACTIVE,new ChunkPos(chunk),0);
+                world.getChunkSource().removeTicketWithRadius(ACTIVE,chunk,0);
         }
         if(requested.isEmpty())owners.remove(key);
         else owners.put(key,new HashSet<>(requested));
         if(owners.isEmpty())OWNERS.remove(world);
     }
     public static void release(ServerLevel world,BlockPos computer){sync(world,computer,Set.of());}
-    public static void cover(Set<Long> desired,BlockPos drill,int radius){
+    public static void cover(Set<ChunkPos> desired,BlockPos drill,int radius){
         int minX=(drill.getX()-radius)>>4,maxX=(drill.getX()+radius)>>4;
         int minZ=(drill.getZ()-radius)>>4,maxZ=(drill.getZ()+radius)>>4;
         for(int x=minX;x<=maxX;x++)for(int z=minZ;z<=maxZ;z++)
-            desired.add(ChunkPos.asLong(x,z));
+            desired.add(new ChunkPos(x,z));
     }
 }

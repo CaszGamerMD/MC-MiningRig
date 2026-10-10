@@ -51,7 +51,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     private int selected, activeSlot;
     private long lastBroadcast;
     private void syncActiveChunks(ServerLevel server){
-        Set<Long> desired=new HashSet<>();
+        Set<ChunkPos> desired=new HashSet<>();
         boolean active=false;
         for(int i=0;i<MAX_DRILLS;i++){
             if(!running[i] || positions[i]==null)continue;
@@ -59,7 +59,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             RigChunkTickets.cover(desired,positions[i],radii[i]);
         }
         // The remote controller must also tick when nobody is nearby.
-        if(active)desired.add(ChunkPos.asLong(worldPosition.getX()>>4,worldPosition.getZ()>>4));
+        if(active)desired.add(new ChunkPos(worldPosition.getX()>>4,worldPosition.getZ()>>4));
         RigChunkTickets.sync(server,worldPosition,desired);
     }
     private void syncIfServer(){
