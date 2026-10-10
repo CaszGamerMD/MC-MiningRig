@@ -216,8 +216,16 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         BlockPos next=previous.below();
         if(next.getY()<world.getMinY())return ComputerEntity.Status.DONE;
         if(!world.hasChunkAt(next) || !world.getBlockState(next).isAir())return ComputerEntity.Status.BLOCKED;
-        if(!world.setBlock(next,MiningRig.DRILL.defaultBlockState(),Block.UPDATE_ALL))return ComputerEntity.Status.BLOCKED;
+        // Mark BEFORE any neighbor changes. Once the destination is populated,
+        // clear every source stack before replacing the old block, so neither
+        // Minecraft's replacement callbacks nor the drill's own drop path can
+        // duplicate tools or mined items during the downward move.
+        relocating=true;
+        if(!world.setBlock(next,MiningRig.DRILL.defaultBlockState(),Block.UPDATE_CLIENTS)){
+            relocating=false;return ComputerEntity.Status.BLOCKED;
+        }
         if(!(world.getBlockEntity(next) instanceof DrillEntity moved)) {
+            relocating=false;
             world.removeBlock(next,false);return ComputerEntity.Status.BLOCKED;
         }
         for(int i=0;i<SLOT_COUNT;i++)moved.items.set(i,items.get(i).copy());
@@ -228,8 +236,10 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         moved.computerDimension=computerDimension;
         moved.linkConfirmed=linkConfirmed;
         moved.setChanged();
-        // Never spill contents during the planned downward step.
-        relocating=true;
+        // Ownership has transferred: source must be genuinely EMPTY before
+        // callbacks run for the block at the previous position.
+        for(int i=0;i<SLOT_COUNT;i++)items.set(i,ItemStack.EMPTY);
+        contentsDropped=true;
         // Move the two-block structure down together. The old lower block
         // becomes the new upper block; no inventory is dropped during motion.
         if(world.getBlockState(previous.above()).is(MiningRig.DRILL_UPPER))
