@@ -47,12 +47,24 @@ public final class MiningRig implements ModInitializer {
     public static final Block DRILL = block("mining_drill", DrillBlock::new);
     public static final Block DRILL_UPPER = machinePart("mining_drill_upper",DrillUpperBlock::new);
     public static final Block COORDINATOR = block("collection_coordinator", CoordinatorBlock::new);
+    // Tablet is a placeable item but needs its own link-aware BlockItem class.
+    private static Block tabletBlock(){
+        BlockItemId key=BlockItemId.create(id("mining_tablet"),id("mining_tablet"));
+        return Registry.register(BuiltInRegistries.BLOCK,key.block(),
+            new MiningTabletBlock(BlockBehaviour.Properties.of().strength(2).noOcclusion().setId(key.block())));
+    }
+    public static final Block TABLET_BLOCK=tabletBlock();
+    public static final Item TABLET=item("mining_tablet",MiningTabletItem::new,
+        new Item.Properties().stacksTo(1));
     public static final BlockEntityType<ComputerEntity> COMPUTER_ENTITY = Registry.register(
             BuiltInRegistries.BLOCK_ENTITY_TYPE, id("mining_computer"),
             FabricBlockEntityTypeBuilder.create(ComputerEntity::new, COMPUTER).build());
     public static final BlockEntityType<DrillEntity> DRILL_ENTITY = Registry.register(
             BuiltInRegistries.BLOCK_ENTITY_TYPE, id("mining_drill"),
             FabricBlockEntityTypeBuilder.create(DrillEntity::new, DRILL).build());
+    public static final BlockEntityType<MiningTabletEntity> TABLET_ENTITY = Registry.register(
+            BuiltInRegistries.BLOCK_ENTITY_TYPE,id("mining_tablet"),
+            FabricBlockEntityTypeBuilder.create(MiningTabletEntity::new,TABLET_BLOCK).build());
     public static final BlockEntityType<CoordinatorEntity> COORDINATOR_ENTITY = Registry.register(
             BuiltInRegistries.BLOCK_ENTITY_TYPE, id("collection_coordinator"),
             FabricBlockEntityTypeBuilder.create(CoordinatorEntity::new, COORDINATOR).build());
@@ -71,8 +83,10 @@ public final class MiningRig implements ModInitializer {
         RigChunkTickets.initialize();
         RigMenus.initialize();
         RigNetworking.initialize();
+        TabletAccess.initialize();
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(TabletAccess::tickServer);
         CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.REDSTONE_BLOCKS).register(tab -> {
-            tab.accept(COMPUTER); tab.accept(DRILL); tab.accept(COORDINATOR);
+            tab.accept(COMPUTER); tab.accept(DRILL); tab.accept(COORDINATOR); tab.accept(TABLET);
             tab.accept(WOOD_BIT); tab.accept(STONE_BIT); tab.accept(IRON_BIT);
             tab.accept(GOLD_BIT); tab.accept(DIAMOND_BIT); tab.accept(NETHERITE_BIT);
         });

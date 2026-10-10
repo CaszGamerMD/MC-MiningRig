@@ -7,47 +7,10 @@
     },
     {
       "when": {
-        "down": "in"
-      },
-      "apply": {
-        "model": "miningrig:block/collection_port_input",
-        "x": 270
-      }
-    },
-    {
-      "when": {
-        "down": "out"
-      },
-      "apply": {
-        "model": "miningrig:block/collection_port_output",
-        "x": 270
-      }
-    },
-    {
-      "when": {
-        "up": "in"
-      },
-      "apply": {
-        "model": "miningrig:block/collection_port_input",
-        "x": 90
-      }
-    },
-    {
-      "when": {
-        "up": "out"
-      },
-      "apply": {
-        "model": "miningrig:block/collection_port_output",
-        "x": 90
-      }
-    },
-    {
-      "when": {
         "north": "in"
       },
       "apply": {
-        "model": "miningrig:block/collection_port_input",
-        "y": 0
+        "model": "miningrig:block/collection_port_input"
       }
     },
     {
@@ -55,8 +18,15 @@
         "north": "out"
       },
       "apply": {
-        "model": "miningrig:block/collection_port_output",
-        "y": 0
+        "model": "miningrig:block/collection_port_output"
+      }
+    },
+    {
+      "when": {
+        "north": "link"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_link"
       }
     },
     {
@@ -79,20 +49,11 @@
     },
     {
       "when": {
-        "west": "in"
+        "south": "link"
       },
       "apply": {
-        "model": "miningrig:block/collection_port_input",
-        "y": 270
-      }
-    },
-    {
-      "when": {
-        "west": "out"
-      },
-      "apply": {
-        "model": "miningrig:block/collection_port_output",
-        "y": 270
+        "model": "miningrig:block/collection_port_link",
+        "y": 180
       }
     },
     {
@@ -111,6 +72,96 @@
       "apply": {
         "model": "miningrig:block/collection_port_output",
         "y": 90
+      }
+    },
+    {
+      "when": {
+        "east": "link"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_link",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "west": "in"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_input",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "west": "out"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_output",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "west": "link"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_link",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "in"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_input",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "up": "out"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_output",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "up": "link"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_link",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "down": "in"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_input",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "out"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_output",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "link"
+      },
+      "apply": {
+        "model": "miningrig:block/collection_port_link",
+        "x": 270
       }
     }
   ]

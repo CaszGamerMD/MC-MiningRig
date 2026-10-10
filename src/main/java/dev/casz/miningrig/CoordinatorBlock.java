@@ -24,7 +24,7 @@ import org.jetbrains.annotations.Nullable;
 
 public final class CoordinatorBlock extends BaseEntityBlock {
     public enum PortVisual implements StringRepresentable {
-        OFF("off"), IN("in"), OUT("out");
+        OFF("off"), IN("in"), OUT("out"), LINK("link");
         private final String name;
         PortVisual(String name){this.name=name;}
         @Override public String getSerializedName(){return name;}

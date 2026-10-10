@@ -139,7 +139,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
             int index=side.get3DDataValue(),bit=1<<index;
             boolean link=((w|d)&bit)!=0;
             boolean outside=(a&bit)!=0;
-            CoordinatorBlock.PortVisual appearance=link?CoordinatorBlock.PortVisual.IN
+            CoordinatorBlock.PortVisual appearance=link?CoordinatorBlock.PortVisual.LINK
                 :(!outside||mode[index]==0)?CoordinatorBlock.PortVisual.OFF
                 :mode[index]==RigNetwork.OUTPUT?CoordinatorBlock.PortVisual.OUT:CoordinatorBlock.PortVisual.IN;
             visualState=visualState.setValue(CoordinatorBlock.PORTS[index],appearance);
