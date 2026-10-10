@@ -106,6 +106,19 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         if(w!=wirelessMask||a!=adjacentMask||d!=drillMask){
             wirelessMask=w;adjacentMask=a;drillMask=d;setChanged();
         }
+        // Only render a hopper/pipe for a VALID connected side. Both adjacent
+        // containers and wireless connections use the same side preference.
+        BlockState visualState=getBlockState();
+        for(Direction side:Direction.values()){
+            int index=side.get3DDataValue(),bit=1<<index;
+            boolean connected=((w|a|d)&bit)!=0;
+            CoordinatorBlock.PortVisual appearance=!connected||mode[index]==0
+                ?CoordinatorBlock.PortVisual.OFF
+                :mode[index]==1?CoordinatorBlock.PortVisual.IN:CoordinatorBlock.PortVisual.OUT;
+            visualState=visualState.setValue(CoordinatorBlock.PORTS[index],appearance);
+        }
+        if(visualState!=getBlockState())
+            world.setBlock(worldPosition,visualState,Block.UPDATE_CLIENTS);
     }
     public static void tick(Level level,BlockPos pos,BlockState state,CoordinatorEntity cc){
         if(!(level instanceof ServerLevel world))return;

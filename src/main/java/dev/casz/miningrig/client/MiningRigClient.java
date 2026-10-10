@@ -11,6 +11,7 @@ import dev.casz.miningrig.MiningRig;
 public final class MiningRigClient implements ClientModInitializer {
     @Override public void onInitializeClient() {
         BlockEntityRenderers.register(MiningRig.COMPUTER_ENTITY, ComputerScreenRenderer::new);
+        BlockEntityRenderers.register(MiningRig.DRILL_ENTITY, DrillIndicatorRenderer::new);
         MenuScreens.register(RigMenus.COMPUTER, ComputerScreen::new);
         ClientPlayNetworking.registerGlobalReceiver(ComputerStatePayload.TYPE,(payload,context)->{
             context.client().execute(()->{

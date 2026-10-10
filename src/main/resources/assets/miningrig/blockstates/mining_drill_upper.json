@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "miningrig:block/mining_drill_upper"
+    }
+  }
+}

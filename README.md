@@ -1,6 +1,6 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.3.1 — active-drill chunk loading and high-throughput collection**
+**Version 0.3.2 — new machine models and drill output hatch**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
@@ -31,6 +31,13 @@ Every drill has its **own** settings, running flag, error state, and tracked pos
 
 ETA is shown as an estimate, not a guaranteed finish time. It begins with approximate tool speed and becomes based on actual per-cell progress after digging. It shows `--` if no usable bit is present, and zero when the configured depth has finished.
 
+## Physical machine designs
+
+- **Mining Drill:** occupies a real two-block-tall vertical space. The lower block has a stepped conical iron drill bit and three visible colored dots that follow the materials of the bits installed in the inventory. The upper half is a weathered yellow machine housing with a **recessed top output hatch, metal lip, rusted lid, and handle**. A top hatch indicates the drill's upward wireless unloading direction; it is cosmetic, and mined items still transfer through the coordinator above without requiring the hatch to be opened.
+- **Mining Computer:** 1.5-block-tall workstation silhouette, with a raised dark screen, metal bezel, keyboard tray, and status lamp. The screen's status text renders higher to match the display.
+- **Collection Coordinator:** compact centered metal box. Any actually connected side set to **IN** renders a flared hopper/intake nozzle; connected sides set to **OUT** render a short metal pipe. The same cues apply to both adjacent containers and other wireless coordinators. Connections are calculated from the server state.
+- The visible structures use built-in Minecraft textures, retaining the existing `miningrig` item and block IDs for world compatibility.
+
 ## Drill behavior
 
 A drill has **three independently working bit slots** (wood, stone, iron, gold, diamond and netherite) and can mine one block per working bit concurrently at a tool-grade break rate. Enchantments apply through block loot and bit wear: Efficiency, Fortune, Silk Touch, Unbreaking. The drill stores up to **64 individual mined items**, shown over inventory pages. It descends one Y layer after clearing the configured footprint.
@@ -58,6 +65,6 @@ One Collection Coordinator block handles all wireless item routing. Its internal
 
 Minecraft **26.2**, Fabric Loader **0.19.5**, Fabric API **0.161.0+26.2**, Java **25**, Gradle **9.7.0**, Loom **1.18.3**.
 
-Run `gradle build` using Java 25; or download the `caszual-mining-rig-0.3.1.jar` inside the `miningrig-26.2` artifact in the most recent successful GitHub Actions workflow.
+Run `gradle build` using Java 25; or download the `caszual-mining-rig-0.3.2.jar` inside the `miningrig-26.2` artifact in the most recent successful GitHub Actions workflow.
 
 **Status:** GitHub Actions compile verification is used, but it does *not* test actual Minecraft interaction, server permissions, chunk reloads, or multiplayer naming/GUI synchronization. Test in a backed-up world and treat this as a development build until in-game verified.
