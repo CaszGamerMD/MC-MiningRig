@@ -76,7 +76,7 @@ public final class TabletAccess {
         ServerLevel world=dimension(((ServerLevel)player.level()).getServer(),link.dimension());
         if(world==null){player.sendSystemMessage(Component.literal("Computer dimension unavailable."));return;}
         acquire(world,link.computer());
-        ComputerEntity computer=find(player.getServer(),link,true);
+        ComputerEntity computer=find(world.getServer(),link,true);
         if(computer==null){
             release(world,link.computer());
             player.sendSystemMessage(Component.literal("Linked Mining Computer missing or replaced."));
