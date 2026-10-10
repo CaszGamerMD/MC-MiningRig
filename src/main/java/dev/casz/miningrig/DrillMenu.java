@@ -14,7 +14,7 @@ import net.minecraft.world.item.ItemStack;
 public final class DrillMenu extends AbstractContainerMenu {
     private final Container drill;
     private final ContainerData data;
-    public DrillMenu(int id, Inventory player) { this(id,player,new SimpleContainer(12),new SimpleContainerData(1)); }
+    public DrillMenu(int id, Inventory player) { this(id,player,new SimpleContainer(12),new SimpleContainerData(2)); }
     public DrillMenu(int id, Inventory player, Container container,ContainerData data) {
         super(RigMenus.DRILL,id);
         checkContainerSize(container,12);
@@ -28,18 +28,21 @@ public final class DrillMenu extends AbstractContainerMenu {
         });
         for(int i=0;i<9;i++)addSlot(new Slot(container,i+3,8+i*18,52) {
             @Override public boolean mayPlace(ItemStack stack) {
-                return !(stack.getItem() instanceof DrillBit) && (drill instanceof DrillEntity entity ? entity.freeStorage()>0 : true);
+                return drill.canPlaceItem(getContainerSlot(),stack);
             }
             @Override public int getMaxStackSize(ItemStack stack) {
-                if(drill instanceof DrillEntity entity) {
-                    return Math.min(stack.getMaxStackSize(),entity.freeStorage()+getItem().getCount());
-                }
-                return stack.getMaxStackSize();
+                return Math.min(stack.getMaxStackSize(),drill.getMaxStackSize(stack)+getItem().getCount());
             }
         });
         addStandardInventorySlots(player,8,100);
     }
     public int stored(){return data.get(0);}
+    public int page(){return data.get(1);}
+    @Override public boolean clickMenuButton(Player player,int id){
+        if(id!=0 && id!=1)return false;
+        data.set(1,Math.max(0,Math.min(7,data.get(1)+(id==1?1:-1))));
+        broadcastChanges();return true;
+    }
     @Override public boolean stillValid(Player player){return drill.stillValid(player);}
     @Override public void removed(Player player){super.removed(player);drill.stopOpen(player);}
     @Override public ItemStack quickMoveStack(Player player,int slotIndex) {
