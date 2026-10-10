@@ -12,8 +12,7 @@ import net.minecraft.world.entity.player.Inventory;
 public final class CoordinatorScreen extends AbstractContainerScreen<CoordinatorMenu> {
     private final EnumMap<Direction,Button> buttons=new EnumMap<>(Direction.class);
     public CoordinatorScreen(CoordinatorMenu menu,Inventory player,Component title){
-        super(menu,player,title);
-        imageWidth=176;imageHeight=214;inventoryLabelY=120;titleLabelY=7;
+        super(menu,player,title,176,214);inventoryLabelY=120;titleLabelY=7;
     }
     @Override protected void init(){
         super.init();buttons.clear();
