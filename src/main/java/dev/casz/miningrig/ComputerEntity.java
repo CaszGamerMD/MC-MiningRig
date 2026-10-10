@@ -20,7 +20,7 @@ public final class ComputerEntity extends BlockEntity {
     public enum Status {
         READY("Ready"), RUNNING("Mining"), STOPPED("Manually stopped"),
         DONE("Job done"), OUT_OF_BITS("Out of bits"), NO_COLLECTOR("Out of range of a collector"),
-        BLOCKED("Unable to break block"), FULL("Collector storage full"), NO_DRILL("No linked drill");
+        BLOCKED("Unable to break block"), FULL("Drill inventory full"), NO_DRILL("No linked drill");
         final String display;
         Status(String display) { this.display = display; }
     }
@@ -64,11 +64,11 @@ public final class ComputerEntity extends BlockEntity {
     public static void tick(Level level, BlockPos pos, BlockState state, ComputerEntity entity) {
         if (!(level instanceof ServerLevel server)) return;
         long time = server.getGameTime();
-        if (time % 8 == 0 && entity.running) {
+        if (entity.running) {
             if (!server.hasChunkAt(entity.drill) || !(server.getBlockEntity(entity.drill) instanceof DrillEntity drill)) {
                 entity.stop(Status.NO_DRILL);
             } else {
-                Status result = drill.mineOne(server, entity);
+                Status result = drill.mineTick(server, entity);
                 if (result != Status.RUNNING) entity.stop(result);
             }
         }
