@@ -9,6 +9,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.MenuProvider;
+import net.minecraft.world.WorldlyContainer;
 import net.minecraft.world.entity.Display;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Inventory;
@@ -109,9 +110,14 @@ public final class CoordinatorEntity extends BlockEntity implements Container, M
                 if(item.isEmpty())continue;
                 for(int slot=0;slot<destination.getContainerSize();slot++){
                     if(!destination.canPlaceItem(slot,item))continue;
+                    if(destination instanceof WorldlyContainer sided){
+                        boolean valid=false;
+                        for(int permitted:sided.getSlotsForFace(side.getOpposite()))if(permitted==slot){valid=true;break;}
+                        if(!valid || !sided.canPlaceItemThroughFace(slot,item,side.getOpposite()))continue;
+                    }
                     ItemStack existing=destination.getItem(slot);
                     if(!existing.isEmpty() && !ItemStack.isSameItemSameComponents(existing,item))continue;
-                    int room=Math.min(item.getMaxStackSize(),64)-existing.getCount();
+                    int room=Math.min(Math.min(item.getMaxStackSize(),64),destination.getMaxStackSize(item))-existing.getCount();
                     int count=Math.min(room,item.getCount());
                     if(count<=0)continue;
                     if(existing.isEmpty())destination.setItem(slot,item.copyWithCount(count));
