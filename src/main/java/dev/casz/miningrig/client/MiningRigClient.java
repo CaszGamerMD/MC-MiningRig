@@ -14,7 +14,7 @@ public final class MiningRigClient implements ClientModInitializer {
         MenuScreens.register(RigMenus.COMPUTER, ComputerScreen::new);
         ClientPlayNetworking.registerGlobalReceiver(ComputerStatePayload.TYPE,(payload,context)->{
             context.client().execute(()->{
-                if(context.client().screen instanceof ComputerScreen screen)
+                if(context.client().gui.screen() instanceof ComputerScreen screen)
                     screen.updateState(payload.state());
             });
         });
