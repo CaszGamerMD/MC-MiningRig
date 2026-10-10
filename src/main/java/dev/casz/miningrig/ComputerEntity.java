@@ -36,7 +36,10 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         READY("Ready"), RUNNING("Mining"), STOPPED("Manually stopped"), DONE("Job done"),
         OUT_OF_BITS("Out of bits"), NO_COLLECTOR("No collector in range"),
         BLOCKED("Unable to break block"), FULL("Drill inventory full"),
-        NO_DRILL("Drill missing"), WAITING("Not placed"), UNLOADED("Chunk unloaded");
+        NO_DRILL("Drill missing"), WAITING("Not placed"), UNLOADED("Chunk unloaded"),
+        NO_FILLER_CONTAINER("No Filler input"),NO_WALL_CONTAINER("No Walls input"),
+        NO_OUTPUT("No Output storage"),OUT_OF_FILLER("Out of Filler / Fluid in hole"),
+        OUT_OF_WALLS("Out of Walls"), FLUID_IN_HOLE("Fluid in hole");
         public final String display;
         Status(String value){display=value;}
     }
@@ -48,6 +51,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     private final int[] radii={2,2,2,2};
     private final int[] depths={12,12,12,12};
     private final boolean[] circles={true,true,true,true};
+    // 0 OFF, 1 AIR boundary sealing, 2 ALWAYS (extended mining and wall blocks)
+    private final int[] wallModes={0,0,0,0};
     private int selected, activeSlot;
     private long lastBroadcast;
     private void syncActiveChunks(ServerLevel server){
@@ -56,7 +61,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         for(int i=0;i<MAX_DRILLS;i++){
             if(!running[i] || positions[i]==null)continue;
             active=true;
-            RigChunkTickets.cover(desired,positions[i],radii[i]);
+            RigChunkTickets.cover(desired,positions[i],radii[i]+1);
         }
         // The remote controller must also tick when nobody is nearby.
         if(active)desired.add(new ChunkPos(worldPosition.getX()>>4,worldPosition.getZ()>>4));
@@ -72,6 +77,12 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public int selectedRadius(){return radii[selected];}
     public int selectedDepth(){return depths[selected];}
     public boolean selectedCircle(){return circles[selected];}
+    public int selectedWallMode(){return wallModes[selected];}
+    public int wallMode(){return wallModes[activeSlot];}
+    public void setWallMode(int value){
+        wallModes[selected]=Math.floorMod(value,3);
+        settingsChanged();
+    }
     public int radius(){return radii[activeSlot];}
     public int depth(){return depths[activeSlot];}
     public boolean circle(){return circles[activeSlot];}
@@ -142,10 +153,20 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         if(running[slot]){running[slot]=false;statuses[slot]=Status.STOPPED;}
         else if(tokens[slot].isEmpty()||positions[slot]==null)
             statuses[slot]=tokens[slot].isEmpty()?Status.NO_DRILL:Status.WAITING;
-        else if(level instanceof ServerLevel){
-            // Request the footprint even when a paired remote chunk is not yet loaded.
-            // If no drill exists once it loads, the next server tick reports NO_DRILL.
-            running[slot]=true;statuses[slot]=Status.RUNNING;
+        else if(level instanceof ServerLevel server){
+            BlockPos at=positions[slot];
+            if(!server.hasChunkAt(at))statuses[slot]=Status.UNLOADED;
+            else if(!(server.getBlockEntity(at) instanceof DrillEntity drill))
+                statuses[slot]=Status.NO_DRILL;
+            else if(RigNetwork.members(server,drill).isEmpty())
+                statuses[slot]=Status.NO_COLLECTOR;
+            else if(!RigNetwork.hasInput(server,drill,false))
+                statuses[slot]=Status.NO_FILLER_CONTAINER;
+            else if(!RigNetwork.hasOutput(server,drill))
+                statuses[slot]=Status.NO_OUTPUT;
+            else if(wallModes[slot]==2&&!RigNetwork.hasInput(server,drill,true))
+                statuses[slot]=Status.NO_WALL_CONTAINER;
+            else {running[slot]=true;statuses[slot]=Status.RUNNING;}
         }else statuses[slot]=Status.NO_DRILL;
         setChanged();syncIfServer();
     }
@@ -198,7 +219,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 .append('\t').append(nicknames[i]).append('\t').append(location)
                 .append('\t').append(status).append('\t').append(eta)
                 .append('\t').append(radii[i]).append('\t').append(depths[i])
-                .append('\t').append(circles[i]?"O":"S");
+                .append('\t').append(circles[i]?"O":"S")
+                .append('\t').append(wallModes[i]);
         }
         return out.toString();
     }
@@ -227,6 +249,16 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         }
         computer.syncActiveChunks(server);
         if(now%10==0){
+            boolean warn=false;
+            for(int i=0;i<MAX_DRILLS;i++)if(computer.running[i] && computer.positions[i]!=null
+                    && server.hasChunkAt(computer.positions[i])
+                    && server.getBlockEntity(computer.positions[i]) instanceof DrillEntity drill
+                    && drill.fluidWarning())warn=true;
+            boolean warning=warn && ((now/10)%2==0);
+            if(state.getValue(ComputerBlock.WARN)!=warning){
+                state=state.setValue(ComputerBlock.WARN,warning);
+                server.setBlock(pos,state,Block.UPDATE_CLIENTS);
+            }
             boolean alarm=false;
             for(int i=0;i<MAX_DRILLS;i++){
                 if(!computer.tokens[i].isEmpty()&&!computer.running[i]
@@ -279,6 +311,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             out.putString("Status"+i,statuses[i].name());
             out.putInt("Radius"+i,radii[i]);out.putInt("Depth"+i,depths[i]);
             out.putBoolean("Circle"+i,circles[i]);
+            out.putInt("WallMode"+i,wallModes[i]);
         }
     }
     @Override protected void loadAdditional(ValueInput in){
@@ -295,6 +328,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             radii[i]=Math.max(1,Math.min(12,in.getIntOr("Radius"+i,2)));
             depths[i]=Math.max(1,Math.min(256,in.getIntOr("Depth"+i,12)));
             circles[i]=in.getBooleanOr("Circle"+i,true);
+            wallModes[i]=Math.max(0,Math.min(2,in.getIntOr("WallMode"+i,0)));
         }
         // Migrate one-drill prototype saves into the four-drill supervisor.
         if(tokens[0].isEmpty() && in.getBooleanOr("Linked",false)){
