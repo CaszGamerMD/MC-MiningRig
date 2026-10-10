@@ -2,6 +2,11 @@ package dev.casz.miningrig;
 
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.util.StringRepresentable;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -17,7 +22,29 @@ import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
 public final class CoordinatorBlock extends BaseEntityBlock {
-    public CoordinatorBlock(Properties properties) { super(properties); }
+    public enum PortVisual implements StringRepresentable {
+        OFF("off"), IN("in"), OUT("out");
+        private final String name;
+        PortVisual(String name){this.name=name;}
+        @Override public String getSerializedName(){return name;}
+    }
+    public static final EnumProperty<PortVisual> DOWN=EnumProperty.create("down",PortVisual.class);
+    public static final EnumProperty<PortVisual> UP=EnumProperty.create("up",PortVisual.class);
+    public static final EnumProperty<PortVisual> NORTH=EnumProperty.create("north",PortVisual.class);
+    public static final EnumProperty<PortVisual> SOUTH=EnumProperty.create("south",PortVisual.class);
+    public static final EnumProperty<PortVisual> WEST=EnumProperty.create("west",PortVisual.class);
+    public static final EnumProperty<PortVisual> EAST=EnumProperty.create("east",PortVisual.class);
+    @SuppressWarnings("unchecked")
+    public static final EnumProperty<PortVisual>[] PORTS=new EnumProperty[]{DOWN,UP,NORTH,SOUTH,WEST,EAST};
+    public CoordinatorBlock(Properties properties){
+        super(properties);
+        BlockState def=defaultBlockState();
+        for(EnumProperty<PortVisual> port:PORTS)def=def.setValue(port,PortVisual.OFF);
+        registerDefaultState(def);
+    }
+    @Override protected void createBlockStateDefinition(StateDefinition.Builder<Block,BlockState> builder){
+        builder.add(PORTS);
+    }
     @Override protected MapCodec<? extends BaseEntityBlock> codec() { return simpleCodec(CoordinatorBlock::new); }
     @Override protected RenderShape getRenderShape(BlockState state) { return RenderShape.MODEL; }
     @Nullable @Override public BlockEntity newBlockEntity(BlockPos pos,BlockState state) { return new CoordinatorEntity(pos,state); }
