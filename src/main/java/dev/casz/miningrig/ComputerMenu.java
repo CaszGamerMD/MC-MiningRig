@@ -25,11 +25,11 @@ public final class ComputerMenu extends AbstractContainerMenu {
         if(id>=0&&id<4)computer.select(id);
         else if(id>=10&&id<14)computer.toggle(id-10);
         else if(id>=20&&id<24)computer.unlink(id-20);
-        else if(id==30)computer.setRadius(computer.radius()-1);
-        else if(id==31)computer.setRadius(computer.radius()+1);
-        else if(id==32)computer.setDepth(computer.depth()-1);
-        else if(id==33)computer.setDepth(computer.depth()+1);
-        else if(id==34)computer.setCircle(!computer.circle());
+        else if(id==30)computer.setRadius(computer.selectedRadius()-1);
+        else if(id==31)computer.setRadius(computer.selectedRadius()+1);
+        else if(id==32)computer.setDepth(computer.selectedDepth()-1);
+        else if(id==33)computer.setDepth(computer.selectedDepth()+1);
+        else if(id==34)computer.setCircle(!computer.selectedCircle());
         else return false;
         broadcastChanges();return true;
     }

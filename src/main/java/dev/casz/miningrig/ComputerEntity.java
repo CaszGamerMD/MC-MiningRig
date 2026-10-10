@@ -51,6 +51,9 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public ComputerEntity(BlockPos pos,BlockState state){super(MiningRig.COMPUTER_ENTITY,pos,state);}
     public boolean belongsTo(ComputerMenu menu){return menu.computer()==this;}
     public int selected(){return selected;}
+    public int selectedRadius(){return radii[selected];}
+    public int selectedDepth(){return depths[selected];}
+    public boolean selectedCircle(){return circles[selected];}
     public int radius(){return radii[activeSlot];}
     public int depth(){return depths[activeSlot];}
     public boolean circle(){return circles[activeSlot];}
@@ -95,6 +98,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public boolean placed(String token,BlockPos place){
         for(int i=0;i<MAX_DRILLS;i++){
             if(!tokens[i].isEmpty()&&tokens[i].equals(token)){
+                if(place.equals(positions[i]))return true;
                 positions[i]=place.immutable();
                 statuses[i]=Status.READY;
                 running[i]=false;

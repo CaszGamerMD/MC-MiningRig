@@ -49,9 +49,9 @@ public final class ComputerBlock extends BaseEntityBlock {
         }
         if (stack.is(Items.STICK) || stack.is(Items.BONE) || stack.is(Items.LAPIS_LAZULI)) {
             if (!level.isClientSide()) {
-                if (stack.is(Items.STICK)) computer.setRadius(computer.radius() + (player.isShiftKeyDown() ? -1 : 1));
-                if (stack.is(Items.BONE)) computer.setDepth(computer.depth() + (player.isShiftKeyDown() ? -1 : 1));
-                if (stack.is(Items.LAPIS_LAZULI)) computer.setCircle(!computer.circle());
+                if (stack.is(Items.STICK)) computer.setRadius(computer.selectedRadius() + (player.isShiftKeyDown() ? -1 : 1));
+                if (stack.is(Items.BONE)) computer.setDepth(computer.selectedDepth() + (player.isShiftKeyDown() ? -1 : 1));
+                if (stack.is(Items.LAPIS_LAZULI)) computer.setCircle(!computer.selectedCircle());
                 player.sendSystemMessage(Component.literal(computer.description()));
             }
             return InteractionResult.SUCCESS;

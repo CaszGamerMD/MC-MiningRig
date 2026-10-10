@@ -35,9 +35,9 @@ public final class ComputerScreenRenderer implements BlockEntityRenderer<Compute
         BlockEntityRenderer.super.extractRenderState(entity, state, partialTick, cameraPos, crumblingOverlay);
         state.message = entity.screenStatus();
         state.running = entity.running();
-        state.radius = entity.radius();
-        state.depth = entity.depth();
-        state.circle = entity.circle();
+        state.radius = entity.selectedRadius();
+        state.depth = entity.selectedDepth();
+        state.circle = entity.selectedCircle();
     }
     @Override public void submit(ComputerScreenRenderState state, PoseStack matrices, SubmitNodeCollector queue,
                                  CameraRenderState cameraState) {
