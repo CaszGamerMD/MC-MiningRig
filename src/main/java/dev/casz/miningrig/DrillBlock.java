@@ -39,6 +39,10 @@ public final class DrillBlock extends BaseEntityBlock {
         if(!level.isClientSide() && level.getBlockEntity(pos) instanceof DrillEntity drill)player.openMenu(drill);
         return InteractionResult.SUCCESS;
     }
+    @Override public BlockState playerWillDestroy(Level level,BlockPos pos,BlockState state,Player player) {
+        if(!level.isClientSide() && level.getBlockEntity(pos) instanceof DrillEntity entity)entity.dropInventory();
+        return super.playerWillDestroy(level,pos,state,player);
+    }
     @Override protected void affectNeighborsAfterRemoval(BlockState state,ServerLevel level,BlockPos pos,boolean moved){
         if(level.getBlockEntity(pos) instanceof DrillEntity drill)drill.dropInventory();
         super.affectNeighborsAfterRemoval(state,level,pos,moved);
