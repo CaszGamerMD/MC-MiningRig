@@ -25,7 +25,7 @@ public final class MiningRig implements ModInitializer {
     private static Block block(String name, Function<BlockBehaviour.Properties, Block> factory) {
         BlockItemId key = BlockItemId.create(id(name), id(name));
         Block block = Registry.register(BuiltInRegistries.BLOCK, key.block(),
-                factory.apply(BlockBehaviour.Properties.of().strength(4.0f).requiresCorrectToolForDrops().setId(key.block())));
+                factory.apply(BlockBehaviour.Properties.of().strength(4.0f).noOcclusion().requiresCorrectToolForDrops().setId(key.block())));
         Registry.register(BuiltInRegistries.ITEM, key.item(),
                 new BlockItem(block, new Item.Properties().useBlockDescriptionPrefix()
                         .stacksTo(name.equals("mining_drill")?1:64).setId(key.item())));
@@ -43,6 +43,7 @@ public final class MiningRig implements ModInitializer {
     }
 
     public static final Block COMPUTER = block("mining_computer", ComputerBlock::new);
+    public static final Block COMPUTER_UPPER = machinePart("mining_computer_upper",ComputerUpperBlock::new);
     public static final Block DRILL = block("mining_drill", DrillBlock::new);
     public static final Block DRILL_UPPER = machinePart("mining_drill_upper",DrillUpperBlock::new);
     public static final Block COORDINATOR = block("collection_coordinator", CoordinatorBlock::new);

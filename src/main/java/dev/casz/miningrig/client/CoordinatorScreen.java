@@ -38,7 +38,8 @@ public final class CoordinatorScreen extends AbstractContainerScreen<Coordinator
             String label=switch(dir){case DOWN->"D";case UP->"U";case NORTH->"N";case SOUTH->"S";case WEST->"W";case EAST->"E";};
             int mode=menu.mode(dir);
             b.setMessage(Component.literal(label+":"+(mode==0?"-":mode==1?"I":"O")));
-            b.active=menu.connected(dir);
+            // Ports must be configurable before a receiver or drill is present.
+            b.active=true;
         }
     }
     @Override public void extractBackground(GuiGraphicsExtractor g,int mouseX,int mouseY,float delta) {

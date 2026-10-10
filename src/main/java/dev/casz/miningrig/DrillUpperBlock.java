@@ -24,7 +24,11 @@ public final class DrillUpperBlock extends Block {
     @Override protected RenderShape getRenderShape(BlockState state){return RenderShape.MODEL;}
     @Override protected InteractionResult useItemOn(ItemStack stack,BlockState state,Level level,
             BlockPos pos,Player player,InteractionHand hand,BlockHitResult hit){
-        if(!(stack.getItem() instanceof DrillBit))return InteractionResult.PASS;
+        if(!(stack.getItem() instanceof DrillBit)){
+            if(!level.isClientSide() && level.getBlockEntity(pos.below()) instanceof DrillEntity drill)
+                player.openMenu(drill);
+            return InteractionResult.SUCCESS;
+        }
         if(!level.isClientSide() && level.getBlockEntity(pos.below()) instanceof DrillEntity drill){
             int slot=drill.insertBit(stack);
             if(slot<0)player.sendSystemMessage(Component.literal("All three drill-bit slots are occupied."));
