@@ -25,16 +25,11 @@ public final class CoordinatorBlock extends BaseEntityBlock {
         return level.isClientSide()?null:createTickerHelper(type,MiningRig.COORDINATOR_ENTITY,CoordinatorEntity::tick);
     }
     @Override protected InteractionResult useWithoutItem(BlockState state,Level level,BlockPos pos,Player player,BlockHitResult hit) {
-        if(!level.isClientSide() && level.getBlockEntity(pos) instanceof CoordinatorEntity collector)
-            player.sendSystemMessage(Component.literal("Collection Coordinator: "+collector.filledSlots()+"/27 slots used. Hoppers can extract; use Rig Linker to configure wireless output."));
+        if(!level.isClientSide() && level.getBlockEntity(pos) instanceof CoordinatorEntity cc)player.openMenu(cc);
         return InteractionResult.SUCCESS;
     }
     @Override protected void affectNeighborsAfterRemoval(BlockState state, net.minecraft.server.level.ServerLevel level, BlockPos pos, boolean moved) {
-        if (level.getBlockEntity(pos) instanceof CoordinatorEntity entity && !level.isClientSide()) {
-            for(int i=0;i<entity.getContainerSize();i++) {
-                if(!entity.getItem(i).isEmpty()) popResource(level,pos,entity.getItem(i));
-            }
-        }
+        if(level.getBlockEntity(pos) instanceof CoordinatorEntity cc)cc.dropContents();
         super.affectNeighborsAfterRemoval(state,level,pos,moved);
     }
 }
