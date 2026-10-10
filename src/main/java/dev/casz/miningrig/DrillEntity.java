@@ -151,7 +151,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     }
     /** Called once each server tick, not every 8 ticks; speed follows vanilla break progress. */
     public ComputerEntity.Status mineTick(ServerLevel world,ComputerEntity computer) {
-        if(completedLayers>=computer.depth())return ComputerEntity.Status.DONE;
+        if(completedLayers>=computer.depth() || worldPosition.getY()-1<world.getMinY())
+            return ComputerEntity.Status.DONE;
         workTicks++;
         // If the CC spine or its required inventories disappear while a rig is
         // running, do not mine indefinitely into an isolated 64-item buffer.
