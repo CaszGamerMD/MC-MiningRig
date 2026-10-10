@@ -62,6 +62,9 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             if(!running[i] || positions[i]==null)continue;
             active=true;
             RigChunkTickets.cover(desired,positions[i],radii[i]+1);
+            if(server.hasChunkAt(positions[i]) &&
+                server.getBlockEntity(positions[i]) instanceof DrillEntity drill)
+                RigNetwork.includeLoadedNetwork(server,drill,desired);
         }
         // The remote controller must also tick when nobody is nearby.
         if(active)desired.add(new ChunkPos(worldPosition.getX()>>4,worldPosition.getZ()>>4));

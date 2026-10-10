@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -149,6 +150,28 @@ public final class RigNetwork {
             }
         }
         return false;
+    }
+    /**
+     * Pin the entire discovered CC graph and adjacent container chunks while
+     * the owning drill runs. Also pin intermediate chunks in each wireless
+     * straight line so unloaded gaps do not break neighbor discovery.
+     */
+    public static void includeLoadedNetwork(ServerLevel world,DrillEntity drill,Set<ChunkPos> chunks){
+        for(CoordinatorEntity cc:members(world,drill)){
+            BlockPos base=cc.getBlockPos();
+            chunks.add(new ChunkPos(base.getX()>>4,base.getZ()>>4));
+            for(Direction side:Direction.values()){
+                BlockPos neighbor=base.relative(side);
+                chunks.add(new ChunkPos(neighbor.getX()>>4,neighbor.getZ()>>4));
+                CoordinatorEntity other=cc.nearest(world,side);
+                if(other==null)continue;
+                for(int n=1;n<=20;n++){
+                    BlockPos p=base.relative(side,n);
+                    chunks.add(new ChunkPos(p.getX()>>4,p.getZ()>>4));
+                    if(p.equals(other.getBlockPos()))break;
+                }
+            }
+        }
     }
     /** Shortest CC hop which leads to any accessible output container. */
     public static CoordinatorEntity nextTowardOutput(ServerLevel world,CoordinatorEntity start){
