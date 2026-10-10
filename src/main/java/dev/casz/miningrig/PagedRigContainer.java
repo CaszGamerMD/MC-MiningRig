@@ -52,6 +52,6 @@ public final class PagedRigContainer implements Container {
         for(int i=0;i<getContainerSize();i++)if(valid(i))backing.setItem(backingSlot(i),ItemStack.EMPTY);
         backing.setChanged();
     }
-    @Override public void startOpen(Player player){backing.startOpen(player);}
-    @Override public void stopOpen(Player player){backing.stopOpen(player);}
+    public void startOpen(Player player){backing.startOpen(player);}
+    public void stopOpen(Player player){backing.stopOpen(player);}
 }
