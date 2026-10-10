@@ -33,7 +33,8 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class CoordinatorEntity extends BlockEntity implements Container,MenuProvider {
     private static final int CAPACITY=192,SLOTS=192,PACKET_SIZE=3;
-    private static final int MAX_FLIGHTS=128,OUTBOUND_PER_TICK=4,CONTAINER_ACTIONS_PER_TICK=32;
+    private static final int MAX_FLIGHTS=256,COLLECT_PER_TICK=4,OUTBOUND_PER_TICK=8,
+        CONTAINER_ACTIONS_PER_TICK=32,MAX_DISPLAY_ENTITIES=48;
     private final NonNullList<ItemStack> items=NonNullList.withSize(SLOTS,ItemStack.EMPTY);
     // 0 unconfigured, 1 filler input, 2 wall input (pause), 3 wall input (continue), 4 output.
     // CC links and the upward drill link need no direction setting.
@@ -151,7 +152,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         // Adjacent container output does not consume wireless travel bandwidth.
         for(int n=0;n<CONTAINER_ACTIONS_PER_TICK;n++)
             if(!cc.outputToContainer(world))break;
-        cc.collectDrillBelow(world,now);
+        for(int n=0;n<COLLECT_PER_TICK;n++)cc.collectDrillBelow(world,now);
         for(int n=0;n<OUTBOUND_PER_TICK;n++)
             if(!cc.dispatch(world,now))break;
     }
@@ -190,13 +191,19 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         Flight flight=new Flight(cargo,origin,target,fromDrill,now,
             Math.max(3,(int)Math.ceil(distance*2.5)));
         flights.add(flight);
-        spawn(world,flight);
+        if(liveDisplays()<MAX_DISPLAY_ENTITIES)spawn(world,flight);
         setChanged();
     }
     private void collectDrillBelow(ServerLevel world,long now){
         if(flights.size()>=MAX_FLIGHTS)return;
         // Reserve room for every packet already traveling upward into this CC.
-        int budget=Math.min(PACKET_SIZE,Math.max(0,freeStorage()-inboundFromDrill()));
+        // Outbound is twice as fast as inbound, and active route packets do
+        // not occupy the 192-item LOCAL inventory until actually delivered.
+        // Backpressure still applies when there is no configured exit.
+        boolean route=RigNetwork.hasOutputHere(world,this)
+            || RigNetwork.nextTowardOutput(world,this)!=null;
+        int budget=route?PACKET_SIZE:
+            Math.min(PACKET_SIZE,Math.max(0,freeStorage()-inboundFromDrill()));
         if(budget==0)return;
         DrillEntity drill=drillBelow(world);
         if(drill==null)return;
@@ -252,7 +259,13 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         startFlight(world,taken,worldPosition,next.worldPosition,false,now);
         return true;
     }
+    private int liveDisplays(){
+        int count=0;
+        for(Flight flight:flights)if(flight.visual!=null&&flight.visual.isAlive())count++;
+        return count;
+    }
     private void spawn(ServerLevel world,Flight flight){
+        if(flight.visual==null && liveDisplays()>=MAX_DISPLAY_ENTITIES)return;
         if(flight.visual!=null&&flight.visual.isAlive())return;
         if(flight.cargo.isEmpty())return;
         Display.ItemDisplay item=new Display.ItemDisplay(
