@@ -5,6 +5,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.InteractionResult;
@@ -23,11 +25,17 @@ public final class DrillBlock extends BaseEntityBlock {
     public DrillBlock(Properties properties){super(properties);}
     @Override protected MapCodec<? extends BaseEntityBlock> codec(){return simpleCodec(DrillBlock::new);}
     @Override protected RenderShape getRenderShape(BlockState state){return RenderShape.MODEL;}
+    @Nullable @Override public BlockState getStateForPlacement(BlockPlaceContext ctx){
+        if(!ctx.getLevel().getBlockState(ctx.getClickedPos().above()).canBeReplaced(ctx))return null;
+        return super.getStateForPlacement(ctx);
+    }
     @Nullable @Override public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level,BlockState state,BlockEntityType<T> type){
         return level.isClientSide()?null:createTickerHelper(type,MiningRig.DRILL_ENTITY,DrillEntity::tick);
     }
     @Override public void setPlacedBy(Level level,BlockPos pos,BlockState state,@Nullable LivingEntity placer,ItemStack stack){
         super.setPlacedBy(level,pos,state,placer,stack);
+        if(level.getBlockState(pos.above()).canBeReplaced())
+            level.setBlock(pos.above(),MiningRig.DRILL_UPPER.defaultBlockState(),Block.UPDATE_ALL);
         if(!(level instanceof ServerLevel server))return;
         DrillBinding.Link link=DrillBinding.read(stack);
         if(link==null || !link.dimension().equals(server.dimension().identifier().toString()))return;
@@ -59,11 +67,17 @@ public final class DrillBlock extends BaseEntityBlock {
         return InteractionResult.SUCCESS;
     }
     @Override public BlockState playerWillDestroy(Level level,BlockPos pos,BlockState state,Player player) {
-        if(!level.isClientSide() && level.getBlockEntity(pos) instanceof DrillEntity entity)entity.dropInventory();
+        if(!level.isClientSide()){
+            if(level.getBlockEntity(pos) instanceof DrillEntity entity)entity.dropInventory();
+            if(level.getBlockState(pos.above()).is(MiningRig.DRILL_UPPER))
+                level.removeBlock(pos.above(),false);
+        }
         return super.playerWillDestroy(level,pos,state,player);
     }
     @Override protected void affectNeighborsAfterRemoval(BlockState state,ServerLevel level,BlockPos pos,boolean moved){
         if(level.getBlockEntity(pos) instanceof DrillEntity drill)drill.dropInventory();
+        if(level.getBlockState(pos.above()).is(MiningRig.DRILL_UPPER))
+            level.removeBlock(pos.above(),false);
         super.affectNeighborsAfterRemoval(state,level,pos,moved);
     }
 }

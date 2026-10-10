@@ -182,7 +182,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
             if(state.isAir()){assigned[lane]=-1;progress[lane]=0;continue;}
             if(state.getDestroySpeed(world,p)<0 || state.hasBlockEntity() || !drillBit.canMine(state)
                 || state.is(MiningRig.DRILL) || state.is(MiningRig.COMPUTER)
-                || state.is(MiningRig.COORDINATOR))return ComputerEntity.Status.BLOCKED;
+                || state.is(MiningRig.COORDINATOR) || state.is(MiningRig.DRILL_UPPER))
+                return ComputerEntity.Status.BLOCKED;
             progress[lane]+=speed(world,bit,state);
             if(progress[lane]<1.0f)continue;
             List<ItemStack> drops=Block.getDrops(state,world,p,null,null,bit);
@@ -228,7 +229,12 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         moved.linkConfirmed=linkConfirmed;
         moved.setChanged();
         // Never spill contents during the planned downward step.
-        relocating=true;world.setBlock(previous,Blocks.AIR.defaultBlockState(),Block.UPDATE_ALL);
+        relocating=true;
+        // Move the two-block structure down together. The old lower block
+        // becomes the new upper block; no inventory is dropped during motion.
+        if(world.getBlockState(previous.above()).is(MiningRig.DRILL_UPPER))
+            world.setBlock(previous.above(),Blocks.AIR.defaultBlockState(),Block.UPDATE_ALL);
+        world.setBlock(previous,MiningRig.DRILL_UPPER.defaultBlockState(),Block.UPDATE_ALL);
         computer.moved(previous,next);
         return ComputerEntity.Status.RUNNING;
     }

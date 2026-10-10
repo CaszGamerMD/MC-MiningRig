@@ -31,6 +31,12 @@ public final class MiningRig implements ModInitializer {
                         .stacksTo(name.equals("mining_drill")?1:64).setId(key.item())));
         return block;
     }
+    /** An upper machine section with no obtainable item of its own. */
+    private static Block machinePart(String name,Function<BlockBehaviour.Properties,Block> factory){
+        BlockItemId key=BlockItemId.create(id(name),id(name));
+        return Registry.register(BuiltInRegistries.BLOCK,key.block(),
+            factory.apply(BlockBehaviour.Properties.of().strength(4.0f).noOcclusion().setId(key.block())));
+    }
     private static Item item(String name, Function<Item.Properties, Item> factory, Item.Properties properties) {
         ResourceKey<Item> key = ResourceKey.create(Registries.ITEM, id(name));
         return Registry.register(BuiltInRegistries.ITEM, key, factory.apply(properties.setId(key)));
@@ -38,6 +44,7 @@ public final class MiningRig implements ModInitializer {
 
     public static final Block COMPUTER = block("mining_computer", ComputerBlock::new);
     public static final Block DRILL = block("mining_drill", DrillBlock::new);
+    public static final Block DRILL_UPPER = machinePart("mining_drill_upper",DrillUpperBlock::new);
     public static final Block COORDINATOR = block("collection_coordinator", CoordinatorBlock::new);
     public static final BlockEntityType<ComputerEntity> COMPUTER_ENTITY = Registry.register(
             BuiltInRegistries.BLOCK_ENTITY_TYPE, id("mining_computer"),
