@@ -28,6 +28,10 @@ public final class CoordinatorBlock extends BaseEntityBlock {
         if(!level.isClientSide() && level.getBlockEntity(pos) instanceof CoordinatorEntity cc)player.openMenu(cc);
         return InteractionResult.SUCCESS;
     }
+    @Override public BlockState playerWillDestroy(Level level,BlockPos pos,BlockState state,Player player) {
+        if(!level.isClientSide() && level.getBlockEntity(pos) instanceof CoordinatorEntity entity)entity.dropContents();
+        return super.playerWillDestroy(level,pos,state,player);
+    }
     @Override protected void affectNeighborsAfterRemoval(BlockState state, net.minecraft.server.level.ServerLevel level, BlockPos pos, boolean moved) {
         if(level.getBlockEntity(pos) instanceof CoordinatorEntity cc)cc.dropContents();
         super.affectNeighborsAfterRemoval(state,level,pos,moved);
