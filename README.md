@@ -1,10 +1,35 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.4.0 — drill-controlled collection networks, fluid sealing, wall building**
+**Version 0.4.1 — coordinator visual overhaul and portable computer tablet**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.4.1: redesigned Collection Coordinators and portable tablet
+
+### Coordinator face designs
+
+Every face is part of the **same six-sided steel Collection Coordinator**, based on the flat / input / output / wireless render reference:
+- **Flat:** dark, inset steel panel and corner rivets; no nearby configured link.
+- **Input:** inset hopper-like collector mouth for an attached Filler or Wall input inventory.
+- **Output:** hollow projecting metal tube for a configured output inventory.
+- **Teal link:** luminous-looking cyan signal core with corner lights for an automatic CC–CC or drill–CC link.
+
+The shapes are generated as independent blockstate multipart model elements and rotate onto all six faces. A model-geometry Z-fighting audit was done for the CC, drill, computer, and tablet. Overlapping outward coplanar teal-panel trim pieces were separated; model overlays sit on different depth planes. The machine still uses the original `miningrig:collection_coordinator` ID and 192-item storage/network rules.
+
+### Mining Computer Tablet
+
+Craft a **Mining Computer Tablet** with iron, glass pane, comparator and redstone, or find it in the Redstone creative category.
+
+1. **Hold the tablet and right-click a real Mining Computer** (including its raised upper section) to pair it. The computer generates a persistent machine identity. You can link multiple tablets to one computer; they don't consume any of its four drill slots.
+2. **Right-click air while holding the linked tablet** to open the **actual remote computer GUI**, including all four drills, live statuses/ETAs, nicknames, running controls and wall modes. Tablets do **not** accept drill pairing; drills must still be linked to a placed Mining Computer.
+3. **Right-click the side of another block with the tablet** to install it as a compact wall/ceiling/floor-mounted workstation. Right-click the installed terminal to open that same remote computer GUI. The linked machine coordinates, dimension and unique machine ID persist through placement and normal player break/pickup.
+4. The handheld item uses **dark/green/yellow/red** visual variants synchronized to the real computer's warning and alarm lamp. The installed terminal's indicator also reflects the computer's current light state; yellow/red blink phases follow the source computer when its chunk is loaded.
+
+**Remote access:** tablet terminals can open their authoritative computer from a different location or dimension. Opening a session loads the computer chunk temporarily and releases that session ticket when the menu closes; this does not add a second computer/drill controller. The link is rejected if the old computer block has been broken and replaced. A tablet outside a loaded computer chunk may appear dark until a session opens or drilling keeps the computer loaded; this is expected and avoids indefinitely force-loading computers from unattended tablets.
+
+**Early-stage testing:** run this development build in a backup world and verify front/back tablet orientation, real multiplayer tablet control, status lamp flashes, the mounted block surviving break/replacement, and every CC face attachment. GitHub Actions verifies compilation, not actual in-world rendering.
 
 ## New linking procedure
 
@@ -122,6 +147,6 @@ One Collection Coordinator block handles all wireless item routing. Its internal
 
 Minecraft **26.2**, Fabric Loader **0.19.5**, Fabric API **0.161.0+26.2**, Java **25**, Gradle **9.7.0**, Loom **1.18.3**.
 
-Run `gradle build` using Java 25; or download the `caszual-mining-rig-0.4.0.jar` inside the `miningrig-26.2` artifact in the most recent successful GitHub Actions workflow.
+Run `gradle build` using Java 25; or download the `caszual-mining-rig-0.4.1.jar` inside the `miningrig-26.2` artifact in the most recent successful GitHub Actions workflow.
 
 **Status:** GitHub Actions compile verification is used, but it does *not* test actual Minecraft interaction, server permissions, chunk reloads, or multiplayer naming/GUI synchronization. Test in a backed-up world and treat this as a development build until in-game verified.
