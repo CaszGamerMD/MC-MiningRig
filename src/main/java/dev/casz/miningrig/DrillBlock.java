@@ -23,7 +23,6 @@ public final class DrillBlock extends BaseEntityBlock {
     @Nullable @Override public BlockEntity newBlockEntity(BlockPos pos,BlockState state){return new DrillEntity(pos,state);}
     @Override protected InteractionResult useItemOn(ItemStack stack,BlockState state,Level level,BlockPos pos,
                                             Player player,InteractionHand hand,BlockHitResult hit){
-        if(stack.is(MiningRig.LINKER))return InteractionResult.PASS;
         if(!(stack.getItem() instanceof DrillBit))return InteractionResult.PASS;
         if(level.getBlockEntity(pos) instanceof DrillEntity drill && !level.isClientSide()){
             int slot=drill.insertBit(stack);
@@ -36,7 +35,12 @@ public final class DrillBlock extends BaseEntityBlock {
         return InteractionResult.SUCCESS;
     }
     @Override protected InteractionResult useWithoutItem(BlockState state,Level level,BlockPos pos,Player player,BlockHitResult hit){
-        if(!level.isClientSide() && level.getBlockEntity(pos) instanceof DrillEntity drill)player.openMenu(drill);
+        if(!level.isClientSide() && level.getBlockEntity(pos) instanceof DrillEntity drill){
+            if(player.isShiftKeyDown() && level instanceof ServerLevel server){
+                RigPairing.select(server,player,pos);
+                player.sendSystemMessage(Component.literal("Drill selected. Sneak-right-click your Mining Computer with an empty hand."));
+            }else player.openMenu(drill);
+        }
         return InteractionResult.SUCCESS;
     }
     @Override public BlockState playerWillDestroy(Level level,BlockPos pos,BlockState state,Player player) {

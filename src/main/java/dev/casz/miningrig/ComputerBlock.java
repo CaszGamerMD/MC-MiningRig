@@ -37,7 +37,6 @@ public final class ComputerBlock extends BaseEntityBlock {
     }
     @Override protected InteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
                                                       Player player, InteractionHand hand, BlockHitResult hit) {
-        if (stack.is(MiningRig.LINKER)) return InteractionResult.PASS;
         if (!(level.getBlockEntity(pos) instanceof ComputerEntity computer)) return InteractionResult.PASS;
         if (stack.is(Items.STICK) || stack.is(Items.BONE) || stack.is(Items.LAPIS_LAZULI)) {
             if (!level.isClientSide()) {
@@ -52,7 +51,12 @@ public final class ComputerBlock extends BaseEntityBlock {
     }
     @Override protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
         if (level.getBlockEntity(pos) instanceof ComputerEntity computer && !level.isClientSide()) {
-            if (!player.isShiftKeyDown()) computer.toggle();
+            if (player.isShiftKeyDown() && level instanceof net.minecraft.server.level.ServerLevel server){
+                boolean linked=RigPairing.linkSelected(server,player,computer);
+                player.sendSystemMessage(Component.literal(linked
+                    ? "Mining Computer linked to selected drill."
+                    : "No selected drill. Sneak-right-click the drill first."));
+            } else computer.toggle();
             player.sendSystemMessage(Component.literal(computer.description()));
         }
         return InteractionResult.SUCCESS;

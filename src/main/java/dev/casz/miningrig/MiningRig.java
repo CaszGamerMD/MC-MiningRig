@@ -48,7 +48,6 @@ public final class MiningRig implements ModInitializer {
             BuiltInRegistries.BLOCK_ENTITY_TYPE, id("collection_coordinator"),
             FabricBlockEntityTypeBuilder.create(CoordinatorEntity::new, COORDINATOR).build());
 
-    public static final Item LINKER = item("rig_linker", RigLinker::new, new Item.Properties().stacksTo(1));
     public static final Item WOOD_BIT = bit("wood_bit", 59, 0, 2, ToolMaterial.WOOD);
     public static final Item STONE_BIT = bit("stone_bit", 131, 1, 4, ToolMaterial.STONE);
     public static final Item IRON_BIT = bit("iron_bit", 250, 2, 6, ToolMaterial.IRON);
@@ -62,7 +61,7 @@ public final class MiningRig implements ModInitializer {
     @Override public void onInitialize() {
         RigMenus.initialize();
         CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.REDSTONE_BLOCKS).register(tab -> {
-            tab.accept(COMPUTER); tab.accept(DRILL); tab.accept(COORDINATOR); tab.accept(LINKER);
+            tab.accept(COMPUTER); tab.accept(DRILL); tab.accept(COORDINATOR);
             tab.accept(WOOD_BIT); tab.accept(STONE_BIT); tab.accept(IRON_BIT);
             tab.accept(GOLD_BIT); tab.accept(DIAMOND_BIT); tab.accept(NETHERITE_BIT);
         });
