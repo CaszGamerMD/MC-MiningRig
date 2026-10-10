@@ -73,7 +73,8 @@ final class DrillSealing {
         BlockState material=blockItem.getBlock().defaultBlockState();
         if(!world.setBlock(p,material,Block.UPDATE_ALL)){
             // Never void material if the world refuses to place it.
-            drill.receive(List.of(supply.get(0)));
+            if(!drill.receive(List.of(supply.get(0))))
+                Block.popResource(world,drill.getBlockPos(),supply.get(0).copy());
             return false;
         }
         pending=p.immutable();pendingType=walls?2:1;wait=8;

@@ -75,13 +75,11 @@ public final class RigNetwork {
         return false;
     }
     public static boolean wallsCanContinue(ServerLevel world,DrillEntity drill){
-        boolean any=false;
-        for(CoordinatorEntity cc:members(world,drill))
-            for(Direction side:Direction.values())if(cc.isWallInput(side) && cc.external(world,side)!=null){
-                any=true;
-                if(cc.portMode(side)==WALL_PAUSE)return false;
-            }
-        return any;
+        // The nearest designated Walls container owns the empty behavior.
+        // Alternative wall containers are still searched first for material.
+        List<Source> options=sources(world,drill,true);
+        return !options.isEmpty()
+            && options.get(0).coordinator().portMode(options.get(0).side())==WALL_CONTINUE;
     }
     private static List<Source> sources(ServerLevel world,DrillEntity drill,boolean walls){
         List<Source> result=new ArrayList<>();
@@ -104,6 +102,7 @@ public final class RigNetwork {
         BlockState state=item.getBlock().defaultBlockState();
         return !state.hasBlockEntity() && !state.isAir()
             && state.getFluidState().isEmpty()
+            && !state.canBeReplaced()
             && !state.is(MiningRig.DRILL) && !state.is(MiningRig.COORDINATOR)
             && !state.is(MiningRig.COMPUTER);
     }
