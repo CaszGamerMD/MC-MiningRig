@@ -1,6 +1,6 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.3.2 — new machine models and drill output hatch**
+**Version 0.3.3 — GUI interaction, model-depth and terrain-occlusion fixes**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
@@ -30,6 +30,15 @@ Every drill has its **own** settings, running flag, error state, and tracked pos
 ### ETA caveat
 
 ETA is shown as an estimate, not a guaranteed finish time. It begins with approximate tool speed and becomes based on actual per-cell progress after digging. It shows `--` if no usable bit is present, and zero when the configured depth has finished.
+
+## v0.3.3 visual and interaction fixes
+
+- Lower drill and centered coordinators now use **non-occluding model properties**, so they no longer conceal surrounding terrain and create a square x-ray hole.
+- Regenerated drill cone/housing and monitor geometry remove coplanar overlapping faces that produced flicker and texture fighting.
+- Visible drill-bit dots now sit **on** the lower drill's metal collar and are properly depth tested, rather than showing through geometry. The computer text is also depth tested and rendered only when looking at the actual front face.
+- Clicking either half of the drill opens its inventory, unless a held drill bit is being installed. Clicking any normal held item on a coordinator opens its inventory. A computer now has a **clickable upper screen target**, not just an upper model extending beyond its one-block click area. Holding a drill item still pairs it to the computer; normal held items and empty hands open its console.
+- Computer upper interaction blocks automatically appear on pre-existing computers where the space above them is air.
+- All six drill bits use larger **3D broad shovel-head/spade bit models** instead of reused vanilla pickaxe sprites.
 
 ## Physical machine designs
 
@@ -65,6 +74,6 @@ One Collection Coordinator block handles all wireless item routing. Its internal
 
 Minecraft **26.2**, Fabric Loader **0.19.5**, Fabric API **0.161.0+26.2**, Java **25**, Gradle **9.7.0**, Loom **1.18.3**.
 
-Run `gradle build` using Java 25; or download the `caszual-mining-rig-0.3.2.jar` inside the `miningrig-26.2` artifact in the most recent successful GitHub Actions workflow.
+Run `gradle build` using Java 25; or download the `caszual-mining-rig-0.3.3.jar` inside the `miningrig-26.2` artifact in the most recent successful GitHub Actions workflow.
 
 **Status:** GitHub Actions compile verification is used, but it does *not* test actual Minecraft interaction, server permissions, chunk reloads, or multiplayer naming/GUI synchronization. Test in a backed-up world and treat this as a development build until in-game verified.
