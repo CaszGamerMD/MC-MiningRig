@@ -45,6 +45,10 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private BlockPos wallWorkTarget;
     public int completedLayers(){return completedLayers;}
     public boolean fluidWarning(){return sealing.warning();}
+    public void retryFailedFill(ServerLevel world){sealing.retryFailedFill(world,this);}
+    public boolean canAutoRecoverFill(ServerLevel world){return sealing.canAutoRecover(world);}
+    @Nullable public BlockPos failedFillPosition(){return sealing.stuckPosition();}
+    public int failedFillAttempts(){return sealing.failedAttempts();}
     private long workTicks;
     private String linkedToken="";
     private BlockPos computerPos;

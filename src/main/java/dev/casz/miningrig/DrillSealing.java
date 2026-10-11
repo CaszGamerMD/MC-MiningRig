@@ -42,6 +42,34 @@ final class DrillSealing {
 
     boolean warning(){return !fluidSpots.isEmpty()||pending!=null||cautionTicks>0;}
     boolean fallback(){return wallFallback;}
+    /** Saved failing coordinate; do not report a generic error with no target. */
+    @Nullable BlockPos stuckPosition(){
+        return attempts>=MAX_FILL_ATTEMPTS?pending:null;
+    }
+    int failedAttempts(){return attempts;}
+    /**
+     * Restart is an explicit retry of the SAME target, not a new excavation.
+     * Previously 'attempts=24' persisted forever and pressing Start/Stop
+     * immediately halted with the same error without placing any blocks.
+     */
+    void retryFailedFill(ServerLevel world,DrillEntity drill){
+        if(attempts<MAX_FILL_ATTEMPTS)return;
+        attempts=0;
+        if(pending!=null && solid(world,pending)){
+            markDone(pending,pendingWall);
+        }else{
+            // Keep pending position and reserve/ready stock: don't skip a wet
+            // or now-air coordinate just because the fluid has flowed away.
+            wait=0;
+        }
+        drill.setChanged();
+    }
+    /** A real environmental repair (stable solid at the failed target) is
+     * enough to auto-resume; an unchanged fluid/air spot needs user retry. */
+    boolean canAutoRecover(ServerLevel world){
+        return attempts>=MAX_FILL_ATTEMPTS && pending!=null
+            && world.hasChunkAt(pending) && solid(world,pending);
+    }
     void retryWallSource(ServerLevel world,DrillEntity drill){
         if(wallSourceChecked)return;
         wallSourceChecked=true;
@@ -228,7 +256,14 @@ final class DrillSealing {
         if(available.isEmpty())return ComputerEntity.Status.RUNNING;
         if(!(available.getItem() instanceof BlockItem item))return ComputerEntity.Status.BLOCKED;
         BlockState state=world.getBlockState(target);
-        if(immune(state)||solid(world,target))return ComputerEntity.Status.BLOCKED;
+        if(immune(state))return ComputerEntity.Status.BLOCKED;
+        if(solid(world,target)){
+            // Water finished draining or someone repaired the spot during
+            // transit. Treat the stable block as success, not 'blocked'.
+            markDone(target,wall);
+            drill.setChanged();
+            return ComputerEntity.Status.RUNNING;
+        }
         if(!world.setBlock(target,item.getBlock().defaultBlockState(),Block.UPDATE_ALL))
             return ComputerEntity.Status.BLOCKED;
         stock.consume();
@@ -243,7 +278,15 @@ final class DrillSealing {
             markDone(pending,pendingWall);drill.setChanged();return null;
         }
         if(attempts>=MAX_FILL_ATTEMPTS)return ComputerEntity.Status.FILL_FAILED;
-        pending=null;wait=0;return null;
+        // Retry EXACTLY this position, rather than selecting another fluid
+        // cell from a newly reordered LinkedHashSet and carrying its 24 tries.
+        WallSupplyPipeline stock=pendingWall?walls:filler;
+        if(!stock.hasSupply()){
+            if(stock.hasFlights())return ComputerEntity.Status.RUNNING;
+            return pendingWall?ComputerEntity.Status.OUT_OF_WALLS:
+                ComputerEntity.Status.OUT_OF_FILLER;
+        }
+        return applyFromStock(world,drill,stock,pending,pendingWall);
     }
     private List<BlockPos> ring(DrillEntity drill,ComputerEntity computer){
         List<BlockPos> positions=new ArrayList<>();
