@@ -43,7 +43,7 @@ public final class DrillMenu extends AbstractContainerMenu {
     public int page(){return data.get(1);}
     public int bank(){return data.get(4);}
     public boolean randomWalls(){return data.get(5)!=0;}
-    public String bankName(){return switch(bank()){case 1->"FILLER";case 2->"WALL";default->"MINED OUTPUT";};}
+    public String bankName(){return switch(bank()){case 1->"FILLER";case 2->"WALL";default->"OUTPUT";};}
     @Override public boolean clickMenuButton(Player player,int id){
         switch(id){
             case 0 -> data.set(1,Math.max(0,data.get(1)-1));
