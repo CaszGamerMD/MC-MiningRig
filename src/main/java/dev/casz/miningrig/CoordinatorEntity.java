@@ -51,6 +51,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         setChanged();return true;
     }
     private int wirelessMask,adjacentMask,drillMask,page,collectorCursor;
+    private long nextRoutingProbe;
     private boolean dropped;
     private final List<Flight> flights=new ArrayList<>();
     // Independent supply buffer, never mixed with normal mined-item output.
@@ -198,7 +199,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         cc.wallDepot.tick(world,cc,cc.supplying(world,true));
         // Visuals are not cargo. Prune stale displays left behind by
         // /stop, disconnect, save/reload, or an interrupted flight.
-        if(now%100==0){
+        if((now+Math.floorMod((long)pos.hashCode(),100))%100==0){
             java.util.Set<java.util.UUID> active=new java.util.HashSet<>();
             for(Flight flight:cc.flights)
                 if(flight.visual!=null&&flight.visual.isAlive())
@@ -323,7 +324,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         return false;
     }
     private boolean dispatch(ServerLevel world,long now){
-        if(stored()==0||flights.size()>=MAX_FLIGHTS)return false;
+        if(stored()==0||flights.size()>=MAX_FLIGHTS||now<nextRoutingProbe)return false;
         // Only route along a shortest path to a configured output, avoiding
         // the ping-pong loops that occurred with freely bidirectional CCs.
         CoordinatorEntity next;
@@ -337,9 +338,14 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
             if(next==null||!next.canReceive(List.of(packet)))continue;
             ItemStack cargo=removeItem(i,packet.getCount());
             if(cargo.isEmpty())continue;
+            nextRoutingProbe=0;
             startFlight(world,List.of(cargo),worldPosition,next.worldPosition,false,now);
             return true;
         }
+        // An output network containing 192 different unroutable items would
+        // otherwise BFS the whole CC graph 192 times every server tick.
+        // Recheck shortly after inventories have a chance to change.
+        nextRoutingProbe=now+5;
         return false;
     }
     private int liveDisplays(){
