@@ -66,7 +66,8 @@ public final class PagedDrillContainer implements Container {
     @Override public void setChanged(){drill.setChanged();}
     @Override public boolean stillValid(Player player){return drill.stillValid(player);}
     @Override public void clearContent(){
-        for(int i=0;i<12;i++)setItem(i,ItemStack.EMPTY);
+        // Work backwards because bundle entries compact when removed.
+        for(int i=11;i>=0;i--)setItem(i,ItemStack.EMPTY);
     }
     public void startOpen(Player player){drill.startOpen(player);}
     public void stopOpen(Player player){drill.stopOpen(player);}
