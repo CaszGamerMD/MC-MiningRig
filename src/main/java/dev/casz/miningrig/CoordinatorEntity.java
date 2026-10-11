@@ -157,6 +157,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         if(!(level instanceof ServerLevel world))return;
         long now=world.getGameTime();
         if(now%10==0)cc.refresh(world);
+        RigMachineSounds.coordinatorTick(world,pos);
         cc.advance(world,now);
         cc.fillerDepot.tick(world,cc,cc.drillBelow(world));
         // Adjacent container output does not consume wireless travel bandwidth.
