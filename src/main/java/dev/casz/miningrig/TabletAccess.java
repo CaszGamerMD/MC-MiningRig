@@ -47,10 +47,7 @@ public final class TabletAccess {
     public static int lamp(MinecraftServer server,TabletLink.Target link){
         ComputerEntity computer=find(server,link,false);
         if(computer==null)return 0;
-        var state=computer.getBlockState();
-        if(state.getValue(ComputerBlock.ALARM))return 3;
-        if(state.getValue(ComputerBlock.WARN))return 2;
-        return 1;
+        return computer.tabletLightLevel();
     }
     private static void acquire(ServerLevel world,BlockPos pos){
         ChunkPos key=new ChunkPos(pos.getX()>>4,pos.getZ()>>4);

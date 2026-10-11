@@ -278,7 +278,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         item.setItemTransform(net.minecraft.world.item.ItemDisplayContext.GROUND);
         item.setTransformation(new com.mojang.math.Transformation(
             new org.joml.Vector3f(0,0,0),new org.joml.Quaternionf(),
-            new org.joml.Vector3f(.25f,.25f,.25f),new org.joml.Quaternionf()));
+            new org.joml.Vector3f(.55f,.55f,.55f),new org.joml.Quaternionf()));
         item.setNoGravity(true);
         item.setPos(flight.origin.getX()+.5,flight.origin.getY()+.6,flight.origin.getZ()+.5);
         world.addFreshEntity(item);

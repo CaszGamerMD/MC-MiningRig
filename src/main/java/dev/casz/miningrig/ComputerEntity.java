@@ -39,7 +39,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         NO_DRILL("Drill missing"), WAITING("Not placed"), UNLOADED("Chunk unloaded"),
         NO_FILLER_CONTAINER("No Filler input"),NO_WALL_CONTAINER("No Walls input"),
         NO_OUTPUT("No Output storage"),OUT_OF_FILLER("Out of Filler / Fluid in hole"),
-        OUT_OF_WALLS("Out of Walls"), FLUID_IN_HOLE("Fluid in hole");
+        OUT_OF_WALLS("Out of Walls"), FLUID_IN_HOLE("Fluid in hole"),
+        FILL_FAILED("Fill blocked - help needed");
         public final String display;
         Status(String value){display=value;}
     }
@@ -198,6 +199,21 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         }
         return active+" mining | "+alerts+" alerts";
     }
+    /** Stable severity independent of the block's alternating lamp phase. */
+    public int tabletLightLevel(){
+        boolean alarm=false;
+        for(int i=0;i<MAX_DRILLS;i++){
+            if(!tokens[i].isEmpty()&&!running[i]
+                && statuses[i]!=Status.READY && statuses[i]!=Status.WAITING)alarm=true;
+        }
+        if(alarm)return 3;
+        if(level instanceof ServerLevel server)
+            for(int i=0;i<MAX_DRILLS;i++)
+                if(running[i]&&positions[i]!=null&&server.hasChunkAt(positions[i])
+                    && server.getBlockEntity(positions[i]) instanceof DrillEntity drill
+                    && drill.fluidWarning())return 2;
+        return 1;
+    }
     public boolean running(){
         for(boolean value:running)if(value)return true;return false;
     }
@@ -230,7 +246,9 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 .append('\t').append(status).append('\t').append(eta)
                 .append('\t').append(radii[i]).append('\t').append(depths[i])
                 .append('\t').append(circles[i]?"O":"S")
-                .append('\t').append(wallModes[i]);
+                .append('\t').append(wallModes[i])
+                .append('\t').append(pos==null||!server.hasChunkAt(pos)?0:
+                    server.getBlockEntity(pos) instanceof DrillEntity drill?drill.completedLayers():0);
         }
         return out.toString();
     }

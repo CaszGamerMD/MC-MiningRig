@@ -29,6 +29,9 @@ public final class MiningTabletEntity extends BlockEntity {
     public static void tick(Level level,BlockPos pos,BlockState state,MiningTabletEntity tablet){
         if(!(level instanceof ServerLevel server)||server.getGameTime()%10!=0)return;
         int signal=TabletAccess.lamp(server.getServer(),tablet.target);
+        // Only the placed block's visual lamp alternates; handheld item stacks
+        // keep a stable model component, preventing repeated re-equip bobbing.
+        if(signal>=2 && (server.getGameTime()/10)%2==0)signal=0;
         MiningTabletBlock.Lamp value=MiningTabletBlock.Lamp.from(signal);
         if(state.getValue(MiningTabletBlock.LAMP)!=value)
             server.setBlock(pos,state.setValue(MiningTabletBlock.LAMP,value),Block.UPDATE_CLIENTS);

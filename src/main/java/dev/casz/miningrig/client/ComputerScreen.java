@@ -13,7 +13,7 @@ import net.minecraft.world.entity.player.Inventory;
 
 /** Four readable drill status cards, with controls and a text box to rename selected drill. */
 public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
-    private final String[][] rows=new String[4][9];
+    private final String[][] rows=new String[4][10];
     private int selected;
     private EditBox rename;
     private boolean initial=true;
@@ -21,7 +21,7 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
         super(menu,player,title,360,294);
         titleLabelY=8;inventoryLabelY=290;
         for(int i=0;i<4;i++){
-            rows[i]=new String[]{"0","Drill "+(i+1),"Not placed","Empty","-1","2","12","O","0"};
+            rows[i]=new String[]{"0","Drill "+(i+1),"Not placed","Empty","-1","2","12","O","0","0"};
         }
     }
     private void click(int id){
@@ -62,7 +62,7 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
             selected=next;initial=false;
             for(int i=0;i<4;i++){
                 String[] entry=lines[i+1].split("\t",-1);
-                if(entry.length>=9)rows[i]=Arrays.copyOf(entry,9);
+                if(entry.length>=10)rows[i]=Arrays.copyOf(entry,10);
             }
             if(changed && rename!=null)rename.setValue(rows[selected][1]);
         }catch(NumberFormatException ignored){}
@@ -95,12 +95,13 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
             String name=r[1].length()>21?r[1].substring(0,21):r[1];
             g.text(font,(i+1)+". "+name,leftPos+13,y,0xffd5edff,false);
             g.text(font,"XYZ: "+r[2],leftPos+13,y+12,0xffa0c4d5,false);
+            g.text(font,"Layers: "+r[9]+"/"+r[6],leftPos+160,y+12,0xffffeab3,false);
             String status=r[3].length()>23?r[3].substring(0,23):r[3];
             g.text(font,status,leftPos+13,y+24,0xfffee0a4,false);
             g.text(font,eta(r[4]),leftPos+140,y+24,0xff8bffae,false);
         }
         g.text(font,"Selected: R "+rows[selected][5]+" | D "+rows[selected][6]
-            +" | "+(rows[selected][7].equals("O")?"Circle":"Square")+" | Wall: "+switch(rows[selected][8]){case "1"->"Air";case "2"->"Always";default->"Off";},leftPos+9,topPos+207,0xffffffff,false);
+            +" | "+(rows[selected][7].equals("O")?"Circle":"Square")+" | Wall: "+switch(rows[selected][8]){case "1"->"Air";case "2"->"Replace";default->"Off";},leftPos+9,topPos+207,0xffffffff,false);
         g.text(font,"Nickname for selected drill:",leftPos+9,topPos+250,0xffbde4f5,false);
     }
 }

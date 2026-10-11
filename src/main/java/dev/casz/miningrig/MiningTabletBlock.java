@@ -3,6 +3,9 @@ package dev.casz.miningrig;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -15,6 +18,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
@@ -45,6 +49,17 @@ public final class MiningTabletBlock extends BaseEntityBlock {
     @Override protected MapCodec<? extends BaseEntityBlock> codec(){return simpleCodec(MiningTabletBlock::new);}
     @Override protected void createBlockStateDefinition(StateDefinition.Builder<net.minecraft.world.level.block.Block,BlockState> builder){builder.add(FACING,LAMP);}
     @Override protected RenderShape getRenderShape(BlockState state){return RenderShape.MODEL;}
+    /** Compact hit/collision box aligned with the visible wall-mounted tablet. */
+    @Override protected VoxelShape getShape(BlockState state,BlockGetter world,BlockPos pos,CollisionContext context){
+        return switch(state.getValue(FACING)){
+            case NORTH->Block.box(2,2,12,14,14,16);
+            case SOUTH->Block.box(2,2,0,14,14,4);
+            case EAST->Block.box(0,2,2,4,14,14);
+            case WEST->Block.box(12,2,2,16,14,14);
+            case UP->Block.box(2,0,2,14,4,14);
+            case DOWN->Block.box(2,12,2,14,16,14);
+        };
+    }
     @Nullable @Override public BlockState getStateForPlacement(BlockPlaceContext ctx){
         return defaultBlockState().setValue(FACING,ctx.getClickedFace());
     }
