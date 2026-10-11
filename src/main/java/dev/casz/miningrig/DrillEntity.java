@@ -133,6 +133,14 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         sealing.setSupply(wall,slot,stack);
         setChanged();
     }
+    /** Begin stockpiling 64 filler and 64 wall blocks at the instant Start
+     * is pressed, before the first excavation or perimeter phase. */
+    public void primeSupply(ServerLevel world,ComputerEntity computer){
+        lastControllerTick=world.getGameTime();
+        lastWallMode=computer.wallMode();
+        sealing.maintainSupply(world,this,computer);
+        setChanged();
+    }
     /** Prevent any further CC prefetch on a stop and return all unplaced stock. */
     public void pauseSupply(ServerLevel world){
         lastControllerTick=Long.MIN_VALUE;
@@ -313,14 +321,17 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         }
         return best;
     }
-    /** Placement duration is 1.3x the corresponding tool's normal mining time. */
+    /** Placement throughput follows the installed bits, including Efficiency,
+     * but is quicker than actually mining stone. Material travel is separately
+     * prefetched and does not add a slow per-block source trip. */
     public boolean placementReady(ServerLevel world){
         int slot=bestBit(world,Blocks.STONE.defaultBlockState());
         if(slot<0)return false;
         placementBit=slot;
         if(placementCharge>=1)return true;
         ItemStack tool=items.get(slot);
-        placementCharge+=speed(world,tool,Blocks.STONE.defaultBlockState())/1.3f;
+        placementCharge+=Math.min(1.0f,
+            speed(world,tool,Blocks.STONE.defaultBlockState())*3.0f);
         return placementCharge>=1;
     }
     private void playCuttingAudio(ServerLevel world){
@@ -409,10 +420,12 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
                     && !RigNetwork.hasInput(world,this,true))
                 return ComputerEntity.Status.NO_WALL_CONTAINER;
         }
+        // Refill supply even if the output buffer is full or all three bits
+        // are on their way. Once the blockage clears, mining resumes primed.
+        sealing.maintainSupply(world,this,computer);
         if(!hasWorkingBits())return hardware.awaitingReplacement()&&!hardware.waitExpired()
             ?ComputerEntity.Status.RUNNING:ComputerEntity.Status.OUT_OF_BITS;
         if(freeStorage()==0)return ComputerEntity.Status.FULL;
-        sealing.maintainSupply(world,this,computer);
         // Operational order is explicitly WALL -> FLUID -> MINING.
         // The controller owns the setting; the sealing state owns the
         // per-coordinate count. Update live for every tick and after reload.
