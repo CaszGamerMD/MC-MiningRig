@@ -24,9 +24,17 @@ final class RigHardware {
     @Nullable private Display.ItemDisplay visual;
     private int elapsed;
     private long requestedAt=-1000;
+    private int pendingReplacements,unfilledTicks;
+    void requestReplacement(){pendingReplacements++;unfilledTicks=0;}
+    boolean awaitingReplacement(){return pendingReplacements>0 || cargo!=null;}
+    boolean waitExpired(){return unfilledTicks>=400;}
+
     void tick(ServerLevel world,DrillEntity drill){
         if(cargo==null){
-            if(drill.emptyBitSlots()==0 || world.getGameTime()-requestedAt<20)return;
+            if(pendingReplacements<=0)return;
+            if(drill.emptyBitSlots()==0){pendingReplacements=0;return;}
+            unfilledTicks++;
+            if(world.getGameTime()-requestedAt<20)return;
             requestedAt=world.getGameTime();
             CoordinatorEntity cc=RigNetwork.nearestDrillCoordinator(world,drill);
             if(cc==null)return;
@@ -83,6 +91,7 @@ final class RigHardware {
         if(cargo==null)return;
         RigNetwork.Supply item=cargo;
         if(drill.insertBit(item.stack())<0)refund(world,drill,item);
+        else {pendingReplacements=Math.max(0,pendingReplacements-1);unfilledTicks=0;}
         clear();drill.setChanged();
     }
     void drop(ServerLevel world,DrillEntity drill){
@@ -92,10 +101,14 @@ final class RigHardware {
     void moveTo(RigHardware next){
         next.clear();
         next.cargo=cargo;next.elapsed=elapsed;next.requestedAt=requestedAt;
+        next.pendingReplacements=pendingReplacements;
+        next.unfilledTicks=unfilledTicks;
         next.visual=visual;
-        cargo=null;visual=null;
+        cargo=null;visual=null;pendingReplacements=0;
     }
     void save(ValueOutput out){
+        out.putInt("HardwareReplacements",pendingReplacements);
+        out.putInt("HardwareMissingTicks",unfilledTicks);
         out.putBoolean("HardwareInFlight",cargo!=null);
         if(cargo==null)return;
         out.store("HardwareItem",ItemStack.CODEC,cargo.stack());
@@ -110,6 +123,8 @@ final class RigHardware {
     }
     void load(ValueInput in){
         clear();
+        pendingReplacements=Math.max(0,in.getIntOr("HardwareReplacements",0));
+        unfilledTicks=Math.max(0,in.getIntOr("HardwareMissingTicks",0));
         if(!in.getBooleanOr("HardwareInFlight",false))return;
         ItemStack stack=in.read("HardwareItem",ItemStack.CODEC).orElse(ItemStack.EMPTY);
         if(stack.isEmpty())return;
