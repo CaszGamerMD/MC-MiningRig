@@ -16,10 +16,10 @@ import net.minecraft.world.level.storage.ValueOutput;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A separate 192-block Filler depot at the CC directly above a filling drill.
+ * One independent 192-block Filler or Wall supply depot at the nearest CC.
  *
- * The depot is actively restocked, 3 blocks per packet, at the same time that
- * the drill fills its own 64-block buffer. Every unit has one owner: original
+ * Each requested material type is prefetched, 3 blocks per packet, at the
+ * same time that the drill replenishes its own 64-block buffer. Every unit has one owner: original
  * container -> inbound packet -> CC cache -> drill packet -> placed block.
  * No player can extract the ItemDisplay entities during transit.
  */
