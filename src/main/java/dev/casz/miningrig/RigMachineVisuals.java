@@ -25,22 +25,24 @@ final class RigMachineVisuals {
         String expected=owner(ccPos);
         for(Display.ItemDisplay display:world.getEntitiesOfClass(
                 Display.ItemDisplay.class,new AABB(ccPos).inflate(32))){
-            if(display.getTags().contains(expected)){
+            if(display.entityTags().contains(expected)){
                 if(!live.contains(display.getUUID()))display.discard();
                 continue;
             }
-            if(!legacy || display.getTags().contains(MARK)
-                    || !display.getTags().isEmpty())continue;
+            if(!legacy || display.entityTags().contains(MARK)
+                    || !display.entityTags().isEmpty())continue;
             // Older releases did not tag transit entities. Their distinctive
             // 0.55x scale, no-gravity ground transform, and proximity to the CC
             // identify abandoned packet models without deleting regular drops.
-            if(!display.isNoGravity() || display.distanceToSqr(
-                ccPos.getX()+.5,ccPos.getY()+.5,ccPos.getZ()+.5)>12.25)continue;
-            org.joml.Vector3f scale=display.getTransformation().getScale();
-            if(Math.abs(scale.x-0.55f)<0.0002f
-                &&Math.abs(scale.y-0.55f)<0.0002f
-                &&Math.abs(scale.z-0.55f)<0.0002f
-                &&!live.contains(display.getUUID()))display.discard();
+            // The previous untagged 0.55-size packets usually remain
+            // against CC faces after a server restart. Only remove old
+            // no-gravity *block* displays in the immediate CC footprint.
+            // Never touch tagged player/entity displays or any live packet.
+            if(!display.isNoGravity() || display.tickCount<200
+                || display.distanceToSqr(ccPos.getX()+.5,
+                    ccPos.getY()+.5,ccPos.getZ()+.5)>3.24)continue;
+            if(display.getItemStack().getItem() instanceof net.minecraft.world.item.BlockItem
+                && !live.contains(display.getUUID()))display.discard();
         }
     }
 }
