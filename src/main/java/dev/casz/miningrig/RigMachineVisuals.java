@@ -39,6 +39,7 @@ final class RigMachineVisuals {
             // no-gravity *block* displays in the immediate CC footprint.
             // Never touch tagged player/entity displays or any live packet.
             if(!display.isNoGravity() || display.tickCount<200
+                || display.getItemTransform()!=net.minecraft.world.item.ItemDisplayContext.GROUND
                 || display.distanceToSqr(ccPos.getX()+.5,
                     ccPos.getY()+.5,ccPos.getZ()+.5)>3.24)continue;
             if(display.getItemStack().getItem() instanceof net.minecraft.world.item.BlockItem
