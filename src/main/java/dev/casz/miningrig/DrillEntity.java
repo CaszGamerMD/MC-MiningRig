@@ -217,7 +217,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         // Only one audio bed for all three concurrent bits; moving block
         // entities carry the timer down to the next excavation level.
         if(lastCuttingAudioTick!=Long.MIN_VALUE && now>=lastCuttingAudioTick
-                && now-lastCuttingAudioTick<60)return;
+                && now-lastCuttingAudioTick<24)return;
         lastCuttingAudioTick=now;
         RigMachineSounds.cutting(world,worldPosition);
     }

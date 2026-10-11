@@ -9,7 +9,7 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 
 /**
- * Quiet, three-second, positional machine beds in the BLOCKS audio category.
+ * Quiet positional machine sound beds in the BLOCKS audio category.
  * Repeated only while the owning machine is ticking/actually cutting.
  * No global player audio, background music, or pickup-able sound entities.
  */
