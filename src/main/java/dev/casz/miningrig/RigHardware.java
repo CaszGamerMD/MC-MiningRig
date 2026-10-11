@@ -25,14 +25,38 @@ final class RigHardware {
     private int elapsed;
     private long requestedAt=-1000;
     private int pendingReplacements,unfilledTicks;
-    void requestReplacement(){pendingReplacements++;unfilledTicks=0;}
+    /**
+     * A layer requests only the missing bit positions. Requests include an
+     * in-flight bit, so starting a new layer does not duplicate a delivery
+     * left over from an earlier break.
+     */
+    void requestLayerBits(int emptySlots){
+        pendingReplacements=Math.max(pendingReplacements,Math.min(3,Math.max(0,emptySlots)));
+    }
+    /** Every broken bit creates one missing-slot request, at most three. */
+    void requestReplacement(){pendingReplacements=Math.min(3,pendingReplacements+1);unfilledTicks=0;}
     boolean awaitingReplacement(){return pendingReplacements>0 || cargo!=null;}
-    boolean waitExpired(){return unfilledTicks>=400;}
+    // Do not time out the drill simply because a Hardware chest is temporarily empty.
+    boolean waitExpired(){return false;}
 
     void tick(ServerLevel world,DrillEntity drill){
+        int missing=drill.emptyBitSlots();
+        // Player-installed bits can satisfy a pending request. Never order or
+        // retain hardware for slots that have already been filled manually.
+        if(missing==0){
+            pendingReplacements=0;
+            if(cargo!=null){
+                refund(world,drill,cargo);
+                clear();
+                drill.setChanged();
+            }
+            return;
+        }
+        int before=pendingReplacements;
+        pendingReplacements=Math.min(pendingReplacements,missing);
+        if(before!=pendingReplacements)drill.setChanged();
         if(cargo==null){
             if(pendingReplacements<=0)return;
-            if(drill.emptyBitSlots()==0){pendingReplacements=0;return;}
             unfilledTicks++;
             if(world.getGameTime()-requestedAt<20)return;
             requestedAt=world.getGameTime();
@@ -92,6 +116,7 @@ final class RigHardware {
         RigNetwork.Supply item=cargo;
         if(drill.insertBit(item.stack())<0)refund(world,drill,item);
         else {pendingReplacements=Math.max(0,pendingReplacements-1);unfilledTicks=0;}
+        pendingReplacements=Math.min(pendingReplacements,drill.emptyBitSlots());
         clear();drill.setChanged();
     }
     void drop(ServerLevel world,DrillEntity drill){
