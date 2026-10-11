@@ -1,10 +1,24 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.5.0 — CC network autonomy and full-screen computer**
+**Version 0.5.1 — adaptive output routing, faster placement and clean CC visuals**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.5.1 — output failover, supply priming, JEI bounds and visuals
+
+**Output failover.** CCs no longer route items to the first configured Output regardless of capacity. Routing inspects the actual items and sided destination inventory slots, including compatible partial stacks, empty slots, stack limits, and sided insertion permissions. A full or incompatible output is skipped immediately in favor of another reachable one. If a packet's destination CC becomes blocked after dispatch, the packet is held safely, returned to its sending CC when possible, or rerouted via an alternate CC after a short stall. No item is discarded due to lack of space. A failed-routing scan has a short five-tick cooldown to prevent a full CC from repeatedly scanning the entire network.
+
+**Placement speed.** Wall blocks and fluid filler placements both use the installed drill bits' mining speed and Efficiency enchantments, with a 3x placement-work multiplier relative to a stone block. Normal solid blocks only need two ticks of stability verification between placements instead of eight. Sand, gravel, and other falling blocks still receive longer checks for real gravity settling.
+
+**Immediate priming.** Pressing Start on an individual drill or Start All immediately begins replenishing that drill's independent 64-item Filler and 64-item Wall buffers. Priming continues every mining tick, including while the mined-item output or drill-bit supply is temporarily stalled. Wall buffering runs when replacement-wall mode is selected; other modes use the Filler stock.
+
+**Computer and JEI.** The full-screen computer reports its actual occupied screen rectangle to Minecraft's menu system, rather than the old fixed 460x330 space. This prevents JEI from treating the computer panel as empty overlay space and painting ingredient lists over its controls.
+
+**Stuck CC cargo visuals.** Animated CC transfers and CC prefetch shipments now tag their transient display entities with the coordinator that owns them. Orphans left by save/reload, interrupted transfers, or a removed CC are automatically pruned while the item cargo stays in machine inventory/NBT. Older untagged no-gravity block packet displays directly against CC faces are also cleaned after a grace period. Cleanup runs staggered across CCs to minimize spikes.
+
+**Verification:** Minecraft 26.2 / Fabric compilation succeeds, but mixed modded sided inventories, JEI's in-game overlay, world-reloaded legacy ghost displays and concurrent drilling speed require a backed-up-world test.
 
 ## v0.5.0 — CC networking, automatic hardware servicing, and full-screen computer
 
