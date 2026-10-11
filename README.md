@@ -1,10 +1,30 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.4.11 — three drill bundles and continuously stocked supply**
+**Version 0.5.0 — CC network autonomy and full-screen computer**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.5.0 — CC networking, automatic hardware servicing, and full-screen computer
+
+**Automatic discovery.** Place a Mining Computer within 24 blocks of a loaded Collection Coordinator, and it will discover and assign up to four drills near **any loaded CC in the same connected CC network**. Drills no longer need item pairing or manual linking. Each drill has a persistent identity even as it moves down. Discovery is limited to loaded chunks; old assignments survive save/load and drill relocation. Use **Rescan** if you previously removed a drill assignment; removing one assignment does not reset the drill's own excavation. A separate **Reset Task** clears that drill's layers and cursor without breaking it or removing its bits.
+
+**New computer console.** The interface expands to the screen size in a black/green theme, with Start/Stop per drill, Start All, Stop All, a current-alert mute, selective task resets, Shape/Wall buttons, and editable Radius (1-12), Depth (1-256), and Fill Tries (1-4096). Press **Apply** to submit all three numbers to the server with range validation. Focused text boxes swallow inventory and other gameplay shortcut keys; drill nicknames have a separate Save Name button.
+
+**Network Storage page.** Each connected CC face can assign a **container nickname**, up to 32 characters, which is saved per CC face and shown in its GUI. The computer and linked tablet display connected container names, source coordinates, assigned type (Filler, Walls, Output, or Hardware), and live item count/estimated stack capacity. The CC graph and its loaded adjacent inventories are the source of truth; no forced loads for offline containers. Storage pages support more than ten containers.
+
+**Hardware port.** Each CC face gains **Hardware** (after Output in the input mode cycle). A Hardware container supplies **drill bits** and **Collection Coordinator blocks only**. When a bit breaks, the drill requests exactly one replacement and receives an animated reserved one-item transfer; intentionally empty bit slots do not auto-consume input stock. If every bit breaks, the drill waits for the hardware resupply (with a finite timeout) instead of stopping immediately.
+
+**Auto network repair.** When a running drill descends beyond the 24-block CC network, the computer enters **Reconnecting CC network**. It searches from the last connected CC for a loaded, empty, straight-line valid position near where the drill last had connectivity; requests one CC from Hardware; animates its transit and places it to restore a CC-to-drill connection. Successful restoration resumes mining automatically; failure after a finite timeout produces a repair-failure alert. The network's CC chunks remain loaded during this recovery. Existing construction and block ownership are not overwritten.
+
+**Shared alarms and sounds.** CCs play a quiet beacon-like hum; active drills play a grindstone-like drilling sound. These are now server-played vanilla sound events, so the game uses their ordinary sound files and subtitles rather than relying on chained mod sound event references. Unmuted computer problems cause a repeating beep on the computer and on linked placed/carried tablets; **Mute Alert** silences the current problem for all terminals without disabling future alert events.
+
+**Tablet item:** the handheld and inventory variants now use a slim, paper-like front-facing tablet icon/model with a minimal frame, pale screen, and colored alert lamp, independently of the placed tablet's 3D model.
+
+**Multi-drill CC supply:** a CC now fairly collects mined output from multiple nearby drills and maintains its wall and filler depots while any of its served drills needs stock, rather than restricting the network to one drill directly underneath.
+
+**Playtesting needed:** Java/Fabric CI verifies compilation and assembles the JAR, but real-world alert subtitles, GUI scale, multiple simultaneous drills, hardware item travel, loaded-chunk discovery, protected areas, and auto-placed CC geometry require testing in a backed-up world.
 
 ## v0.4.11 — three 64-item drill bundles and wall ordering
 
