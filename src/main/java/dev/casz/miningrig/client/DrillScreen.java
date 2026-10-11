@@ -22,7 +22,7 @@ public final class DrillScreen extends AbstractContainerScreen<DrillMenu> {
         super.init();
         addRenderableWidget(Button.builder(Component.literal("Next storage"),b->click(2))
             .bounds(leftPos+8,topPos+48,84,20).build());
-        wallChoice=addRenderableWidget(Button.builder(Component.literal("In Order"),b->click(3))
+        wallChoice=addRenderableWidget(Button.builder(Component.literal("Wall: Order"),b->click(3))
             .bounds(leftPos+96,topPos+48,72,20).build());
         addRenderableWidget(Button.builder(Component.literal("<"),b->click(0))
             .bounds(leftPos+126,topPos+113,20,18).build());
@@ -41,7 +41,7 @@ public final class DrillScreen extends AbstractContainerScreen<DrillMenu> {
     }
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mouseX,int mouseY,float delta){
         if(wallChoice!=null)wallChoice.setMessage(Component.literal(
-            menu.randomWalls()?"Random":"In Order"));
+            menu.randomWalls()?"Wall: Rand":"Wall: Order"));
         super.extractRenderState(g,mouseX,mouseY,delta);
         g.text(font,"3 DRILL BITS",leftPos+7,topPos+27,0xffffffff,false);
         g.text(font,menu.bankName()+" "+menu.stored()+"/64",leftPos+7,topPos+116,0xff9fe5ff,false);
