@@ -24,7 +24,7 @@ public final class CoordinatorMenu extends AbstractContainerMenu {
         addDataSlots(data);
         inventory.startOpen(player.player);
         for(int i=0;i<27;i++) {
-            addSlot(new Slot(inventory,i,8+(i%9)*18,88+(i/9)*18) {
+            addSlot(new Slot(inventory,i,8+(i%9)*18,120+(i/9)*18) {
                 @Override public boolean mayPlace(ItemStack stack) {
                     return coordinator.canPlaceItem(getContainerSlot(),stack);
                 }
@@ -33,7 +33,7 @@ public final class CoordinatorMenu extends AbstractContainerMenu {
                 }
             });
         }
-        addStandardInventorySlots(player,8,166);
+        addStandardInventorySlots(player,8,198);
     }
     public CoordinatorEntity coordinator(){
         return coordinator instanceof PagedRigContainer view?view.coordinator():null;
