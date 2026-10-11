@@ -25,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
 final class WallSupplyPipeline {
     private static final int PER_PACKET=3;
     private static final int MAX_ACTIVE_FLIGHTS=12;
-    private static final int MAX_AHEAD=48;
+    private static final int MAX_AHEAD=64;
     private static final int NEW_FLIGHTS_PER_TICK=4;
     private static final int MAX_SAVED_PACKETS=96;
 
@@ -39,6 +39,13 @@ final class WallSupplyPipeline {
             if(visual!=null)visual.discard();
             visual=null;
         }
+    }
+    private final String key;
+    private final boolean walls;
+    private final int bufferLimit;
+    WallSupplyPipeline(String key,boolean walls,int bufferLimit){
+        this.key=key;this.walls=walls;
+        this.bufferLimit=Math.max(3,Math.min(MAX_AHEAD,bufferLimit));
     }
     private final List<Packet> flights=new ArrayList<>();
     private final List<ItemStack> ready=new ArrayList<>();
@@ -116,9 +123,9 @@ final class WallSupplyPipeline {
         int lacking=Math.max(0,stillNeeded-readyCount()-flightCount());
         int packets=0;
         while(lacking>0&&flights.size()<MAX_ACTIVE_FLIGHTS
-                &&readyCount()+flightCount()<MAX_AHEAD&&packets<NEW_FLIGHTS_PER_TICK){
-            int amount=Math.min(PER_PACKET,Math.min(lacking,MAX_AHEAD-readyCount()-flightCount()));
-            RigNetwork.Supply cargo=RigNetwork.reservePacket(world,drill,true,amount);
+                &&readyCount()+flightCount()<bufferLimit&&packets<NEW_FLIGHTS_PER_TICK){
+            int amount=Math.min(PER_PACKET,Math.min(lacking,bufferLimit-readyCount()-flightCount()));
+            RigNetwork.Supply cargo=RigNetwork.reservePacket(world,drill,walls,amount);
             if(cargo==null)break;
             flights.add(new Packet(cargo,0));
             lacking-=cargo.stack().getCount();
@@ -154,6 +161,7 @@ final class WallSupplyPipeline {
         drill.setChanged();
     }
     void moveTo(WallSupplyPipeline next){
+        for(Packet previous:next.flights)previous.discard();
         next.flights.clear();
         next.flights.addAll(flights);
         next.ready.clear();
@@ -163,41 +171,41 @@ final class WallSupplyPipeline {
         requestedTotal=0;deliveredCount=0;
     }
     void save(ValueOutput out){
-        out.putInt("WallBatchDemand",requestedTotal);
-        out.putInt("WallBatchArrived",deliveredCount);
-        out.putInt("WallBatchFlights",flights.size());
+        out.putInt(key+"WallBatchDemand",requestedTotal);
+        out.putInt(key+"WallBatchArrived",deliveredCount);
+        out.putInt(key+"WallBatchFlights",flights.size());
         for(int i=0;i<flights.size();i++){
             Packet packet=flights.get(i);
-            out.store("WallFlightItem"+i,ItemStack.CODEC,packet.cargo.stack());
-            out.putInt("WallFlightTick"+i,packet.elapsed);
+            out.store(key+"WallFlightItem"+i,ItemStack.CODEC,packet.cargo.stack());
+            out.putInt(key+"WallFlightTick"+i,packet.elapsed);
             List<BlockPos> path=packet.cargo.path();
-            out.putInt("WallFlightPathLength"+i,path.size());
+            out.putInt(key+"WallFlightPathLength"+i,path.size());
             for(int j=0;j<path.size();j++)
-                out.putLong("WallFlightPath"+i+"_"+j,path.get(j).asLong());
+                out.putLong(key+"WallFlightPath"+i+"_"+j,path.get(j).asLong());
         }
-        out.putInt("WallBatchReady",ready.size());
+        out.putInt(key+"WallBatchReady",ready.size());
         for(int i=0;i<ready.size();i++)
-            out.store("WallReadyItem"+i,ItemStack.CODEC,ready.get(i));
+            out.store(key+"WallReadyItem"+i,ItemStack.CODEC,ready.get(i));
     }
     void load(ValueInput in){
         for(Packet packet:flights)packet.discard();
         flights.clear();ready.clear();
-        requestedTotal=Math.max(0,in.getIntOr("WallBatchDemand",0));
-        deliveredCount=Math.max(0,in.getIntOr("WallBatchArrived",0));
-        int count=Math.max(0,Math.min(MAX_SAVED_PACKETS,in.getIntOr("WallBatchFlights",0)));
+        requestedTotal=Math.max(0,in.getIntOr(key+"WallBatchDemand",0));
+        deliveredCount=Math.max(0,in.getIntOr(key+"WallBatchArrived",0));
+        int count=Math.max(0,Math.min(MAX_SAVED_PACKETS,in.getIntOr(key+"WallBatchFlights",0)));
         for(int i=0;i<count;i++){
-            ItemStack item=in.read("WallFlightItem"+i,ItemStack.CODEC).orElse(ItemStack.EMPTY);
-            int pathLen=Math.max(0,Math.min(256,in.getIntOr("WallFlightPathLength"+i,0)));
+            ItemStack item=in.read(key+"WallFlightItem"+i,ItemStack.CODEC).orElse(ItemStack.EMPTY);
+            int pathLen=Math.max(0,Math.min(256,in.getIntOr(key+"WallFlightPathLength"+i,0)));
             List<BlockPos> path=new ArrayList<>();
             for(int j=0;j<pathLen;j++)
-                path.add(BlockPos.of(in.getLongOr("WallFlightPath"+i+"_"+j,0)));
+                path.add(BlockPos.of(in.getLongOr(key+"WallFlightPath"+i+"_"+j,0)));
             if(!item.isEmpty()&&path.size()>=2)
                 flights.add(new Packet(new RigNetwork.Supply(item,path),
-                    Math.max(0,in.getIntOr("WallFlightTick"+i,0))));
+                    Math.max(0,in.getIntOr(key+"WallFlightTick"+i,0))));
         }
-        int readyCount=Math.max(0,Math.min(MAX_SAVED_PACKETS,in.getIntOr("WallBatchReady",0)));
+        int readyCount=Math.max(0,Math.min(MAX_SAVED_PACKETS,in.getIntOr(key+"WallBatchReady",0)));
         for(int i=0;i<readyCount;i++){
-            ItemStack item=in.read("WallReadyItem"+i,ItemStack.CODEC).orElse(ItemStack.EMPTY);
+            ItemStack item=in.read(key+"WallReadyItem"+i,ItemStack.CODEC).orElse(ItemStack.EMPTY);
             if(!item.isEmpty())ready.add(item);
         }
     }
