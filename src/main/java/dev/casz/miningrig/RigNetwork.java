@@ -106,6 +106,69 @@ public final class RigNetwork {
             && !state.is(MiningRig.DRILL) && !state.is(MiningRig.COORDINATOR)
             && !state.is(MiningRig.COMPUTER);
     }
+    /** One requested material packet and its real path through linked CCs. */
+    public record Supply(ItemStack stack,List<BlockPos> path){}
+    private static List<BlockPos> route(ServerLevel world,CoordinatorEntity source,DrillEntity drill){
+        CoordinatorEntity start=null;
+        for(int i=1;i<=20;i++){
+            BlockPos p=drill.getBlockPos().above(i);
+            if(!world.hasChunkAt(p))break;
+            if(world.getBlockEntity(p) instanceof CoordinatorEntity cc){start=cc;break;}
+        }
+        if(start==null)return List.of();
+        Map<BlockPos,BlockPos> prev=new HashMap<>();
+        Queue<CoordinatorEntity> todo=new ArrayDeque<>();
+        Set<BlockPos> visited=new HashSet<>();
+        todo.add(source);visited.add(source.getBlockPos());
+        while(!todo.isEmpty() && visited.size()<512){
+            CoordinatorEntity cc=todo.remove();
+            if(cc.getBlockPos().equals(start.getBlockPos()))break;
+            for(Direction dir:Direction.values()){
+                CoordinatorEntity next=cc.nearest(world,dir);
+                if(next==null||!visited.add(next.getBlockPos()))continue;
+                prev.put(next.getBlockPos(),cc.getBlockPos());
+                todo.add(next);
+            }
+        }
+        if(!visited.contains(start.getBlockPos()))return List.of();
+        List<BlockPos> path=new ArrayList<>();
+        BlockPos current=start.getBlockPos();
+        path.add(current);
+        while(!current.equals(source.getBlockPos())){
+            current=prev.get(current);
+            if(current==null)return List.of();
+            path.add(0,current);
+        }
+        path.add(drill.getBlockPos());
+        return path;
+    }
+    /** Reserve exactly one block for an actual requested drill delivery. */
+    public static Supply reserve(ServerLevel world,DrillEntity drill,boolean walls){
+        for(Source source:sources(world,drill,walls)){
+            List<BlockPos> hops=route(world,source.coordinator(),drill);
+            if(hops.isEmpty())continue;
+            Container from=source.container();
+            Direction face=source.side().getOpposite();
+            int[] slots=from instanceof WorldlyContainer side?side.getSlotsForFace(face):null;
+            int n=slots==null?from.getContainerSize():slots.length;
+            for(int i=0;i<n;i++){
+                int slot=slots==null?i:slots[i];
+                if(slot<0||slot>=from.getContainerSize())continue;
+                ItemStack stack=from.getItem(slot);
+                if(!isFiller(stack))continue;
+                if(from instanceof WorldlyContainer side &&
+                        !side.canTakeItemThroughFace(slot,stack,face))continue;
+                ItemStack taken=from.removeItem(slot,1);
+                if(taken.isEmpty())continue;
+                from.setChanged();
+                List<BlockPos> fullPath=new ArrayList<>();
+                fullPath.add(source.pos());
+                fullPath.addAll(hops);
+                return new Supply(taken,fullPath);
+            }
+        }
+        return null;
+    }
     /**
      * Pull up to three blocks per request from the closest available input.
      * The source is never vacuumed into a CC without a drill request.
