@@ -333,14 +333,18 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         for(int i=0;i<SLOTS;i++){
             ItemStack stack=items.get(i);
             if(stack.isEmpty())continue;
-            ItemStack packet=stack.copyWithCount(Math.min(PACKET_SIZE,stack.getCount()));
-            next=RigNetwork.nextTowardOutput(world,this,packet);
-            if(next==null||!next.canReceive(List.of(packet)))continue;
-            ItemStack cargo=removeItem(i,packet.getCount());
-            if(cargo.isEmpty())continue;
-            nextRoutingProbe=0;
-            startFlight(world,List.of(cargo),worldPosition,next.worldPosition,false,now);
-            return true;
+            // A path with room for one item must not be excluded just because
+            // the preferred animated packet size is three.
+            for(int size=Math.min(PACKET_SIZE,stack.getCount());size>=1;size--){
+                ItemStack packet=stack.copyWithCount(size);
+                next=RigNetwork.nextTowardOutput(world,this,packet);
+                if(next==null||!next.canReceive(List.of(packet)))continue;
+                ItemStack cargo=removeItem(i,size);
+                if(cargo.isEmpty())continue;
+                nextRoutingProbe=0;
+                startFlight(world,List.of(cargo),worldPosition,next.worldPosition,false,now);
+                return true;
+            }
         }
         // An output network containing 192 different unroutable items would
         // otherwise BFS the whole CC graph 192 times every server tick.
