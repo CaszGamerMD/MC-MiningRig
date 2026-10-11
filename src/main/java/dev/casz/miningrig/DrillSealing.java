@@ -48,6 +48,7 @@ final class DrillSealing {
     @Nullable private Display.ItemDisplay visual;
 
     boolean warning(){return !fluidSpots.isEmpty()||pending!=null||cautionTicks>0;}
+    boolean fluidFilling(){return fluidMode;}
     boolean fallback(){return wallFallback;}
     /** Saved failing coordinate; do not report a generic error with no target. */
     @Nullable BlockPos stuckPosition(){
@@ -493,7 +494,8 @@ final class DrillSealing {
                 target(world,at,null);
                 if(failed())return ComputerEntity.Status.FILL_FAILED;
                 if(!filler.hasSupply()){
-                    if(filler.hasFlights())return ComputerEntity.Status.RUNNING;
+                    if(filler.hasFlights() || RigNetwork.fillerDepotPending(world,drill))
+                        return ComputerEntity.Status.RUNNING;
                     return ComputerEntity.Status.OUT_OF_FILLER;
                 }
                 return applyFromStock(world,drill,filler,at,false);

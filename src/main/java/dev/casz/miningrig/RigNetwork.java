@@ -73,8 +73,14 @@ public final class RigNetwork {
         if(stack.isEmpty())return true;
         List<ItemStack> cargo=List.of(stack);
         for(CoordinatorEntity cc:members(world,drill))
-            if(cc.canReceive(cargo) && cc.receive(cargo))return true;
+            if((hasOutputHere(world,cc)||nextTowardOutput(world,cc)!=null)
+                    && cc.canReceive(cargo) && cc.receive(cargo))return true;
         return false;
+    }
+    /** Count also material whose prefetch flight has not reached the CC. */
+    public static boolean fillerDepotPending(ServerLevel world,DrillEntity drill){
+        CoordinatorEntity depot=nearestDrillCoordinator(world,drill);
+        return depot!=null && depot.cachedFillerPending()>0;
     }
     public static boolean hasOutput(ServerLevel world,DrillEntity drill){
         for(CoordinatorEntity cc:members(world,drill))
@@ -119,7 +125,62 @@ public final class RigNetwork {
             && !state.is(MiningRig.COMPUTER);
     }
     /** One requested material packet and its real path through linked CCs. */
-    public record Supply(ItemStack stack,List<BlockPos> path){}
+    /**
+     * Each packet remembers its original storage to return unused supplies to
+     * the input first, even after CC staging, drill movement and world saves.
+     */
+    public record Supply(ItemStack stack,List<BlockPos> path,
+            @org.jetbrains.annotations.Nullable BlockPos sourcePos,
+            @org.jetbrains.annotations.Nullable Direction sourceFace){
+        public Supply(ItemStack stack,List<BlockPos> path){this(stack,path,null,null);}
+    }
+    @org.jetbrains.annotations.Nullable
+    public static CoordinatorEntity nearestDrillCoordinator(ServerLevel world,DrillEntity drill){
+        for(int y=1;y<=20;y++){
+            BlockPos p=drill.getBlockPos().above(y);
+            if(!world.hasChunkAt(p))break;
+            if(world.getBlockEntity(p) instanceof CoordinatorEntity cc)return cc;
+        }
+        return null;
+    }
+    /**
+     * Insert unused material back into the original Filler/Wall input (only
+     * when that same storage remains loaded/connected). Return any overflow
+     * for the regular output network; never replace items in occupied slots.
+     */
+    public static ItemStack returnToSource(ServerLevel world,Supply cargo){
+        ItemStack remaining=cargo.stack().copy();
+        if(remaining.isEmpty()||cargo.sourcePos()==null||cargo.sourceFace()==null
+                ||!world.hasChunkAt(cargo.sourcePos()))return remaining;
+        if(!(world.getBlockEntity(cargo.sourcePos()) instanceof Container container))
+            return remaining;
+        Direction side=cargo.sourceFace();
+        int[] slots=container instanceof WorldlyContainer sided
+            ?sided.getSlotsForFace(side):null;
+        int n=slots==null?container.getContainerSize():slots.length;
+        // Merge with matching stacks first; use empty slots afterward.
+        for(int pass=0;pass<2 && !remaining.isEmpty();pass++)
+            for(int i=0;i<n && !remaining.isEmpty();i++){
+                int slot=slots==null?i:slots[i];
+                if(slot<0||slot>=container.getContainerSize()
+                        ||!container.canPlaceItem(slot,remaining))continue;
+                if(container instanceof WorldlyContainer sided &&
+                        !sided.canPlaceItemThroughFace(slot,remaining,side))continue;
+                ItemStack present=container.getItem(slot);
+                if((pass==0&&present.isEmpty())||(pass==1&&!present.isEmpty()))
+                    continue;
+                if(!present.isEmpty()&&!ItemStack.isSameItemSameComponents(present,remaining))
+                    continue;
+                int capacity=Math.min(remaining.getMaxStackSize(),
+                    container.getMaxStackSize(remaining))-(present.isEmpty()?0:present.getCount());
+                int amount=Math.min(remaining.getCount(),Math.max(0,capacity));
+                if(amount<=0)continue;
+                if(present.isEmpty())container.setItem(slot,remaining.copyWithCount(amount));
+                else {present.grow(amount);container.setChanged();}
+                remaining.shrink(amount);
+            }
+        return remaining;
+    }
     private static List<BlockPos> route(ServerLevel world,CoordinatorEntity source,DrillEntity drill){
         CoordinatorEntity start=null;
         for(int i=1;i<=20;i++){
@@ -162,6 +223,26 @@ public final class RigNetwork {
      */
     public static Supply reservePacket(ServerLevel world,DrillEntity drill,boolean walls,int requested){
         int max=Math.max(0,Math.min(3,requested));
+        if(!walls&&max>0){
+            CoordinatorEntity near=nearestDrillCoordinator(world,drill);
+            if(near!=null){
+                Supply staged=near.takeCachedFiller(world,drill,max);
+                if(staged!=null)return staged;
+            }
+        }
+        return reserveFromInput(world,drill,walls,max);
+    }
+    /** For CC prefetch: bypass its own cache to avoid recirculation. */
+    public static Supply reserveForCache(ServerLevel world,DrillEntity drill,int amount){
+        Supply cargo=reserveFromInput(world,drill,false,amount);
+        if(cargo==null)return null;
+        List<BlockPos> path=new ArrayList<>(cargo.path());
+        if(!path.isEmpty()&&path.get(path.size()-1).equals(drill.getBlockPos()))
+            path.remove(path.size()-1);
+        return new Supply(cargo.stack(),path,cargo.sourcePos(),cargo.sourceFace());
+    }
+    private static Supply reserveFromInput(ServerLevel world,DrillEntity drill,boolean walls,int requested){
+        int max=Math.max(0,Math.min(3,requested));
         if(max==0)return null;
         for(Source source:sources(world,drill,walls)){
             List<BlockPos> hops=route(world,source.coordinator(),drill);
@@ -183,7 +264,7 @@ public final class RigNetwork {
                 List<BlockPos> path=new ArrayList<>();
                 path.add(source.pos());
                 path.addAll(hops);
-                return new Supply(taken,path);
+                return new Supply(taken,path,source.pos(),side);
             }
         }
         return null;
@@ -210,7 +291,7 @@ public final class RigNetwork {
                 List<BlockPos> fullPath=new ArrayList<>();
                 fullPath.add(source.pos());
                 fullPath.addAll(hops);
-                return new Supply(taken,fullPath);
+                return new Supply(taken,fullPath,source.pos(),face);
             }
         }
         return null;

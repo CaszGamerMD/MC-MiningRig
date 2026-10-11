@@ -15,7 +15,7 @@ import net.minecraft.core.Direction;
 public final class CoordinatorMenu extends AbstractContainerMenu {
     private final Container coordinator;
     private final ContainerData data;
-    public CoordinatorMenu(int id,Inventory player) { this(id,player,new SimpleContainer(27),new SimpleContainerData(11)); }
+    public CoordinatorMenu(int id,Inventory player) { this(id,player,new SimpleContainer(27),new SimpleContainerData(12)); }
     public CoordinatorMenu(int id,Inventory player,Container inventory,ContainerData data) {
         super(RigMenus.COORDINATOR,id);
         checkContainerSize(inventory,27);
@@ -40,6 +40,8 @@ public final class CoordinatorMenu extends AbstractContainerMenu {
     public boolean drillSide(Direction side){return ((data.get(10)>>>side.get3DDataValue())&1)!=0;}
     public boolean containerSide(Direction side){return ((data.get(8)>>>side.get3DDataValue())&1)!=0;}
     public int stored(){return data.get(7);}
+    /** Supply depot belongs to fluid filling; ordinary storage is separate. */
+    public int fillerPending(){return data.get(11);}
     public int page(){return data.get(9);}
     @Override public boolean clickMenuButton(Player player,int buttonId) {
         if(buttonId==6 || buttonId==7){
