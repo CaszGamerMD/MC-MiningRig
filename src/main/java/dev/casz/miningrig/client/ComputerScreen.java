@@ -7,6 +7,7 @@ import dev.casz.miningrig.ComputerMenu;
 import dev.casz.miningrig.ComputerRenamePayload;
 import dev.casz.miningrig.ComputerSettingsPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
@@ -29,7 +30,13 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
     private int bodyTop,editorTop,uiWidth,uiHeight;
     private Button saveName,applySettings;
     public ComputerScreen(ComputerMenu menu,Inventory player,Component title){
-        super(menu,player,title,460,330);
+        // AbstractContainerScreen's width/height describe the occupied GUI
+        // rectangle to JEI. The earlier 460x330 fixed bounds left most of
+        // this full-screen interface "empty" to JEI, so its ingredient
+        // overlay rendered ON TOP of our buttons. Reserve the entire viewport.
+        super(menu,player,title,
+            Math.max(460,Minecraft.getInstance().getWindow().getGuiScaledWidth()-24),
+            Math.max(330,Minecraft.getInstance().getWindow().getGuiScaledHeight()-24));
         for(int i=0;i<4;i++)
             rows[i]=new String[]{"0","Drill "+(i+1),"Not placed","Empty","-1","2","12","O","0","0","24"};
         titleLabelY=7;inventoryLabelY=9000;
