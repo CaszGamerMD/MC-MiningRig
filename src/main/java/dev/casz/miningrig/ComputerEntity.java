@@ -62,6 +62,61 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     private int selected, activeSlot;
     private long lastBroadcast;
     private String tabletId;
+    private long alertSerial,mutedAlertSerial;
+    private final Set<String> ignoredDrills=new HashSet<>();
+    public boolean activeAlert(){return alertSerial>mutedAlertSerial && hasFault();}
+    private boolean hasFault(){
+        for(int i=0;i<MAX_DRILLS;i++)
+            if(!tokens[i].isEmpty()&&!running[i]&&isFault(statuses[i]))return true;
+        return false;
+    }
+    private static boolean isFault(Status status){
+        return status!=Status.READY&&status!=Status.WAITING
+            &&status!=Status.STOPPED&&status!=Status.DONE;
+    }
+    public void muteAlerts(){mutedAlertSerial=alertSerial;setChanged();}
+    public void startAll(){for(int i=0;i<MAX_DRILLS;i++)if(!tokens[i].isEmpty()&&!running[i])toggle(i);}
+    public void stopAll(){for(int i=0;i<MAX_DRILLS;i++)if(running[i])stop(i,Status.STOPPED);}
+    public void resetTask(int slot){
+        if(slot<0||slot>=MAX_DRILLS||positions[slot]==null)return;
+        if(!(level instanceof ServerLevel server)||!server.hasChunkAt(positions[slot]))return;
+        if(server.getBlockEntity(positions[slot]) instanceof DrillEntity drill
+            && drill.matchesLink(tokens[slot])){
+            if(running[slot])stop(slot,Status.STOPPED);
+            drill.resetTask(server);
+            statuses[slot]=Status.READY;setChanged();
+        }
+    }
+    public void applySettings(int radius,int depth,int tries){
+        if(radius<1||radius>12||depth<1||depth>256
+            ||tries<MIN_FILL_TRIES||tries>MAX_FILL_TRIES)return;
+        boolean change=radius!=radii[selected]||depth!=depths[selected];
+        radii[selected]=radius;depths[selected]=depth;
+        if(fillTries[selected]!=tries)setFillAttemptLimit(tries);
+        if(change)settingsChanged();
+    }
+    private void autoDiscover(ServerLevel server){
+        for(DrillEntity drill:RigTopology.networkDrills(server,this)){
+            String id=drill.identity();
+            if(ignoredDrills.contains(id))continue;
+            int slot=-1;
+            for(int i=0;i<MAX_DRILLS;i++)
+                if(id.equals(tokens[i])){slot=i;break;}
+            if(slot<0){
+                for(int i=0;i<MAX_DRILLS;i++)
+                    if(tokens[i].isEmpty()){slot=i;break;}
+                if(slot<0)continue;
+                tokens[slot]=id;positions[slot]=drill.getBlockPos().immutable();
+                nicknames[slot]="Drill "+(slot+1);
+                statuses[slot]=Status.READY;
+            }else if(positions[slot]==null||!positions[slot].equals(drill.getBlockPos()))
+                positions[slot]=drill.getBlockPos().immutable();
+            if(!drill.matchesLink(id))drill.adoptController(server,this,id);
+            setChanged();
+        }
+    }
+    public void allowRescan(){ignoredDrills.clear();setChanged();}
+
     public String tabletIdentity(){
         if(tabletId==null || tabletId.isBlank()){
             tabletId=UUID.randomUUID().toString();setChanged();
@@ -203,6 +258,11 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public void unlink(int index){
         if(index<0||index>=MAX_DRILLS)return;
         releaseDrillSupplies(index);
+        if(level instanceof ServerLevel server && positions[index]!=null &&
+                server.hasChunkAt(positions[index])
+                && server.getBlockEntity(positions[index]) instanceof DrillEntity drill
+                && drill.matchesLink(tokens[index]))drill.detachController();
+        if(!tokens[index].isEmpty())ignoredDrills.add(tokens[index]);
         tokens[index]="";positions[index]=null;running[index]=false;
         statuses[index]=Status.READY;nicknames[index]="Drill "+(index+1);setChanged();syncIfServer();
     }
@@ -218,7 +278,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             else if(!(server.getBlockEntity(at) instanceof DrillEntity drill)
                     || !drill.matchesLink(tokens[slot]))
                 statuses[slot]=Status.NO_DRILL;
-            else if(RigNetwork.members(server,drill).isEmpty())
+            else if(!RigTopology.joined(server,this,drill))
                 statuses[slot]=Status.NO_COLLECTOR;
             else if(!RigNetwork.hasInput(server,drill,false))
                 statuses[slot]=Status.NO_FILLER_CONTAINER;
@@ -245,7 +305,11 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public void stop(int slot,Status reason){
         if(slot<0||slot>=MAX_DRILLS)return;
         releaseDrillSupplies(slot);
-        running[slot]=false;statuses[slot]=reason;setChanged();syncIfServer();
+        boolean newFault=isFault(reason)
+            && (running[slot]||statuses[slot]!=reason);
+        running[slot]=false;statuses[slot]=reason;
+        if(newFault)alertSerial++;
+        setChanged();syncIfServer();
     }
     public void moved(String token,BlockPos oldPos,BlockPos newPos){
         if(token==null||token.isBlank())return;
@@ -258,8 +322,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         int active=0,alerts=0;
         for(int i=0;i<MAX_DRILLS;i++){
             if(running[i])active++;
-            else if(!tokens[i].isEmpty() && statuses[i]!=Status.READY
-                    && statuses[i]!=Status.WAITING)alerts++;
+            else if(!tokens[i].isEmpty() && isFault(statuses[i]))alerts++;
         }
         return active+" mining | "+alerts+" alerts";
     }
@@ -267,8 +330,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public int tabletLightLevel(){
         boolean alarm=false;
         for(int i=0;i<MAX_DRILLS;i++){
-            if(!tokens[i].isEmpty()&&!running[i]
-                && statuses[i]!=Status.READY && statuses[i]!=Status.WAITING)alarm=true;
+            if(!tokens[i].isEmpty()&&!running[i] && isFault(statuses[i]))alarm=true;
         }
         if(alarm)return 3;
         if(level instanceof ServerLevel server)
@@ -323,6 +385,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                     && drill.matchesLink(tokens[i])?drill.completedLayers():0)
                 .append('\t').append(fillTries[i]);
         }
+        out.append('\n').append("ALERT").append('\t').append(activeAlert()?"1":"0");
+        out.append(RigStorageMonitor.snapshot(server,this));
         return out.toString();
     }
     public static void tick(Level level,BlockPos pos,BlockState state,ComputerEntity computer){
@@ -332,7 +396,9 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         // the space is clear, without overwriting a player-built block.
         if(now%20==0 && server.getBlockState(pos.above()).isAir())
             server.setBlock(pos.above(),MiningRig.COMPUTER_UPPER.defaultBlockState(),Block.UPDATE_ALL);
+        if(now%20==0)computer.autoDiscover(server);
         computer.syncActiveChunks(server);
+        if(now%60==0&&computer.activeAlert())RigMachineSounds.problem(server,pos);
         // A halted drill recovers automatically once the exact failed block
         // becomes permanently solid; do not require unlinking or replacing it.
         if(now%20==0)for(int i=0;i<MAX_DRILLS;i++){
@@ -424,6 +490,13 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         super.saveAdditional(out);
         out.putInt("Selected",selected);
         if(tabletId!=null)out.putString("TabletIdentity",tabletId);
+        out.putLong("AlertSerial",alertSerial);
+        out.putLong("MutedSerial",mutedAlertSerial);
+        out.putInt("IgnoredDrills",Math.min(256,ignoredDrills.size()));
+        int skip=0;for(String id:ignoredDrills){
+            if(skip>=256)break;
+            out.putString("IgnoredDrill"+skip++,id);
+        }
         for(int i=0;i<MAX_DRILLS;i++){
             out.putString("Token"+i,tokens[i]);
             out.putString("Name"+i,nicknames[i]);
@@ -440,6 +513,11 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     @Override protected void loadAdditional(ValueInput in){
         super.loadAdditional(in);
         tabletId=in.getStringOr("TabletIdentity","");
+        alertSerial=in.getLongOr("AlertSerial",0);
+        mutedAlertSerial=in.getLongOr("MutedSerial",0);
+        ignoredDrills.clear();
+        for(int j=0;j<Math.min(256,in.getIntOr("IgnoredDrills",0));j++)
+            ignoredDrills.add(in.getStringOr("IgnoredDrill"+j,""));
         selected=Math.max(0,Math.min(MAX_DRILLS-1,in.getIntOr("Selected",0)));
         activeSlot=selected;
         for(int i=0;i<MAX_DRILLS;i++){
