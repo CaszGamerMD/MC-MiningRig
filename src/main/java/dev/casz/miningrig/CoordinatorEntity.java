@@ -87,7 +87,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     }
     private final ContainerData data=new ContainerData(){
         @Override public int get(int i){
-            return i<6?(((wirelessMask|drillMask)&(1<<i))!=0?5:mode[i]):i==6?wirelessMask|adjacentMask
+            return i<6?(((wirelessMask|drillMask)&(1<<i))!=0?5:mode[i]==RigNetwork.HARDWARE?6:mode[i]):i==6?wirelessMask|adjacentMask
                 :i==7?stored():i==8?adjacentMask:i==9?page:i==10?drillMask:i==11?fillerDepot.stored():wallDepot.stored();
         }
         @Override public void set(int i,int v){
