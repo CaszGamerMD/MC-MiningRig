@@ -26,7 +26,8 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
     private boolean initial=true,alert;
     private EditBox rename,radius,depth,tries;
     private Button drillTab,networkTab,prev,next;
-    private int bodyTop,editorTop;
+    private int bodyTop,editorTop,uiWidth,uiHeight;
+    private Button saveName,applySettings;
     public ComputerScreen(ComputerMenu menu,Inventory player,Component title){
         super(menu,player,title,460,330);
         for(int i=0;i<4;i++)
@@ -43,11 +44,13 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
         return button;
     }
     @Override protected void init(){
-        imageWidth=Math.max(460,width-24);
-        imageHeight=Math.max(310,height-24);
         super.init();
+        uiWidth=Math.max(460,width-24);
+        uiHeight=Math.max(310,height-24);
+        leftPos=Math.max(0,(width-uiWidth)/2);
+        topPos=Math.max(0,(height-uiHeight)/2);
         bodyTop=topPos+80;
-        editorTop=topPos+imageHeight-112;
+        editorTop=topPos+uiHeight-112;
         drillButtons.clear();
         drillTab=addRenderableWidget(Button.builder(Component.literal("DRILLS"),b->{
             tab=0;refreshTabs();
@@ -55,11 +58,11 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
         networkTab=addRenderableWidget(Button.builder(Component.literal("NETWORK STORAGE"),b->{
             tab=1;refreshTabs();
         }).bounds(leftPos+112,topPos+32,142,22).build());
-        add("START ALL",leftPos+imageWidth-352,topPos+32,108,22,42,true);
-        add("STOP ALL",leftPos+imageWidth-240,topPos+32,108,22,43,true);
-        add("MUTE ALERT",leftPos+imageWidth-128,topPos+32,116,22,41,false);
+        add("START ALL",leftPos+uiWidth-352,topPos+32,108,22,42,true);
+        add("STOP ALL",leftPos+uiWidth-240,topPos+32,108,22,43,true);
+        add("MUTE ALERT",leftPos+uiWidth-128,topPos+32,116,22,41,false);
         int rowHeight=Math.max(36,Math.min(57,(editorTop-bodyTop-12)/4));
-        int x=leftPos+imageWidth-290;
+        int x=leftPos+uiWidth-290;
         for(int i=0;i<4;i++){
             int n=i,y=bodyTop+i*rowHeight;
             add("SELECT",x,y+2,66,21,n,true);
@@ -74,27 +77,27 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
         add("WALL MODE",leftPos+283,editorTop+79,103,22,35,true);
         prev=addRenderableWidget(Button.builder(Component.literal("PREVIOUS"),b->{
             storagePage=Math.max(0,storagePage-1);
-        }).bounds(leftPos+imageWidth-205,topPos+58,93,19).build());
+        }).bounds(leftPos+uiWidth-205,topPos+58,93,19).build());
         next=addRenderableWidget(Button.builder(Component.literal("NEXT"),b->{
             storagePage++;
-        }).bounds(leftPos+imageWidth-108,topPos+58,93,19).build());
+        }).bounds(leftPos+uiWidth-108,topPos+58,93,19).build());
         int fieldY=editorTop+30;
-        rename=new EditBox(font,leftPos+14,fieldY,Math.max(96,(imageWidth-375)/2),20,
+        rename=new EditBox(font,leftPos+14,fieldY,Math.max(96,(uiWidth-375)/2),20,
             Component.literal("Drill nickname"));
         rename.setMaxLength(24);
         rename.setValue(rows[selected][1]);
         addRenderableWidget(rename);
-        addRenderableWidget(Button.builder(Component.literal("SAVE NAME"),b->{
+        saveName=addRenderableWidget(Button.builder(Component.literal("SAVE NAME"),b->{
             ClientPlayNetworking.send(new ComputerRenamePayload(selected,rename.getValue()));
         }).bounds(leftPos+18+rename.getWidth(),fieldY,83,20).build());
-        int first=leftPos+Math.max(235,imageWidth/2);
+        int first=leftPos+Math.max(235,uiWidth/2);
         radius=new EditBox(font,first,fieldY,48,20,Component.literal("Radius"));
         depth=new EditBox(font,first+78,fieldY,48,20,Component.literal("Depth"));
         tries=new EditBox(font,first+156,fieldY,65,20,Component.literal("Fill tries"));
         for(EditBox box:new EditBox[]{radius,depth,tries}){
             box.setMaxLength(5);addRenderableWidget(box);
         }
-        addRenderableWidget(Button.builder(Component.literal("APPLY"),b->{
+        applySettings=addRenderableWidget(Button.builder(Component.literal("APPLY"),b->{
             try{
                 ClientPlayNetworking.send(new ComputerSettingsPayload(selected,
                     Integer.parseInt(radius.getValue().strip()),
@@ -115,6 +118,8 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
         boolean drilling=tab==0;
         for(Button button:drillButtons)button.visible=drilling;
         prev.visible=!drilling;next.visible=!drilling;
+        if(saveName!=null)saveName.visible=drilling;
+        if(applySettings!=null)applySettings.visible=drilling;
         for(EditBox input:new EditBox[]{rename,radius,depth,tries})
             if(input!=null){input.visible=drilling;input.setFocused(false);}
         // Name and APPLY widgets are rendered only on the Drill page via their layout region.
@@ -171,29 +176,29 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
     }
     @Override public void extractBackground(GuiGraphicsExtractor g,int mx,int my,float delta){
         g.fill(0,0,width,height,0xff020604);
-        g.fill(leftPos,topPos,leftPos+imageWidth,topPos+imageHeight,DARK);
-        g.fill(leftPos+5,topPos+5,leftPos+imageWidth-5,topPos+27,PANEL);
-        g.fill(leftPos+8,topPos+28,leftPos+imageWidth-8,topPos+78,0xff0c1e13);
+        g.fill(leftPos,topPos,leftPos+uiWidth,topPos+uiHeight,DARK);
+        g.fill(leftPos+5,topPos+5,leftPos+uiWidth-5,topPos+27,PANEL);
+        g.fill(leftPos+8,topPos+28,leftPos+uiWidth-8,topPos+78,0xff0c1e13);
         if(tab==0){
             int rowHeight=Math.max(36,Math.min(57,(editorTop-bodyTop-12)/4));
             for(int i=0;i<4;i++){
                 int y=bodyTop+i*rowHeight;
-                g.fill(leftPos+8,y,leftPos+imageWidth-8,y+rowHeight-3,
+                g.fill(leftPos+8,y,leftPos+uiWidth-8,y+rowHeight-3,
                     i==selected?0xff1c4230:0xff11271b);
                 g.fill(leftPos+8,y,leftPos+11,y+rowHeight-3,
                     i==selected?GREEN:0xff365d45);
             }
-            g.fill(leftPos+8,editorTop,leftPos+imageWidth-8,
-                topPos+imageHeight-6,PANEL);
+            g.fill(leftPos+8,editorTop,leftPos+uiWidth-8,
+                topPos+uiHeight-6,PANEL);
         }else{
-            g.fill(leftPos+8,bodyTop,leftPos+imageWidth-8,
-                topPos+imageHeight-8,PANEL);
+            g.fill(leftPos+8,bodyTop,leftPos+uiWidth-8,
+                topPos+uiHeight-8,PANEL);
         }
     }
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mx,int my,float delta){
         super.extractRenderState(g,mx,my,delta);
         g.text(font,"CASZUAL MINING COMPUTER",leftPos+14,topPos+12,GREEN,false);
-        if(alert)g.text(font,"! ACTIVE ALERT !",leftPos+imageWidth-126,topPos+14,
+        if(alert)g.text(font,"! ACTIVE ALERT !",leftPos+uiWidth-126,topPos+14,
             0xffff7777,false);
         if(tab==0){
             int rowHeight=Math.max(36,Math.min(57,(editorTop-bodyTop-12)/4));
@@ -208,7 +213,7 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
             }
             g.text(font,"SELECTED DRILL SETTINGS",leftPos+16,editorTop+6,GREEN,false);
             g.text(font,"Nickname",leftPos+14,editorTop+20,MUTED,false);
-            int first=leftPos+Math.max(235,imageWidth/2);
+            int first=leftPos+Math.max(235,uiWidth/2);
             g.text(font,"Radius",first,editorTop+19,MUTED,false);
             g.text(font,"Depth",first+78,editorTop+19,MUTED,false);
             g.text(font,"Fill tries",first+156,editorTop+19,MUTED,false);
@@ -220,22 +225,22 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
             g.text(font,"CONNECTED CONTAINER VOLUMES    "+storage.size()+" total",
                 leftPos+16,topPos+63,GREEN,false);
             g.text(font,"NAME",leftPos+18,bodyTop+12,GREEN,false);
-            g.text(font,"TYPE",leftPos+imageWidth/3,bodyTop+12,GREEN,false);
-            g.text(font,"COORDINATES",leftPos+imageWidth*2/3-56,bodyTop+12,GREEN,false);
-            g.text(font,"ITEMS",leftPos+imageWidth-88,bodyTop+12,GREEN,false);
+            g.text(font,"TYPE",leftPos+uiWidth/3,bodyTop+12,GREEN,false);
+            g.text(font,"COORDINATES",leftPos+uiWidth*2/3-56,bodyTop+12,GREEN,false);
+            g.text(font,"ITEMS",leftPos+uiWidth-88,bodyTop+12,GREEN,false);
             int last=Math.min(storage.size(),(storagePage+1)*10);
             for(int i=storagePage*10;i<last;i++){
                 String[] record=storage.get(i);
                 int y=bodyTop+31+(i-storagePage*10)*19;
-                g.fill(leftPos+14,y-2,leftPos+imageWidth-14,y+15,
+                g.fill(leftPos+14,y-2,leftPos+uiWidth-14,y+15,
                     (i%2==0)?0xff1a3222:0xff12281b);
                 g.text(font,record[1],leftPos+18,y,WHITE,false);
-                g.text(font,record[2],leftPos+imageWidth/3,y,MUTED,false);
-                g.text(font,record[3],leftPos+imageWidth*2/3-56,y,MUTED,false);
-                g.text(font,record[4]+"/"+record[5],leftPos+imageWidth-88,y,GREEN,false);
+                g.text(font,record[2],leftPos+uiWidth/3,y,MUTED,false);
+                g.text(font,record[3],leftPos+uiWidth*2/3-56,y,MUTED,false);
+                g.text(font,record[4]+"/"+record[5],leftPos+uiWidth-88,y,GREEN,false);
             }
             g.text(font,"Page "+(storagePage+1)+"/"+Math.max(1,(storage.size()+9)/10),
-                leftPos+imageWidth-191,topPos+imageHeight-18,MUTED,false);
+                leftPos+uiWidth-191,topPos+uiHeight-18,MUTED,false);
         }
     }
 }
