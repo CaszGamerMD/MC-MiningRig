@@ -3,7 +3,7 @@
     "steel": "minecraft:block/iron_block",
     "dark": "minecraft:block/polished_deepslate",
     "cone": "minecraft:block/raw_iron_block",
-    "paint": "minecraft:block/yellow_concrete_powder",
+    "paint": "minecraft:block/yellow_concrete",
     "rust": "minecraft:block/exposed_copper",
     "grime": "minecraft:block/coarse_dirt",
     "hatch": "minecraft:block/black_concrete",
