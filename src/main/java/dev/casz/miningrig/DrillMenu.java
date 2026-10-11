@@ -10,11 +10,11 @@ import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
-/** Three independent working bits and nine storage stacks, capped at 64 total items. */
+/** Three bits plus tabs for three independent 64-item bundle inventories. */
 public final class DrillMenu extends AbstractContainerMenu {
     private final Container drill;
     private final ContainerData data;
-    public DrillMenu(int id, Inventory player) { this(id,player,new SimpleContainer(12),new SimpleContainerData(2)); }
+    public DrillMenu(int id, Inventory player) { this(id,player,new SimpleContainer(12),new SimpleContainerData(6)); }
     public DrillMenu(int id, Inventory player, Container container,ContainerData data) {
         super(RigMenus.DRILL,id);
         checkContainerSize(container,12);
@@ -31,16 +31,27 @@ public final class DrillMenu extends AbstractContainerMenu {
                 return drill.canPlaceItem(getContainerSlot(),stack);
             }
             @Override public int getMaxStackSize(ItemStack stack) {
-                return Math.min(stack.getMaxStackSize(),drill.getMaxStackSize(stack)+getItem().getCount());
+                return Math.min(stack.getMaxStackSize(),
+                    drill instanceof PagedDrillContainer view
+                        ?view.roomForSlot(getContainerSlot())
+                        :drill.getMaxStackSize(stack));
             }
         });
         addStandardInventorySlots(player,8,100);
     }
-    public int stored(){return data.get(0);}
+    public int stored(){return data.get(switch(data.get(4)){case 1->2;case 2->3;default->0;});}
     public int page(){return data.get(1);}
+    public int bank(){return data.get(4);}
+    public boolean randomWalls(){return data.get(5)!=0;}
+    public String bankName(){return switch(bank()){case 1->"FILLER";case 2->"WALL";default->"MINED OUTPUT";};}
     @Override public boolean clickMenuButton(Player player,int id){
-        if(id!=0 && id!=1)return false;
-        data.set(1,Math.max(0,Math.min(7,data.get(1)+(id==1?1:-1))));
+        switch(id){
+            case 0 -> data.set(1,Math.max(0,data.get(1)-1));
+            case 1 -> data.set(1,Math.min(7,data.get(1)+1));
+            case 2 -> data.set(4,(data.get(4)+1)%3);
+            case 3 -> data.set(5,data.get(5)==0?1:0);
+            default -> {return false;}
+        }
         broadcastChanges();return true;
     }
     @Override public boolean stillValid(Player player){return drill.stillValid(player);}
