@@ -271,6 +271,9 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         if(!hasWorkingBits())return ComputerEntity.Status.OUT_OF_BITS;
         if(freeStorage()==0)return ComputerEntity.Status.FULL;
         // Operational order is explicitly WALL -> FLUID -> MINING.
+        // The controller owns the setting; the sealing state owns the
+        // per-coordinate count. Update live for every tick and after reload.
+        sealing.setTryLimit(computer.fillAttemptLimit());
         ComputerEntity.Status walls=sealing.wallStep(world,this,computer);
         if(walls!=null)return walls==ComputerEntity.Status.RUNNING
             ?ComputerEntity.Status.WALLING:walls;

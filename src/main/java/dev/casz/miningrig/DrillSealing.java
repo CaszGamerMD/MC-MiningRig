@@ -24,7 +24,7 @@ import org.jetbrains.annotations.Nullable;
  */
 final class DrillSealing {
     private static final int VERIFY_TICKS=8;
-    private static final int MAX_FILL_ATTEMPTS=24;
+    private static final int DEFAULT_FILL_ATTEMPTS=24;
     private final LinkedHashSet<BlockPos> fluidSpots=new LinkedHashSet<>();
     private final LinkedHashSet<BlockPos> finishedWalls=new LinkedHashSet<>();
     @Nullable private BlockPos pending;
@@ -33,7 +33,8 @@ final class DrillSealing {
     // Attempts MUST belong to one physical target, never the layer as a
     // whole. A sand/gravel column may be much deeper than 24 blocks.
     @Nullable private BlockPos attemptTarget;
-    private int allowedAttempts=MAX_FILL_ATTEMPTS;
+    private int allowedAttempts=DEFAULT_FILL_ATTEMPTS;
+    private int configuredLimit=DEFAULT_FILL_ATTEMPTS;
     private int gravityDropDepth;
     private boolean wallFallback,wallFinished,wallSourceChecked;
     private int cautionTicks;
@@ -54,12 +55,17 @@ final class DrillSealing {
     }
     int failedAttempts(){return attempts;}
     int attemptLimit(){return allowedAttempts;}
+    void setTryLimit(int limit){
+        configuredLimit=Math.max(ComputerEntity.MIN_FILL_TRIES,
+            Math.min(ComputerEntity.MAX_FILL_TRIES,limit));
+        allowedAttempts=configuredLimit;
+    }
     int fallDepth(){return gravityDropDepth;}
     private void target(ServerLevel world,BlockPos at,@Nullable ItemStack stack){
         if(attemptTarget==null || !attemptTarget.equals(at)){
             attemptTarget=at.immutable();
             attempts=0;
-            allowedAttempts=MAX_FILL_ATTEMPTS;
+            allowedAttempts=configuredLimit;
             gravityDropDepth=0;
         }
         if(stack==null || !(stack.getItem() instanceof BlockItem item)
@@ -80,7 +86,9 @@ final class DrillSealing {
         gravityDropDepth=Math.max(gravityDropDepth,gap);
         // A few extra tries beyond the physical drop height are useful for
         // flowing water and entity settling, but the check is still finite.
-        allowedAttempts=Math.max(allowedAttempts,Math.min(512,gravityDropDepth+16));
+        // The operator chooses the attempt ceiling in the Mining Computer.
+        // Still measure gravity depth to extend settling time, but do not
+        // override the configured maximum with an automatic retry allowance.
     }
     private int settleTicks(ItemStack item){
         return item.getItem() instanceof BlockItem block
@@ -152,6 +160,7 @@ final class DrillSealing {
         next.wait=wait;next.attempts=attempts;
         next.attemptTarget=attemptTarget;
         next.allowedAttempts=allowedAttempts;
+        next.configuredLimit=configuredLimit;
         next.gravityDropDepth=gravityDropDepth;
         next.wallFallback=wallFallback;next.wallFinished=wallFinished;
         next.wallSourceChecked=wallSourceChecked;
@@ -172,13 +181,13 @@ final class DrillSealing {
         cautionTicks=0;pending=null;pendingWall=false;
         replaceCleared=false;fluidMode=false;legacyWallPhase=false;
         deliveryWall=false;pendingSourceWalls=false;flightTicks=0;attempts=0;wait=0;
-        attemptTarget=null;allowedAttempts=MAX_FILL_ATTEMPTS;gravityDropDepth=0;
+        attemptTarget=null;allowedAttempts=configuredLimit;gravityDropDepth=0;
         discardVisual();
     }
     void nextLayer(){
         fluidSpots.clear();finishedWalls.clear();pending=null;pendingWall=false;
         wait=0;attempts=0;wallFinished=false;wallSourceChecked=false;
-        attemptTarget=null;allowedAttempts=MAX_FILL_ATTEMPTS;gravityDropDepth=0;
+        attemptTarget=null;allowedAttempts=configuredLimit;gravityDropDepth=0;
         replaceCleared=false;fluidMode=false;
     }
     private void scanFluids(ServerLevel world,DrillEntity drill,ComputerEntity computer){
@@ -494,6 +503,7 @@ final class DrillSealing {
         out.putBoolean("HasAttemptTarget",attemptTarget!=null);
         if(attemptTarget!=null)out.putLong("AttemptTarget",attemptTarget.asLong());
         out.putInt("AllowedAttempts",allowedAttempts);
+        out.putInt("ConfiguredFillTries",configuredLimit);
         out.putInt("GravityDropDepth",gravityDropDepth);
         out.putBoolean("WallFallback",wallFallback);
         out.putInt("CautionTicks",cautionTicks);
@@ -530,8 +540,10 @@ final class DrillSealing {
         attempts=Math.max(0,in.getIntOr("FillAttempts",0));
         attemptTarget=in.getBooleanOr("HasAttemptTarget",false)
             ?BlockPos.of(in.getLongOr("AttemptTarget",0)):pending;
-        allowedAttempts=Math.max(MAX_FILL_ATTEMPTS,
-            Math.min(512,in.getIntOr("AllowedAttempts",MAX_FILL_ATTEMPTS)));
+        configuredLimit=Math.max(ComputerEntity.MIN_FILL_TRIES,
+            Math.min(ComputerEntity.MAX_FILL_TRIES,
+                in.getIntOr("ConfiguredFillTries",DEFAULT_FILL_ATTEMPTS)));
+        allowedAttempts=configuredLimit;
         gravityDropDepth=Math.max(0,in.getIntOr("GravityDropDepth",0));
         wallFallback=in.getBooleanOr("WallFallback",false);
         cautionTicks=Math.max(0,in.getIntOr("CautionTicks",0));

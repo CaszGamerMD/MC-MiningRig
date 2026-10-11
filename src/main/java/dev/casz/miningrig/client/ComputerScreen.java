@@ -13,15 +13,15 @@ import net.minecraft.world.entity.player.Inventory;
 
 /** Four readable drill status cards, with controls and a text box to rename selected drill. */
 public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
-    private final String[][] rows=new String[4][10];
+    private final String[][] rows=new String[4][11];
     private int selected;
     private EditBox rename;
     private boolean initial=true;
     public ComputerScreen(ComputerMenu menu,Inventory player,Component title){
-        super(menu,player,title,360,294);
-        titleLabelY=8;inventoryLabelY=290;
+        super(menu,player,title,360,330);
+        titleLabelY=8;inventoryLabelY=326;
         for(int i=0;i<4;i++){
-            rows[i]=new String[]{"0","Drill "+(i+1),"Not placed","Empty","-1","2","12","O","0","0"};
+            rows[i]=new String[]{"0","Drill "+(i+1),"Not placed","Empty","-1","2","12","O","0","0","24"};
         }
     }
     private void click(int id){
@@ -45,12 +45,23 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
             .bounds(leftPos+216,topPos+223,55,18).build());
         addRenderableWidget(Button.builder(Component.literal("Unlink"),b->click(20+selected))
             .bounds(leftPos+274,topPos+223,74,18).build());
-        rename=new EditBox(font,leftPos+8,topPos+261,236,19,Component.literal("Drill nickname"));
+        // Safety control is shared by the local block UI and remote tablet.
+        // The limit applies separately at EVERY fill coordinate, not to
+        // the total number of blocks in the hole.
+        addRenderableWidget(Button.builder(Component.literal("-25"),b->click(38))
+            .bounds(leftPos+156,topPos+253,42,18).build());
+        addRenderableWidget(Button.builder(Component.literal("-1"),b->click(36))
+            .bounds(leftPos+201,topPos+253,42,18).build());
+        addRenderableWidget(Button.builder(Component.literal("+1"),b->click(37))
+            .bounds(leftPos+246,topPos+253,42,18).build());
+        addRenderableWidget(Button.builder(Component.literal("+25"),b->click(39))
+            .bounds(leftPos+291,topPos+253,58,18).build());
+        rename=new EditBox(font,leftPos+8,topPos+296,236,19,Component.literal("Drill nickname"));
         rename.setMaxLength(24);rename.setValue(rows[selected][1]);
         addRenderableWidget(rename);
         addRenderableWidget(Button.builder(Component.literal("Save name"),b->{
             ClientPlayNetworking.send(new ComputerRenamePayload(selected,rename.getValue()));
-        }).bounds(leftPos+250,topPos+261,99,19).build());
+        }).bounds(leftPos+250,topPos+296,99,19).build());
     }
     public void updateState(String raw){
         String[] lines=raw.split("\n",-1);
@@ -62,7 +73,7 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
             selected=next;initial=false;
             for(int i=0;i<4;i++){
                 String[] entry=lines[i+1].split("\t",-1);
-                if(entry.length>=10)rows[i]=Arrays.copyOf(entry,10);
+                if(entry.length>=11)rows[i]=Arrays.copyOf(entry,11);
             }
             if(changed && rename!=null)rename.setValue(rows[selected][1]);
         }catch(NumberFormatException ignored){}
@@ -85,7 +96,8 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
             g.fill(leftPos+5,y,leftPos+8,y+46,i==selected?0xff64cbff:0xff647885);
         }
         g.fill(leftPos+5,topPos+218,leftPos+354,topPos+246,0xff263946);
-        g.fill(leftPos+5,topPos+250,leftPos+354,topPos+287,0xff263946);
+        g.fill(leftPos+5,topPos+250,leftPos+354,topPos+276,0xff263946);
+        g.fill(leftPos+5,topPos+285,leftPos+354,topPos+322,0xff263946);
     }
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mx,int my,float delta){
         super.extractRenderState(g,mx,my,delta);
@@ -102,6 +114,8 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
         }
         g.text(font,"Selected: R "+rows[selected][5]+" | D "+rows[selected][6]
             +" | "+(rows[selected][7].equals("O")?"Circle":"Square")+" | Wall: "+switch(rows[selected][8]){case "1"->"Air";case "2"->"Replace";default->"Off";},leftPos+9,topPos+207,0xffffffff,false);
-        g.text(font,"Nickname for selected drill:",leftPos+9,topPos+250,0xffbde4f5,false);
+        g.text(font,"Fill tries / block: "+rows[selected][10],
+            leftPos+9,topPos+257,0xffbde4f5,false);
+        g.text(font,"Nickname for selected drill:",leftPos+9,topPos+286,0xffbde4f5,false);
     }
 }
