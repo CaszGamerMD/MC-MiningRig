@@ -22,8 +22,21 @@ public final class RigTopology {
     public static final int RANGE=24;
     private static final Map<ServerLevel,Set<BlockPos>> coordinators=new WeakHashMap<>();
     private static final Map<ServerLevel,Set<BlockPos>> drills=new WeakHashMap<>();
+    private record NetworkCache(long tick,BlockPos root,List<CoordinatorEntity> component){}
+    private static final Map<ServerLevel,NetworkCache> cachedNetworks=new WeakHashMap<>();
+    static List<CoordinatorEntity> network(ServerLevel world,ComputerEntity computer){
+        CoordinatorEntity root=nearest(world,computer.getBlockPos());
+        if(root==null)return List.of();
+        NetworkCache cached=cachedNetworks.get(world);
+        if(cached!=null&&cached.tick()==world.getGameTime()
+            &&cached.root().equals(root.getBlockPos()))return cached.component();
+        List<CoordinatorEntity> result=RigNetwork.component(world,root);
+        cachedNetworks.put(world,new NetworkCache(world.getGameTime(),root.getBlockPos(),result));
+        return result;
+    }
     public static void coordinator(ServerLevel world,BlockPos pos){
-        coordinators.computeIfAbsent(world,w->new HashSet<>()).add(pos.immutable());
+        if(coordinators.computeIfAbsent(world,w->new HashSet<>()).add(pos.immutable()))
+            cachedNetworks.remove(world);
     }
     public static void drill(ServerLevel world,BlockPos pos){
         drills.computeIfAbsent(world,w->new HashSet<>()).add(pos.immutable());
@@ -31,6 +44,7 @@ public final class RigTopology {
     public static void forgetCoordinator(ServerLevel world,BlockPos pos){
         Set<BlockPos> points=coordinators.get(world);
         if(points!=null)points.remove(pos);
+        cachedNetworks.remove(world);
     }
     public static void forgetDrill(ServerLevel world,BlockPos pos){
         Set<BlockPos> points=drills.get(world);
@@ -70,17 +84,13 @@ public final class RigTopology {
     public static List<DrillEntity> networkDrills(ServerLevel world,ComputerEntity computer){
         List<DrillEntity> result=new ArrayList<>();
         Set<BlockPos> seen=new HashSet<>();
-        CoordinatorEntity entry=nearest(world,computer.getBlockPos());
-        if(entry==null)return result;
-        for(CoordinatorEntity cc:RigNetwork.component(world,entry))
+        for(CoordinatorEntity cc:network(world,computer))
             for(DrillEntity drill:drills(world,cc.getBlockPos()))
                 if(seen.add(drill.getBlockPos()))result.add(drill);
         return result;
     }
     public static boolean joined(ServerLevel world,ComputerEntity computer,DrillEntity drill){
-        CoordinatorEntity root=nearest(world,computer.getBlockPos());
-        if(root==null)return false;
-        for(CoordinatorEntity cc:RigNetwork.component(world,root))
+        for(CoordinatorEntity cc:network(world,computer))
             if(nearby(cc.getBlockPos(),drill.getBlockPos()))return true;
         return false;
     }
