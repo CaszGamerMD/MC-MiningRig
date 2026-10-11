@@ -136,6 +136,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     /** Prevent any further CC prefetch on a stop and return all unplaced stock. */
     public void pauseSupply(ServerLevel world){
         lastControllerTick=Long.MIN_VALUE;
+        hardware.pause(world,this);
         sealing.pauseSupply(world,this);
         CoordinatorEntity cc=RigNetwork.nearestDrillCoordinator(world,this);
         if(cc!=null)cc.returnCachedSupplies(world,this);
@@ -145,6 +146,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     public boolean activelyFilling(ServerLevel world){
         return recentlyProcessing(world);
     }
+    public boolean activelyMining(ServerLevel world){return recentlyProcessing(world);}
     public void retryFailedFill(ServerLevel world){sealing.retryFailedFill(world,this);}
     public boolean canAutoRecoverFill(ServerLevel world){return sealing.canAutoRecover(world);}
     @Nullable public BlockPos failedFillPosition(){return sealing.stuckPosition();}
