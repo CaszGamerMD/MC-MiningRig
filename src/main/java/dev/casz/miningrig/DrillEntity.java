@@ -241,8 +241,6 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         }
         if(!hasWorkingBits())return ComputerEntity.Status.OUT_OF_BITS;
         if(freeStorage()==0)return ComputerEntity.Status.FULL;
-        if(cursor==0 && assigned[0]<0 && assigned[1]<0 && assigned[2]<0)
-            sealing.retryWallSource(world,this);
         // Operational order is explicitly WALL -> FLUID -> MINING.
         ComputerEntity.Status walls=sealing.wallStep(world,this,computer);
         if(walls!=null)return walls;

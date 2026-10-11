@@ -29,7 +29,7 @@ final class DrillSealing {
     @Nullable private BlockPos pending;
     private boolean pendingWall;
     private int wait,attempts;
-    private boolean wallFallback,wallFinished;
+    private boolean wallFallback,wallFinished,wallSourceChecked;
     private int cautionTicks;
     @Nullable private RigNetwork.Supply delivery;
     @Nullable private BlockPos deliveryTarget;
@@ -40,6 +40,10 @@ final class DrillSealing {
     boolean warning(){return !fluidSpots.isEmpty()||pending!=null||cautionTicks>0;}
     boolean fallback(){return wallFallback;}
     void retryWallSource(ServerLevel world,DrillEntity drill){
+        if(wallSourceChecked)return;
+        wallSourceChecked=true;
+        // Check once on each new layer, not again for every tick during the
+        // wall pass; Continue mode stays in Air fallback until next layer.
         if(wallFallback && RigNetwork.hasAvailable(world,drill,true))wallFallback=false;
     }
     static boolean contains(ComputerEntity computer,int x,int z,boolean expanded){
@@ -70,6 +74,7 @@ final class DrillSealing {
         next.pending=pending;next.pendingWall=pendingWall;
         next.wait=wait;next.attempts=attempts;
         next.wallFallback=wallFallback;next.wallFinished=wallFinished;
+        next.wallSourceChecked=wallSourceChecked;
         next.cautionTicks=cautionTicks;
         next.delivery=delivery;next.deliveryTarget=deliveryTarget;
         next.deliveryWall=deliveryWall;next.flightTicks=flightTicks;
@@ -78,7 +83,7 @@ final class DrillSealing {
     }
     void nextLayer(){
         fluidSpots.clear();finishedWalls.clear();pending=null;pendingWall=false;
-        wait=0;attempts=0;wallFinished=false;
+        wait=0;attempts=0;wallFinished=false;wallSourceChecked=false;
     }
     private void scanFluids(ServerLevel world,DrillEntity drill,ComputerEntity computer){
         int r=computer.radius()+1;
@@ -199,6 +204,7 @@ final class DrillSealing {
      * ring using proper bits and installs wall material before core mining.
      */
     ComputerEntity.Status wallStep(ServerLevel world,DrillEntity drill,ComputerEntity computer){
+        retryWallSource(world,drill);
         int setting=computer.wallMode();
         if(setting==0||wallFinished)return null;
         if(delivery!=null)return advanceDelivery(world,drill);
@@ -265,6 +271,7 @@ final class DrillSealing {
         out.putInt("FinishedWalls",finishedWalls.size());
         i=0;for(BlockPos p:finishedWalls)out.putLong("WallPos"+i++,p.asLong());
         out.putBoolean("WallFinished",wallFinished);
+        out.putBoolean("WallSourceChecked",wallSourceChecked);
         out.putBoolean("FillPending",pending!=null);
         if(pending!=null)out.putLong("FillPosition",pending.asLong());
         out.putInt("FillType",pendingWall?2:1);out.putInt("FillWait",wait);
@@ -291,6 +298,7 @@ final class DrillSealing {
         for(int i=0;i<Math.min(4096,in.getIntOr("FinishedWalls",0));i++)
             finishedWalls.add(BlockPos.of(in.getLongOr("WallPos"+i,0)));
         wallFinished=in.getBooleanOr("WallFinished",false);
+        wallSourceChecked=in.getBooleanOr("WallSourceChecked",false);
         pending=in.getBooleanOr("FillPending",false)
             ?BlockPos.of(in.getLongOr("FillPosition",0)):null;
         pendingWall=in.getIntOr("FillType",0)==2;
