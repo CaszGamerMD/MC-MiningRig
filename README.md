@@ -1,10 +1,17 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.4.2 — accurate layer scheduling, reverse supply transport, compact CCs and tablet fixes**
+**Version 0.4.3 — new drill progress isolation and handheld model repair**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.4.3 — fresh drill pairing and handheld model repairs
+
+- **Fresh excavation progress:** Placing a drill item starts at **Layers: 0 / configured depth** even if the exact block location previously contained another drill, or the item somehow retained old block-entity excavation data. Fresh placement clears the old drill's mining cursor, completed layers, hardness progress, tool-placement charge, wall sealing state, and pending work. It does **not** clear physically installed mining bits or mined-item storage. Planned automatic drill descent retains progress normally.
+- **Per-drill identity protection:** Mining Computers no longer treat any drill at a remembered coordinate as the registered drill. They validate the registered item's unique pairing token for start/stop, mining ticks, ETA, layer counts, and downward relocation. Linking a new drill in another drill's old location invalidates the obsolete location, without transferring the prior drill's progress or starting it accidentally.
+- **Handheld model rebuilt:** The mining drill item model is generated from the **current two placed block models**, including the correct worn-yellow top housing, matching material aliases, lower steel/raw-iron cone, dirt/rust accents, and top hatch. Legacy copied item geometry and mismatched old material keys were discarded. All 25 visible model elements use explicit face UVs and the joint upper/lower surface faces are removed. A geometric audit found **zero duplicated, outward-facing coplanar surfaces** in the handheld model. Item and placed housing use the same yellow-concrete material for consistent color.
+- **In-game verification:** With the computer set to depth 12, link and place a new drill where an 8/12 drill used to be. The new machine should read **0/12, Ready**, while the old pairing no longer controls it. A drill legitimately continuing to descend should preserve its own layer count and bits. Rotate the drill in first- and third-person views to inspect its yellow paint, cone and model edges. Compile verification is not an in-game render test.
 
 ## v0.4.2: in-game feedback fixes
 
@@ -163,6 +170,6 @@ One Collection Coordinator block handles all wireless item routing. Its internal
 
 Minecraft **26.2**, Fabric Loader **0.19.5**, Fabric API **0.161.0+26.2**, Java **25**, Gradle **9.7.0**, Loom **1.18.3**.
 
-Run `gradle build` using Java 25; or download the `caszual-mining-rig-0.4.2.jar` inside the `miningrig-26.2` artifact in the most recent successful GitHub Actions workflow.
+Run `gradle build` using Java 25; or download the `caszual-mining-rig-0.4.3.jar` inside the `miningrig-26.2` artifact in the most recent successful GitHub Actions workflow.
 
 **Status:** GitHub Actions compile verification is used, but it does *not* test actual Minecraft interaction, server permissions, chunk reloads, or multiplayer naming/GUI synchronization. Test in a backed-up world and treat this as a development build until in-game verified.
