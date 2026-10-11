@@ -1,10 +1,26 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.4.10 — full-speed Wall/Filler supply buffers**
+**Version 0.4.11 — three drill bundles and continuously stocked supply**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.4.11 — three 64-item drill bundles and wall ordering
+
+Each mining drill now maintains three **independent** capacities, all capped at **64 individual items**:
+
+- **Output (64):** mined blocks and drops only, transferred up to Collection Coordinators.
+- **Filler (64):** valid sealing blocks for liquid repair and Air-mode perimeter patches.
+- **Wall (64):** valid wall blocks for Replace mode. Separate from both Filler and mined output.
+
+Open the Mining Drill and use **Next storage** to switch between the three paged bundle views (up to eight pages each). The interface reports each storage's own used capacity. The wall selector is **Wall: Order** by default. **Wall: Random** picks from a different available wall input stack when possible, randomly selecting **one block per source draw** rather than depleting the first stack; wall placement also randomly samples the ready wall bundle, avoiding the previously used packet when an alternative is available. The chosen mode is saved on the drill and travels with it as it descends.
+
+**While running**, Filler continually requests **64 total ready/in-flight blocks**, and Wall does the same in Replace mode. The nearest CC maintains separate upstream Filler and Wall depots (up to 192 each) to keep both drill buffers fed even while other phases are active. Unlike older versions, the buffers are **not emptied at each completed wall or fluid phase**.
+
+**When paused or stopped**, the drill refunds unused reserve packets and immediately tells its nearest CC to refund its supply depots before chunk tickets are released. Unused supplies return to their **original input inventories first**, with overflow routed through configured **Output** CCs; the existing safe fallback behavior prevents item loss when all destinations are full. Switching Wall: Order/Random also returns the outstanding Wall stock before refilling according to the new policy, without clearing Filler.
+
+**Validation:** Fabric 26.2 GitHub Actions checks compilation. In-world throughput, mixed-wall patterns, pause/resume refunds and GUI stack interactions should still be playtested with backup worlds.
 
 ## v0.4.10 — continuously stocked Wall + Filler depots
 
