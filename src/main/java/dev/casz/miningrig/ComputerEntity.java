@@ -198,6 +198,21 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         }
         return active+" mining | "+alerts+" alerts";
     }
+    /** Stable severity independent of the block's alternating lamp phase. */
+    public int tabletLightLevel(){
+        boolean alarm=false;
+        for(int i=0;i<MAX_DRILLS;i++){
+            if(!tokens[i].isEmpty()&&!running[i]
+                && statuses[i]!=Status.READY && statuses[i]!=Status.WAITING)alarm=true;
+        }
+        if(alarm)return 3;
+        if(level instanceof ServerLevel server)
+            for(int i=0;i<MAX_DRILLS;i++)
+                if(running[i]&&positions[i]!=null&&server.hasChunkAt(positions[i])
+                    && server.getBlockEntity(positions[i]) instanceof DrillEntity drill
+                    && drill.fluidWarning())return 2;
+        return 1;
+    }
     public boolean running(){
         for(boolean value:running)if(value)return true;return false;
     }

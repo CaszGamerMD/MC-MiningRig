@@ -100,7 +100,7 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
             g.text(font,eta(r[4]),leftPos+140,y+24,0xff8bffae,false);
         }
         g.text(font,"Selected: R "+rows[selected][5]+" | D "+rows[selected][6]
-            +" | "+(rows[selected][7].equals("O")?"Circle":"Square")+" | Wall: "+switch(rows[selected][8]){case "1"->"Air";case "2"->"Always";default->"Off";},leftPos+9,topPos+207,0xffffffff,false);
+            +" | "+(rows[selected][7].equals("O")?"Circle":"Square")+" | Wall: "+switch(rows[selected][8]){case "1"->"Air";case "2"->"Replace";default->"Off";},leftPos+9,topPos+207,0xffffffff,false);
         g.text(font,"Nickname for selected drill:",leftPos+9,topPos+250,0xffbde4f5,false);
     }
 }
