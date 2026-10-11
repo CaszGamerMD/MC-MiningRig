@@ -50,6 +50,7 @@ final class WallSupplyPipeline {
     private final List<Packet> flights=new ArrayList<>();
     private final List<RigNetwork.Supply> ready=new ArrayList<>();
     private int requestedTotal,deliveredCount;
+    private long lastAdvanceTick=Long.MIN_VALUE;
 
     int readyCount(){
         int n=0;for(RigNetwork.Supply supply:ready)n+=supply.stack().getCount();return n;
@@ -66,7 +67,7 @@ final class WallSupplyPipeline {
     private static int legTicks(BlockPos a,BlockPos b){
         int dist=Math.abs(a.getX()-b.getX())+Math.abs(a.getY()-b.getY())+
             Math.abs(a.getZ()-b.getZ());
-        return Math.max(3,(int)Math.ceil(dist*2.5));
+        return Math.max(2,(int)Math.ceil(dist*0.8));
     }
     private static void spawn(ServerLevel world,Packet packet){
         if(packet.visual!=null || packet.cargo.path().isEmpty())return;
@@ -85,6 +86,11 @@ final class WallSupplyPipeline {
     }
     /** Advance all concurrently in-flight packets, independent of placement. */
     void tick(ServerLevel world,DrillEntity drill){
+        // Air walls and fluid sealing may both run in one game tick.
+        // Never advance the same flight twice in that case.
+        long time=world.getGameTime();
+        if(lastAdvanceTick==time)return;
+        lastAdvanceTick=time;
         if(flights.isEmpty())return;
         for(int i=flights.size()-1;i>=0;i--){
             Packet packet=flights.get(i);
@@ -171,6 +177,7 @@ final class WallSupplyPipeline {
         for(RigNetwork.Supply cargo:ready)next.ready.add(new RigNetwork.Supply(
             cargo.stack().copy(),cargo.path(),cargo.sourcePos(),cargo.sourceFace()));
         next.requestedTotal=requestedTotal;next.deliveredCount=deliveredCount;
+        next.lastAdvanceTick=lastAdvanceTick;
         flights.clear();ready.clear();
         requestedTotal=0;deliveredCount=0;
     }
