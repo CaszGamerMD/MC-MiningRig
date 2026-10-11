@@ -53,8 +53,31 @@ final class DrillSealing {
     boolean fluidFilling(){return fluidMode;}
     boolean needsWallSupply(){return !wallFinished;}
     boolean needsAirFiller(){return !wallFinished && airWallNeeded;}
-    int wallDepotTarget(){return Math.max(0,wallPositionsRemaining
-        -walls.readyCount()-walls.flightCount());}
+    int wallDepotTarget(){return 192;}
+    int supplyStored(boolean wall){return (wall?walls:filler).bundleCount();}
+    ItemStack supplyItem(boolean wall,int slot){return (wall?walls:filler).bundleItem(slot);}
+    int supplyRoom(boolean wall,int slot){return (wall?walls:filler).bundleRoom(slot);}
+    ItemStack removeSupply(boolean wall,int slot,int count){
+        return (wall?walls:filler).removeBundleItem(slot,count);
+    }
+    void setSupply(boolean wall,int slot,ItemStack stack){
+        (wall?walls:filler).setBundleItem(slot,stack);
+    }
+    /**
+     * Material reservations never stop between wall/fluid phases: these are
+     * permanent 64-item running buffers, independent of the 64 mined drops.
+     */
+    void maintainSupply(ServerLevel world,DrillEntity drill,ComputerEntity computer){
+        filler.tick(world,drill);
+        filler.request(world,drill,64);
+        walls.tick(world,drill);
+        if(computer.wallMode()==2)walls.request(world,drill,64);
+    }
+    /** Pausing returns drill stock to the original bins, then the output CC. */
+    void pauseSupply(ServerLevel world,DrillEntity drill){
+        walls.flush(world,drill);
+        filler.flush(world,drill);
+    }
     boolean fallback(){return wallFallback;}
     /** Saved failing coordinate; do not report a generic error with no target. */
     @Nullable BlockPos stuckPosition(){
@@ -326,7 +349,7 @@ final class DrillSealing {
     private ComputerEntity.Status applyFromStock(ServerLevel world,DrillEntity drill,
             WallSupplyPipeline stock,BlockPos target,boolean wall){
         if(!drill.placementReady(world))return ComputerEntity.Status.RUNNING;
-        ItemStack available=stock.peek();
+        ItemStack available=stock.peek(world,stock==walls&&drill.randomWalls());
         if(available.isEmpty())return ComputerEntity.Status.RUNNING;
         if(!(available.getItem() instanceof BlockItem item))return ComputerEntity.Status.BLOCKED;
         target(world,target,available);
@@ -437,11 +460,10 @@ final class DrillSealing {
         }
         wallPositionsRemaining=remaining;
         if(remaining==0){
-            walls.flush(world,drill);
             replaceCleared=false;wallFinished=true;drill.setChanged();
             return null;
         }
-        walls.request(world,drill,Math.min(64,remaining));
+        walls.request(world,drill,64);
         if(!walls.hasSupply()){
             if(walls.hasFlights() || RigNetwork.supplyDepotPending(world,drill,true))
                 return ComputerEntity.Status.RUNNING;
@@ -500,7 +522,6 @@ final class DrillSealing {
             }
             return applyFromStock(world,drill,filler,at,true);
         }
-        walls.flush(world,drill);
         wallFinished=true;airWallNeeded=false;drill.setChanged();
         return null;
     }
@@ -515,10 +536,7 @@ final class DrillSealing {
         scanFluids(world,drill,computer);
         if(!fluidSpots.isEmpty()||pending!=null&&!pendingWall)fluidMode=true;
         if(!fluidMode){
-            // Air-mode walls may already have prefetched Filler. Return unused
-            // stock if there is no fluid work after the wall step.
-            if(filler.readyCount()>0 || filler.hasFlights())
-                filler.flush(world,drill);
+            // Keep filler stocked through ordinary mining. Release only on pause.
             if(cautionTicks>0)cautionTicks--;
             return null;
         }
@@ -567,9 +585,7 @@ final class DrillSealing {
                         return ComputerEntity.Status.RUNNING;
             }
         }
-        // Only after all detected fluid has passed solid-block verification
-        // is the unused filler released to ordinary mined-item output.
-        filler.flush(world,drill);
+        // Retain the filler buffer so the next fluid pocket needs no cold start.
         fluidMode=false;
         drill.setChanged();
         if(cautionTicks>0)cautionTicks--;
