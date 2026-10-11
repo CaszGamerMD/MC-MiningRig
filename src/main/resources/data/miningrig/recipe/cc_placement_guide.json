@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "ICI",
+    "ARA",
+    " S "
+  ],
+  "key": {
+    "I": "minecraft:iron_ingot",
+    "C": "minecraft:comparator",
+    "A": "minecraft:amethyst_shard",
+    "R": "minecraft:redstone",
+    "S": "minecraft:stick"
+  },
+  "result": {
+    "id": "miningrig:cc_placement_guide",
+    "count": 1
+  }
+}

@@ -54,6 +54,8 @@ public final class MiningRig implements ModInitializer {
             new MiningTabletBlock(BlockBehaviour.Properties.of().strength(2).noOcclusion().setId(key.block())));
     }
     public static final Block TABLET_BLOCK=tabletBlock();
+    public static final Item CC_GUIDE=item("cc_placement_guide",CoordinatorGuideItem::new,
+        new Item.Properties().stacksTo(1));
     public static final Item TABLET=item("mining_tablet",MiningTabletItem::new,
         new Item.Properties().stacksTo(1));
     public static final BlockEntityType<ComputerEntity> COMPUTER_ENTITY = Registry.register(
@@ -86,8 +88,9 @@ public final class MiningRig implements ModInitializer {
         RigNetworking.initialize();
         TabletAccess.initialize();
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(TabletAccess::tickServer);
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(CoordinatorGuideItem::tickServer);
         CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.REDSTONE_BLOCKS).register(tab -> {
-            tab.accept(COMPUTER); tab.accept(DRILL); tab.accept(COORDINATOR); tab.accept(TABLET);
+            tab.accept(COMPUTER); tab.accept(DRILL); tab.accept(COORDINATOR); tab.accept(CC_GUIDE); tab.accept(TABLET);
             tab.accept(WOOD_BIT); tab.accept(STONE_BIT); tab.accept(IRON_BIT);
             tab.accept(GOLD_BIT); tab.accept(DIAMOND_BIT); tab.accept(NETHERITE_BIT);
         });

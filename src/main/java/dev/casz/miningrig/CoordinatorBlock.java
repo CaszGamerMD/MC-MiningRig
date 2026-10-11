@@ -54,6 +54,8 @@ public final class CoordinatorBlock extends BaseEntityBlock {
     }
     @Override protected InteractionResult useItemOn(ItemStack stack,BlockState state,Level level,
             BlockPos pos,Player player,InteractionHand hand,BlockHitResult hit){
+        if(stack.is(MiningRig.CC_GUIDE))
+            return CoordinatorGuideItem.select(level,pos,hit.getDirection(),player,stack);
         if(!level.isClientSide() && level.getBlockEntity(pos) instanceof CoordinatorEntity coordinator)
             player.openMenu(coordinator);
         return InteractionResult.SUCCESS;
