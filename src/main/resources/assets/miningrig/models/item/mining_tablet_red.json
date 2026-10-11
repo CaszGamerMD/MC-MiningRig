@@ -1,5 +1,5 @@
 {
-  "parent": "miningrig:block/mining_tablet_red",
+  "parent": "miningrig:item/mining_tablet_dark",
   "display": {
     "gui": {
       "rotation": [
@@ -71,6 +71,6 @@
     }
   },
   "textures": {
-    "lamp": "miningrig:item/tablet_lamp_red"
+    "lamp": "minecraft:block/redstone_block"
   }
 }
