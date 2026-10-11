@@ -462,22 +462,71 @@ public final class RigNetwork {
             }
         }
     }
-    /** Shortest CC hop which leads to any accessible output container. */
-    public static CoordinatorEntity nextTowardOutput(ServerLevel world,CoordinatorEntity start){
+    /**
+     * Determine which actual output faces can accept the candidate item.
+     * A non-full container can still reject items (different stack, sided
+     * restriction, non-stackable slots); inspect real slots rather than
+     * treating an output port as a guaranteed destination.
+     */
+    public static boolean canOutput(ServerLevel world,CoordinatorEntity cc,ItemStack item){
+        if(item.isEmpty())return false;
+        for(Direction face:Direction.values()){
+            if(cc.portMode(face)!=OUTPUT)continue;
+            Container destination=cc.external(world,face);
+            if(destination==null)continue;
+            Direction incoming=face.getOpposite();
+            int[] slots=destination instanceof WorldlyContainer sided
+                ?sided.getSlotsForFace(incoming):null;
+            int count=slots==null?destination.getContainerSize():slots.length;
+            for(int n=0;n<count;n++){
+                int slot=slots==null?n:slots[n];
+                if(slot<0||slot>=destination.getContainerSize()
+                    ||!destination.canPlaceItem(slot,item))continue;
+                if(destination instanceof WorldlyContainer sided
+                    && !sided.canPlaceItemThroughFace(slot,item,incoming))continue;
+                ItemStack existing=destination.getItem(slot);
+                if(!existing.isEmpty()
+                    && !ItemStack.isSameItemSameComponents(existing,item))continue;
+                int limit=Math.min(item.getMaxStackSize(),destination.getMaxStackSize(item));
+                if(existing.getCount()<limit)return true;
+            }
+        }
+        return false;
+    }
+
+    /** Shortest CC hop with output space for an actual packet, not merely
+     * a configured output face. Avoid routing to blocked CCs and retry other
+     * containers elsewhere on the network as their available slots change. */
+    public static CoordinatorEntity nextTowardOutput(ServerLevel world,CoordinatorEntity start,
+            ItemStack cargo){
+        return nextTowardOutput(world,start,cargo,null);
+    }
+    public static CoordinatorEntity nextTowardOutput(ServerLevel world,CoordinatorEntity start,
+            ItemStack cargo,BlockPos avoid){
         Queue<CoordinatorEntity> queue=new ArrayDeque<>();
         Map<BlockPos,CoordinatorEntity> firstHop=new HashMap<>();
         Set<BlockPos> seen=new HashSet<>();
         seen.add(start.getBlockPos());queue.add(start);
         while(!queue.isEmpty()&&seen.size()<512){
             CoordinatorEntity current=queue.remove();
-            if(current!=start && hasOutputHere(world,current))return firstHop.get(current.getBlockPos());
+            if(current!=start && (cargo==null
+                ?hasOutputHere(world,current):canOutput(world,current,cargo)))
+                return firstHop.get(current.getBlockPos());
             for(Direction dir:Direction.values()){
                 CoordinatorEntity neighbor=current.nearest(world,dir);
-                if(neighbor==null||!seen.add(neighbor.getBlockPos()))continue;
-                firstHop.put(neighbor.getBlockPos(),current==start?neighbor:firstHop.get(current.getBlockPos()));
+                if(neighbor==null||neighbor.getBlockPos().equals(avoid)
+                    ||!seen.add(neighbor.getBlockPos()))continue;
+                // Do not send a packet into a CC with a blocked bundle, even
+                // when other connected branches may still accept it.
+                if(cargo!=null&&!neighbor.canReceive(List.of(cargo)))continue;
+                firstHop.put(neighbor.getBlockPos(),current==start
+                    ?neighbor:firstHop.get(current.getBlockPos()));
                 queue.add(neighbor);
             }
         }
         return null;
+    }
+    public static CoordinatorEntity nextTowardOutput(ServerLevel world,CoordinatorEntity start){
+        return nextTowardOutput(world,start,null,null);
     }
 }
