@@ -250,9 +250,53 @@ public final class RigNetwork {
             path.remove(path.size()-1);
         return new Supply(cargo.stack(),path,cargo.sourcePos(),cargo.sourceFace());
     }
+    private record WallCandidate(Source source,int slot,List<BlockPos> route){}
+
+    /**
+     * Random wall selection acts on the actual input inventory slots.
+     * Pull one block per draw so a large first chest stack cannot monopolize
+     * the 64-item wall bundle or the CC's 192-item prefetch depot.
+     */
+    private static Supply reserveRandomWall(ServerLevel world,DrillEntity drill){
+        List<WallCandidate> options=new ArrayList<>();
+        List<WallCandidate> alternatives=new ArrayList<>();
+        for(Source source:sources(world,drill,true)){
+            List<BlockPos> hops=route(world,source.coordinator(),drill);
+            if(hops.isEmpty())continue;
+            Container container=source.container();
+            Direction face=source.side().getOpposite();
+            int[] slots=container instanceof WorldlyContainer sided
+                ?sided.getSlotsForFace(face):null;
+            int n=slots==null?container.getContainerSize():slots.length;
+            for(int i=0;i<n;i++){
+                int slot=slots==null?i:slots[i];
+                if(slot<0||slot>=container.getContainerSize())continue;
+                ItemStack item=container.getItem(slot);
+                if(!isFiller(item))continue;
+                if(container instanceof WorldlyContainer sided &&
+                        !sided.canTakeItemThroughFace(slot,item,face))continue;
+                WallCandidate candidate=new WallCandidate(source,slot,hops);
+                options.add(candidate);
+                if(!drill.wasLastWallSource(source.pos(),slot))alternatives.add(candidate);
+            }
+        }
+        if(options.isEmpty())return null;
+        List<WallCandidate> pool=alternatives.isEmpty()?options:alternatives;
+        WallCandidate selected=pool.get(world.getRandom().nextInt(pool.size()));
+        Source source=selected.source();
+        Direction face=source.side().getOpposite();
+        ItemStack taken=source.container().removeItem(selected.slot(),1);
+        if(taken.isEmpty())return null;
+        source.container().setChanged();
+        drill.recordWallSource(source.pos(),selected.slot());
+        List<BlockPos> path=new ArrayList<>();
+        path.add(source.pos());path.addAll(selected.route());
+        return new Supply(taken,path,source.pos(),face);
+    }
     private static Supply reserveFromInput(ServerLevel world,DrillEntity drill,boolean walls,int requested){
         int max=Math.max(0,Math.min(3,requested));
         if(max==0)return null;
+        if(walls&&drill.randomWalls())return reserveRandomWall(world,drill);
         for(Source source:sources(world,drill,walls)){
             List<BlockPos> hops=route(world,source.coordinator(),drill);
             if(hops.isEmpty())continue;
