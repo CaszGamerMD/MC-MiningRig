@@ -268,9 +268,11 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         if(freeStorage()==0)return ComputerEntity.Status.FULL;
         // Operational order is explicitly WALL -> FLUID -> MINING.
         ComputerEntity.Status walls=sealing.wallStep(world,this,computer);
-        if(walls!=null)return walls;
+        if(walls!=null)return walls==ComputerEntity.Status.RUNNING
+            ?ComputerEntity.Status.WALLING:walls;
         ComputerEntity.Status fluid=sealing.fluidStep(world,this,computer);
-        if(fluid!=null)return fluid;
+        if(fluid!=null)return fluid==ComputerEntity.Status.RUNNING
+            ?ComputerEntity.Status.FILLING:fluid;
         if(!initialized){startY=worldPosition.getY();initialized=true;}
         // Replace mode excavates its one-block perimeter in the Wall step.
         // Core mining ALWAYS scans the selected footprint and all requested

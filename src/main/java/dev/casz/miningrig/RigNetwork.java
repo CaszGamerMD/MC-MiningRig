@@ -64,6 +64,18 @@ public final class RigNetwork {
                     return true;
         return false;
     }
+    /**
+     * Return unneeded reserved wall/filler material to the connected CC
+     * network's ordinary output stream without filling the drill's 64-item
+     * mining buffer and prematurely stopping the restarted excavation.
+     */
+    public static boolean returnSurplus(ServerLevel world,DrillEntity drill,ItemStack stack){
+        if(stack.isEmpty())return true;
+        List<ItemStack> cargo=List.of(stack);
+        for(CoordinatorEntity cc:members(world,drill))
+            if(cc.canReceive(cargo) && cc.receive(cargo))return true;
+        return false;
+    }
     public static boolean hasOutput(ServerLevel world,DrillEntity drill){
         for(CoordinatorEntity cc:members(world,drill))
             if(hasOutputHere(world,cc))return true;
@@ -141,6 +153,40 @@ public final class RigNetwork {
         }
         path.add(drill.getBlockPos());
         return path;
+    }
+    /**
+     * The drill requests a NUMBER of wall blocks after it finishes clearing
+     * the ring. Each network packet carries up to three of one usable block
+     * type, taking from the nearest stocked, correctly configured wall input.
+     * The item leaves source inventory only when this reservation succeeds.
+     */
+    public static Supply reservePacket(ServerLevel world,DrillEntity drill,boolean walls,int requested){
+        int max=Math.max(0,Math.min(3,requested));
+        if(max==0)return null;
+        for(Source source:sources(world,drill,walls)){
+            List<BlockPos> hops=route(world,source.coordinator(),drill);
+            if(hops.isEmpty())continue;
+            Container from=source.container();
+            Direction side=source.side().getOpposite();
+            int[] slots=from instanceof WorldlyContainer sided?sided.getSlotsForFace(side):null;
+            int count=slots==null?from.getContainerSize():slots.length;
+            for(int i=0;i<count;i++){
+                int slot=slots==null?i:slots[i];
+                if(slot<0||slot>=from.getContainerSize())continue;
+                ItemStack available=from.getItem(slot);
+                if(!isFiller(available))continue;
+                if(from instanceof WorldlyContainer sided
+                        && !sided.canTakeItemThroughFace(slot,available,side))continue;
+                ItemStack taken=from.removeItem(slot,Math.min(max,available.getCount()));
+                if(taken.isEmpty())continue;
+                from.setChanged();
+                List<BlockPos> path=new ArrayList<>();
+                path.add(source.pos());
+                path.addAll(hops);
+                return new Supply(taken,path);
+            }
+        }
+        return null;
     }
     /** Reserve exactly one block for an actual requested drill delivery. */
     public static Supply reserve(ServerLevel world,DrillEntity drill,boolean walls){
