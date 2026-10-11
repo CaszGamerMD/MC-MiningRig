@@ -39,7 +39,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         NO_DRILL("Drill missing"), WAITING("Not placed"), UNLOADED("Chunk unloaded"),
         NO_FILLER_CONTAINER("No Filler input"),NO_WALL_CONTAINER("No Walls input"),
         NO_OUTPUT("No Output storage"),OUT_OF_FILLER("Out of Filler / Fluid in hole"),
-        OUT_OF_WALLS("Out of Walls"), FLUID_IN_HOLE("Fluid in hole");
+        OUT_OF_WALLS("Out of Walls"), FLUID_IN_HOLE("Fluid in hole"),
+        FILL_FAILED("Fill blocked - help needed");
         public final String display;
         Status(String value){display=value;}
     }
@@ -245,7 +246,9 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 .append('\t').append(status).append('\t').append(eta)
                 .append('\t').append(radii[i]).append('\t').append(depths[i])
                 .append('\t').append(circles[i]?"O":"S")
-                .append('\t').append(wallModes[i]);
+                .append('\t').append(wallModes[i])
+                .append('\t').append(pos==null?0:
+                    server.getBlockEntity(pos) instanceof DrillEntity drill?drill.completedLayers():0);
         }
         return out.toString();
     }
