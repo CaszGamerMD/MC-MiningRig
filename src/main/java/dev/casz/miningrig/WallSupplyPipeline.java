@@ -51,6 +51,48 @@ final class WallSupplyPipeline {
     private final List<RigNetwork.Supply> ready=new ArrayList<>();
     private int requestedTotal,deliveredCount;
     private long lastAdvanceTick=Long.MIN_VALUE;
+    private int selectedIndex=-1;
+    @Nullable private RigNetwork.Supply lastUsed;
+
+    /** The ready queue is the drill's 64-item bundle. Flights reserve room in it. */
+    int bundleCount(){return readyCount();}
+    int bundleSize(){return 64;}
+    ItemStack bundleItem(int index){
+        return index>=0&&index<ready.size()?ready.get(index).stack():ItemStack.EMPTY;
+    }
+    ItemStack removeBundleItem(int index,int count){
+        if(index<0||index>=ready.size()||count<=0)return ItemStack.EMPTY;
+        ItemStack result=ready.get(index).stack().split(count);
+        if(ready.get(index).stack().isEmpty())ready.remove(index);
+        selectedIndex=-1;
+        return result;
+    }
+    void setBundleItem(int index,ItemStack item){
+        if(index<0||index>=bundleSize())return;
+        if(index>ready.size())return;
+        RigNetwork.Supply previous=index<ready.size()?ready.get(index):null;
+        int previousCount=previous==null?0:previous.stack().getCount();
+        int room=Math.max(0,bufferLimit-readyCount()-flightCount()+previousCount);
+        if(item.isEmpty()){
+            if(previous!=null)ready.remove(index);
+        }else if(RigNetwork.isFiller(item)){
+            int accepted=Math.min(item.getCount(),Math.min(item.getMaxStackSize(),room));
+            if(accepted<=0)return;
+            RigNetwork.Supply next=new RigNetwork.Supply(item.copyWithCount(accepted),
+                previous!=null&&ItemStack.isSameItemSameComponents(previous.stack(),item)
+                    ?previous.path():List.of(),
+                previous!=null&&ItemStack.isSameItemSameComponents(previous.stack(),item)
+                    ?previous.sourcePos():null,
+                previous!=null&&ItemStack.isSameItemSameComponents(previous.stack(),item)
+                    ?previous.sourceFace():null);
+            if(previous!=null)ready.set(index,next);else ready.add(next);
+        }
+        selectedIndex=-1;
+    }
+    int bundleRoom(int index){
+        return Math.max(0,bufferLimit-readyCount()-flightCount()
+            +(index>=0&&index<ready.size()?ready.get(index).stack().getCount():0));
+    }
 
     int readyCount(){
         int n=0;for(RigNetwork.Supply supply:ready)n+=supply.stack().getCount();return n;
@@ -139,15 +181,27 @@ final class WallSupplyPipeline {
         }
         if(packets>0)drill.setChanged();
     }
-    /** Consume exactly one block only after the world accepts its placement. */
-    ItemStack peek(){
-        return ready.isEmpty()?ItemStack.EMPTY:ready.get(0).stack();
+    /** Select among material stacks. Random avoids the previously used stack when possible. */
+    ItemStack peek(ServerLevel world,boolean random){
+        if(ready.isEmpty()){selectedIndex=-1;return ItemStack.EMPTY;}
+        selectedIndex=0;
+        if(random && ready.size()>1){
+            List<Integer> options=new ArrayList<>();
+            for(int i=0;i<ready.size();i++)
+                if(ready.get(i)!=lastUsed)options.add(i);
+            if(options.isEmpty())for(int i=0;i<ready.size();i++)options.add(i);
+            selectedIndex=options.get(world.getRandom().nextInt(options.size()));
+        }
+        return ready.get(selectedIndex).stack();
     }
     void consume(){
         if(ready.isEmpty())return;
-        ItemStack top=ready.get(0).stack();
-        top.shrink(1);
-        if(top.isEmpty())ready.remove(0);
+        int index=selectedIndex>=0&&selectedIndex<ready.size()?selectedIndex:0;
+        RigNetwork.Supply supply=ready.get(index);
+        lastUsed=supply;
+        supply.stack().shrink(1);
+        if(supply.stack().isEmpty())ready.remove(index);
+        selectedIndex=-1;
     }
     private static void refund(ServerLevel world,DrillEntity drill,RigNetwork.Supply packet){
         if(packet.stack().isEmpty())return;
@@ -167,6 +221,7 @@ final class WallSupplyPipeline {
         for(RigNetwork.Supply supply:ready)refund(world,drill,supply);
         ready.clear();
         requestedTotal=0;deliveredCount=0;
+        selectedIndex=-1;lastUsed=null;
         drill.setChanged();
     }
     void moveTo(WallSupplyPipeline next){
@@ -177,9 +232,11 @@ final class WallSupplyPipeline {
         for(RigNetwork.Supply cargo:ready)next.ready.add(new RigNetwork.Supply(
             cargo.stack().copy(),cargo.path(),cargo.sourcePos(),cargo.sourceFace()));
         next.requestedTotal=requestedTotal;next.deliveredCount=deliveredCount;
+        next.selectedIndex=-1;next.lastUsed=null;
         next.lastAdvanceTick=lastAdvanceTick;
         flights.clear();ready.clear();
         requestedTotal=0;deliveredCount=0;
+        selectedIndex=-1;lastUsed=null;
     }
     private static void saveOrigin(ValueOutput out,String prefix,RigNetwork.Supply cargo){
         if(cargo.sourcePos()!=null&&cargo.sourceFace()!=null){
@@ -219,6 +276,7 @@ final class WallSupplyPipeline {
     void load(ValueInput in){
         for(Packet packet:flights)packet.discard();
         flights.clear();ready.clear();
+        selectedIndex=-1;lastUsed=null;
         requestedTotal=Math.max(0,in.getIntOr(key+"WallBatchDemand",0));
         deliveredCount=Math.max(0,in.getIntOr(key+"WallBatchArrived",0));
         int count=Math.max(0,Math.min(MAX_SAVED_PACKETS,in.getIntOr(key+"WallBatchFlights",0)));
