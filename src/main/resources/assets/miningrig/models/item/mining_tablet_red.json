@@ -69,5 +69,8 @@
         0.8
       ]
     }
+  },
+  "textures": {
+    "lamp": "miningrig:item/tablet_lamp_red"
   }
 }
