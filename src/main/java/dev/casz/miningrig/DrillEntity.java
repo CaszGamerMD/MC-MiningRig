@@ -40,6 +40,10 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private boolean initialized, relocating, contentsDropped;
     private int page;
     private final DrillSealing sealing=new DrillSealing();
+    private float placementCharge,wallWorkCharge;
+    private int placementBit=-1;
+    private BlockPos wallWorkTarget;
+    public int completedLayers(){return completedLayers;}
     public boolean fluidWarning(){return sealing.warning();}
     private long workTicks;
     private String linkedToken="";
@@ -149,6 +153,77 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         float hardness=state.getDestroySpeed(world,worldPosition);
         return hardness<=0?1.0f:Math.min(1.0f,speed/Math.max(0.00001f,hardness*30.0f));
     }
+    private int bestBit(ServerLevel world,BlockState state){
+        int best=-1;float score=0;
+        for(int i=0;i<BIT_SLOTS;i++)if(items.get(i).getItem() instanceof DrillBit bit
+                && bit.canMine(state)){
+            float value=bit.miningSpeed()+enchantmentLevel(world,items.get(i),Enchantments.EFFICIENCY)*2;
+            if(value>score){best=i;score=value;}
+        }
+        return best;
+    }
+    /** Placement duration is 1.3x the corresponding tool's normal mining time. */
+    public boolean placementReady(ServerLevel world){
+        int slot=bestBit(world,Blocks.STONE.defaultBlockState());
+        if(slot<0)return false;
+        placementBit=slot;
+        if(placementCharge>=1)return true;
+        ItemStack tool=items.get(slot);
+        placementCharge+=speed(world,tool,Blocks.STONE.defaultBlockState())/1.3f;
+        return placementCharge>=1;
+    }
+    private void damageBit(ServerLevel world,int slot,float multiplier){
+        if(slot<0||slot>=BIT_SLOTS)return;
+        ItemStack bit=items.get(slot);
+        if(!(bit.getItem() instanceof DrillBit))return;
+        int rolls=1+(world.getRandom().nextFloat()<(multiplier-1.0f)?1:0);
+        int unbreaking=enchantmentLevel(world,bit,Enchantments.UNBREAKING);
+        for(int j=0;j<rolls;j++){
+            if(world.getRandom().nextInt(unbreaking+1)!=0)continue;
+            int damage=bit.getDamageValue()+1;
+            if(damage>=bit.getMaxDamage()){items.set(slot,ItemStack.EMPTY);break;}
+            bit.setDamageValue(damage);
+        }
+        setChanged();
+    }
+    /** A tool only wears when its delivered placement successfully occurs. */
+    public void placementWear(ServerLevel world){
+        damageBit(world,placementBit,1.3f);
+        placementCharge=0;placementBit=-1;
+        setChanged();
+    }
+    /**
+     * Replacement mode excavates one outer-wall block with a legitimate tool.
+     * Returns null once the space is clear; keeps hardness progress per target.
+     */
+    public ComputerEntity.Status mineWall(ServerLevel world,BlockPos target){
+        BlockState state=world.getBlockState(target);
+        if(state.isAir()||!state.getFluidState().isEmpty())return null;
+        if(DrillSealing.immune(state)||state.getDestroySpeed(world,target)<0||state.hasBlockEntity())
+            return ComputerEntity.Status.BLOCKED;
+        int slot=bestBit(world,state);
+        if(slot<0)return ComputerEntity.Status.BLOCKED;
+        if(!target.equals(wallWorkTarget)){
+            wallWorkTarget=target.immutable();wallWorkCharge=0;
+        }
+        // Actual target hardness, not the drill's housing position.
+        DrillBit bit=(DrillBit)items.get(slot).getItem();
+        float power=bit.miningSpeed();
+        int efficiency=enchantmentLevel(world,items.get(slot),Enchantments.EFFICIENCY);
+        if(efficiency>0)power+=efficiency*efficiency+1;
+        float hardness=state.getDestroySpeed(world,target);
+        wallWorkCharge+=hardness<=0?1:Math.min(1,power/Math.max(.00001f,hardness*30.0f));
+        if(wallWorkCharge<1)return ComputerEntity.Status.RUNNING;
+        List<ItemStack> drops=Block.getDrops(state,world,target,null,null,items.get(slot));
+        if(!canReceive(drops))return ComputerEntity.Status.FULL;
+        if(!world.setBlock(target,Blocks.AIR.defaultBlockState(),Block.UPDATE_ALL))
+            return ComputerEntity.Status.BLOCKED;
+        if(!receive(drops))return ComputerEntity.Status.FULL;
+        damageBit(world,slot,1);
+        wallWorkTarget=null;wallWorkCharge=0;
+        setChanged();
+        return null;
+    }
     /** Called once each server tick, not every 8 ticks; speed follows vanilla break progress. */
     public ComputerEntity.Status mineTick(ServerLevel world,ComputerEntity computer) {
         if(completedLayers>=computer.depth() || worldPosition.getY()-1<world.getMinY())
@@ -164,15 +239,20 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
                     && !RigNetwork.hasInput(world,this,true))
                 return ComputerEntity.Status.NO_WALL_CONTAINER;
         }
-        ComputerEntity.Status fluid=sealing.beforeMining(world,this,computer);
-        if(fluid!=null)return fluid;
         if(!hasWorkingBits())return ComputerEntity.Status.OUT_OF_BITS;
         if(freeStorage()==0)return ComputerEntity.Status.FULL;
         if(cursor==0 && assigned[0]<0 && assigned[1]<0 && assigned[2]<0)
             sealing.retryWallSource(world,this);
+        // Operational order is explicitly WALL -> FLUID -> MINING.
+        ComputerEntity.Status walls=sealing.wallStep(world,this,computer);
+        if(walls!=null)return walls;
+        ComputerEntity.Status fluid=sealing.fluidStep(world,this,computer);
+        if(fluid!=null)return fluid;
         if(!initialized){startY=worldPosition.getY();initialized=true;}
-        boolean expanded=computer.wallMode()==2&&!sealing.fallback();
-        int r=computer.radius()+(expanded?1:0),edge=2*r+1,total=edge*edge;
+        // Replace mode excavates its one-block perimeter in the Wall step.
+        // Core mining ALWAYS scans the selected footprint and all requested
+        // depth layers, regardless of wall fallback.
+        int r=computer.radius(),edge=2*r+1,total=edge*edge;
         int active=0;
         for(int lane=0;lane<BIT_SLOTS;lane++){
             ItemStack bit=items.get(lane);
@@ -184,7 +264,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
             if(assigned[lane]<0){
                 while(cursor<total){
                     int index=cursor++,dx=index%edge-r,dz=index/edge-r;
-                    if(!DrillSealing.contains(computer,dx,dz,expanded))continue;
+                    if(!computer.contains(dx,dz))continue;
                     BlockPos p=worldPosition.offset(dx,-1,dz);
                     if(p.getY()<world.getMinY())return ComputerEntity.Status.DONE;
                     if(!world.hasChunkAt(p)){cursor--;return ComputerEntity.Status.BLOCKED;}
@@ -221,8 +301,6 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         if(active==0)return ComputerEntity.Status.OUT_OF_BITS;
         if(cursor>=total){
             for(int lane=0;lane<BIT_SLOTS;lane++)if(assigned[lane]>=0)return ComputerEntity.Status.RUNNING;
-            ComputerEntity.Status walls=sealing.afterMining(world,this,computer);
-            if(walls!=null)return walls;
             return descend(world,computer);
         }
         return ComputerEntity.Status.RUNNING;
@@ -235,7 +313,15 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         BlockPos previous=worldPosition;
         BlockPos next=previous.below();
         if(next.getY()<world.getMinY())return ComputerEntity.Status.DONE;
-        if(!world.hasChunkAt(next) || !world.getBlockState(next).isAir())return ComputerEntity.Status.BLOCKED;
+        if(!world.hasChunkAt(next))return ComputerEntity.Status.BLOCKED;
+        if(!world.getBlockState(next).isAir()){
+            // Gravel/sand can drop into the already-cleared center between
+            // clearing the layer and moving. Mine that obstruction rather
+            // than silently ending a 12-layer job after only 3-4 layers.
+            ComputerEntity.Status cleanup=mineWall(world,next);
+            if(cleanup!=null)return cleanup;
+            if(!world.getBlockState(next).isAir())return ComputerEntity.Status.BLOCKED;
+        }
         // Mark BEFORE any neighbor changes. Once the destination is populated,
         // clear every source stack before replacing the old block, so neither
         // Minecraft's replacement callbacks nor the drill's own drop path can
@@ -255,6 +341,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         moved.linkedToken=linkedToken;moved.computerPos=computerPos;
         moved.computerDimension=computerDimension;
         moved.linkConfirmed=linkConfirmed;
+        moved.placementCharge=placementCharge;
+        moved.placementBit=placementBit;
         sealing.copyTo(moved.sealing);
         moved.sealing.nextLayer();
         moved.setChanged();
@@ -274,6 +362,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     public void dropInventory(){
         if(contentsDropped || relocating || level==null || level.isClientSide())return;
         contentsDropped=true;
+        sealing.dropCargo((ServerLevel)level,worldPosition);
         for(ItemStack stack:items)if(!stack.isEmpty())Block.popResource(level,worldPosition,stack.copy());
         for(int i=0;i<SLOT_COUNT;i++)items.set(i,ItemStack.EMPTY);
         setChanged();
@@ -322,6 +411,10 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         out.putInt("StartY",startY);out.putInt("Layers",completedLayers);
         out.putInt("Cursor",cursor);out.putBoolean("Initialized",initialized);
         out.putLong("WorkTicks",workTicks);
+        out.putFloat("PlacementCharge",placementCharge);
+        out.putInt("PlacementBit",placementBit);
+        out.putFloat("WallWorkCharge",wallWorkCharge);
+        if(wallWorkTarget!=null)out.putLong("WallWorkTarget",wallWorkTarget.asLong());
         sealing.save(out);
         if(computerPos!=null){
             out.putLong("Supervisor",computerPos.asLong());
@@ -342,6 +435,11 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         startY=in.getIntOr("StartY",worldPosition.getY());completedLayers=in.getIntOr("Layers",0);
         cursor=in.getIntOr("Cursor",0);initialized=in.getBooleanOr("Initialized",false);
         workTicks=in.getLongOr("WorkTicks",0);
+        placementCharge=in.getFloatOr("PlacementCharge",0);
+        placementBit=in.getIntOr("PlacementBit",-1);
+        wallWorkCharge=in.getFloatOr("WallWorkCharge",0);
+        wallWorkTarget=in.getLong("WallWorkTarget").isPresent()
+            ?BlockPos.of(in.getLongOr("WallWorkTarget",0)):null;
         sealing.load(in);
         computerPos=in.getLong("Supervisor").isPresent()
             ? BlockPos.of(in.getLongOr("Supervisor",0)):null;
