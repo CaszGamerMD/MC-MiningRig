@@ -1,10 +1,27 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.4.8 — positional machinery audio**
+**Version 0.4.9 — CC Placement Guide**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.4.9 — CC Placement Guide
+
+A new craftable **CC Placement Guide** assists with laying out Collection Coordinators so their existing *automatic 20-block straight-axis wireless links* line up without trial-and-error. Available in the **Redstone** creative tab.
+
+**Crafting:** Iron–Comparator–Iron / Amethyst–Redstone–Amethyst / Empty–Stick–Empty.
+
+**How to use**
+1. Hold the Guide and **right-click a face of an existing Collection Coordinator**. That locks the face and X/Y/Z axis. Unlike normal right-clicking, this selects the guide instead of opening the CC inventory.
+2. An **END_ROD particle beam** shows the 20-block wireless axis. Eight faint particle corners outline the proposed placement (bright when valid, smoke when blocked). Only visible while holding the Guide and when the chunks are loaded.
+3. **Sneak + right-click air** to change the placement distance by one (1 through 20, wrapping). **Right-click air normally** to place a Collection Coordinator at the outlined location.
+4. Alternatively, **right-click a nearby ordinary block** along the beam to select the corresponding distance and immediately place the CC *snapped exactly to the wirelessly connected line* (up to four blocks' lateral correction).
+5. In survival, the tool consumes **one CC from your inventory** for each placement; in creative it doesn't consume any. After placement, the guide automatically switches its anchor to the newly placed CC, preserving the chosen distance so building straight CC chains is quick.
+
+**Safety and restrictions:** The guide never overwrites solid blocks or block entities. It enforces the 1–20 range, current dimension, loaded chunks, world interaction permissions, and proper one-to-one network discovery. It rejects a proposed link if an existing nearer CC would intercept the wireless connection or if an attached storage container occupies either link face. Air, water and other replaceable positions can be targeted; the original CC auto-link and routing code is unchanged. If a target is blocked, try another spacing or reposition the tool's selection.
+
+**Playtest** on Minecraft 26.2 Fabric: select each of the six CC faces, place several CCs precisely on their axes, confirm teal link panels and actual item transfer, test walls/solid blocks between wireless endpoints, place in water, check survival CC consumption, and verify rejection when a chest occupies a wireless face. CI compilation does not replace in-game visual/gameplay testing.
 
 ## v0.4.8 — quiet machine sounds
 
