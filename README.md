@@ -1,10 +1,31 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.4.3 — new drill progress isolation and handheld model repair**
+**Version 0.4.4 — two-phase Replace walls and full-buffer fluid recovery**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.4.4 — Clear every wall block before material deliveries
+
+The **Replace** mode now has two strict stages on each mining layer:
+
+1. **Wall excavation:** The drill clears **all non-air/non-fluid blocks in the one-block-wide outside ring** using real drill bits, honoring mining speed, tool tier, wear, unbreakable blocks, and storage. **No Wall supplies are requested or placed during this stage.**
+2. **Wall replacement:** After the whole ring is clear, the drill counts the **actual number of wall blocks needed** and asks the connected network for that quantity. Nearest stocked Walls inputs reserve blocks as **three-item packets**, with up to **four packets launched per server tick**, **12 concurrent trips**, and a **48-block ready-plus-in-flight prefetch target**. Items remain non-pickup animated ground models along each CC route. The drill places the blocks using the existing **1.3x tool time/durability** and eight-tick block verification while deliveries are already arriving.
+
+If a new solid block falls into the ring after the clearance stage, the drill returns to clearing that obstruction instead of silently overwriting it. **When Empty → Continue** still switches remaining unfinished wall positions to Air-style Filler repair; **Pause** stops with **Out of Walls**.
+
+### Fluid filling: stay stocked until fully sealed
+
+If any fluid is found on the current layer or its one-block outer boundary, the drill enters **Sealing fluids** mode. Mining stays suspended, and the drill requests a separate, persistent **64-block Filler supply buffer**, continuously replenishing it from the nearest configured Filler input. The 64-block cap counts **blocks already inside the drill plus reserved packets still in transit**, so it does not over-pull from storage. Each input shipment still contains no more than three items and is visible along the network.
+
+The drill remains in this filling mode through all flowing-fluid changes, gravity/falling-block rechecks, and eight-tick solidity verification. It cannot restart mining while detected spots remain unsealed. If every Filler container is exhausted *and the drill's supply buffer is empty*, it stops with **Out of Filler / Fluid in hole**. The previous **24 placement retries per position** safeguard remains.
+
+Once **every** leak is confirmed filled, spare Filler blocks are sent into the connected CC output network (or retained in drill mined-item inventory if the network is full, with a safe dropped-item fallback rather than deleting material). Only then does the computer status change from **Sealing fluids** back to **Mining**, preserving the original **Wall → Fluid → Mining** phase order. While Replace is working, the computer displays **Replacing walls**.
+
+Both Wall and Filler reservation buffers, plus each animated in-flight packet, are persisted alongside the moving drill's state. Breaking the drill safely drops/refunds reserved stock rather than duplicating it.
+
+**Please test in a backed-up world:** a stone-filled Replace perimeter, low Wall stock with Pause/Continue, a water/lava source outside the hole, 64-block filler replenishment, falling sand, server reload mid-supply flight, and automatic restart of mining once fully sealed. Fabric compilation does not verify world-side behavior.
 
 ## v0.4.3 — fresh drill pairing and handheld model repairs
 
@@ -170,6 +191,6 @@ One Collection Coordinator block handles all wireless item routing. Its internal
 
 Minecraft **26.2**, Fabric Loader **0.19.5**, Fabric API **0.161.0+26.2**, Java **25**, Gradle **9.7.0**, Loom **1.18.3**.
 
-Run `gradle build` using Java 25; or download the `caszual-mining-rig-0.4.3.jar` inside the `miningrig-26.2` artifact in the most recent successful GitHub Actions workflow.
+Run `gradle build` using Java 25; or download the `caszual-mining-rig-0.4.4.jar` inside the `miningrig-26.2` artifact in the most recent successful GitHub Actions workflow.
 
 **Status:** GitHub Actions compile verification is used, but it does *not* test actual Minecraft interaction, server permissions, chunk reloads, or multiplayer naming/GUI synchronization. Test in a backed-up world and treat this as a development build until in-game verified.
