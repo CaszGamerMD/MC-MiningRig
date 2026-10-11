@@ -97,19 +97,32 @@ public final class TabletAccess {
                 ServerPlayNetworking.send(player,
                     new ComputerStatePayload(menu.computer().snapshot(world)));
             }
+            boolean beep=false;
             for(int i=0;i<player.getInventory().getContainerSize();i++){
                 ItemStack item=player.getInventory().getItem(i);
                 if(item.is(MiningRig.TABLET)){
-                    int lamp=lamp(server,TabletLink.read(item));
+                    TabletLink.Target target=TabletLink.read(item);
+                    if(!beep && time%60==0){
+                        ComputerEntity linked=find(server,target,false);
+                        if(linked!=null&&linked.activeAlert())beep=true;
+                    }
+                    int lamp=lamp(server,target);
                     String status=lamp==3?"red":lamp==2?"yellow":lamp==1?"green":"dark";
                     TabletLink.light(item,status);
                 }
             }
             ItemStack offhand=player.getOffhandItem();
             if(offhand.is(MiningRig.TABLET)){
-                int lamp=lamp(server,TabletLink.read(offhand));
+                TabletLink.Target offTarget=TabletLink.read(offhand);
+                if(!beep&&time%60==0){
+                    ComputerEntity linked=find(server,offTarget,false);
+                    if(linked!=null&&linked.activeAlert())beep=true;
+                }
+                int lamp=lamp(server,offTarget);
                 TabletLink.light(offhand,lamp==3?"red":lamp==2?"yellow":lamp==1?"green":"dark");
             }
+            if(beep&&player.level() instanceof ServerLevel local)
+                RigMachineSounds.problem(local,player.blockPosition());
         }
     }
 }
