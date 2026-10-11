@@ -144,8 +144,12 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 }
             }
         }
-        // The remote controller must also tick when nobody is nearby.
-        if(active)desired.add(new ChunkPos(worldPosition.getX()>>4,worldPosition.getZ()>>4));
+        // A disconnected drill still needs the previous CC spine and the
+        // Hardware source network loaded long enough to deliver a repair CC.
+        if(active){
+            desired.add(new ChunkPos(worldPosition.getX()>>4,worldPosition.getZ()>>4));
+            RigNetwork.includeLoadedCCs(server,RigTopology.network(server,this),desired);
+        }
         RigChunkTickets.sync(server,worldPosition,desired);
     }
     private void syncIfServer(){
