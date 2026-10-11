@@ -134,7 +134,18 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         }
         return -1;
     }
-    /** Invoked when a linked drill item becomes a block in the same dimension. */
+    /** Fresh placement resets only the paired slot's running state. */
+    public boolean placedFresh(String token,BlockPos place){
+        if(!placed(token,place))return false;
+        for(int i=0;i<MAX_DRILLS;i++)if(token.equals(tokens[i])){
+            positions[i]=place.immutable();
+            running[i]=false;statuses[i]=Status.READY;
+            setChanged();syncIfServer();
+            return true;
+        }
+        return false;
+    }
+    /** Retry registration for an already-running drill must be idempotent. */
     public boolean placed(String token,BlockPos place){
         if(token==null || token.isBlank())return false;
         for(int i=0;i<MAX_DRILLS;i++){

@@ -47,7 +47,7 @@ public final class DrillBlock extends BaseEntityBlock {
             drill.applyBinding(link);
             if(server.hasChunkAt(link.computer()) &&
                     server.getBlockEntity(link.computer()) instanceof ComputerEntity computer)
-                computer.placed(link.token(),pos);
+                computer.placedFresh(link.token(),pos);
         }
     }
     @Nullable @Override public BlockEntity newBlockEntity(BlockPos pos,BlockState state){return new DrillEntity(pos,state);}
