@@ -232,6 +232,10 @@ public final class RigNetwork {
             if(near!=null){
                 Supply staged=near.takeCachedSupply(world,drill,walls,max);
                 if(staged!=null)return staged;
+                // A Wall shipment has already left its input chest and is
+                // on the way to the depot. Wait for it instead of reserving
+                // a second copy directly from the same container.
+                if(walls && near.cachedSupplyPending(true)>0)return null;
             }
         }
         return reserveFromInput(world,drill,walls,max);
