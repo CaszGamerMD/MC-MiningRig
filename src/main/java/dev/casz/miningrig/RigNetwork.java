@@ -443,7 +443,10 @@ public final class RigNetwork {
      * straight line so unloaded gaps do not break neighbor discovery.
      */
     public static void includeLoadedNetwork(ServerLevel world,DrillEntity drill,Set<ChunkPos> chunks){
-        for(CoordinatorEntity cc:members(world,drill)){
+        includeLoadedCCs(world,members(world,drill),chunks);
+    }
+    public static void includeLoadedCCs(ServerLevel world,List<CoordinatorEntity> connected,Set<ChunkPos> chunks){
+        for(CoordinatorEntity cc:connected){
             BlockPos base=cc.getBlockPos();
             chunks.add(new ChunkPos(base.getX()>>4,base.getZ()>>4));
             for(Direction side:Direction.values()){
