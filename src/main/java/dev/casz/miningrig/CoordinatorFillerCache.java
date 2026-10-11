@@ -115,7 +115,7 @@ final class CoordinatorFillerCache {
         // Farther CCs must not all siphon extra filler from the same network.
         if(drill!=null && RigNetwork.nearestDrillCoordinator(world,drill)!=cc)
             drill=null;
-        if(drill==null || !drill.fluidFilling()){
+        if(drill==null || !drill.activelyFilling(world)){
             if(!isEmpty())flush(world,cc);
             if(changed)cc.setChanged();
             return;
