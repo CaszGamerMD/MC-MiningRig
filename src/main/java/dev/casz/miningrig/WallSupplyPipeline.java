@@ -134,7 +134,7 @@ final class WallSupplyPipeline {
         if(lastAdvanceTick==time)return;
         lastAdvanceTick=time;
         if(flights.isEmpty())return;
-        for(int i=flights.size()-1;i>=0;i--){
+        for(int i=0;i<flights.size();){
             Packet packet=flights.get(i);
             spawn(world,packet);
             packet.elapsed++;
@@ -153,6 +153,7 @@ final class WallSupplyPipeline {
                     packet.visual.setPos(a.getX()+.5+(b.getX()-a.getX())*t,
                         a.getY()+.55+(b.getY()-a.getY())*t+.1*Math.sin(Math.PI*t),
                         a.getZ()+.5+(b.getZ()-a.getZ())*t);
+                i++;
             }else{
                 ready.add(packet.cargo);
                 deliveredCount+=packet.units();
