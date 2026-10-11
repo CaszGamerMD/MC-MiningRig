@@ -247,7 +247,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 .append('\t').append(radii[i]).append('\t').append(depths[i])
                 .append('\t').append(circles[i]?"O":"S")
                 .append('\t').append(wallModes[i])
-                .append('\t').append(pos==null?0:
+                .append('\t').append(pos==null||!server.hasChunkAt(pos)?0:
                     server.getBlockEntity(pos) instanceof DrillEntity drill?drill.completedLayers():0);
         }
         return out.toString();

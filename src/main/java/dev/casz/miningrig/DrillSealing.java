@@ -152,7 +152,7 @@ final class DrillSealing {
         if(immune(existing)||solid(world,target)){
             // Another machine or solid block arrived while the cargo traveled.
             refund(world,drill,material);
-            pending=target;pendingWall=deliveryWall;wait=0;attempts=0;
+            pending=target;pendingWall=!wallFinished;wait=0;attempts=0;
             return ComputerEntity.Status.RUNNING;
         }
         if(attempts>=MAX_FILL_ATTEMPTS){
@@ -164,7 +164,7 @@ final class DrillSealing {
             return ComputerEntity.Status.BLOCKED;
         }
         attempts++;
-        pending=target;pendingWall=deliveryWall;wait=VERIFY_TICKS;
+        pending=target;pendingWall=!wallFinished;wait=VERIFY_TICKS;
         drill.placementWear(world);
         drill.setChanged();
         return ComputerEntity.Status.RUNNING;
@@ -202,7 +202,7 @@ final class DrillSealing {
         int setting=computer.wallMode();
         if(setting==0||wallFinished)return null;
         if(delivery!=null)return advanceDelivery(world,drill);
-        if(pending!=null&&pendingWall){
+        if(pending!=null){
             ComputerEntity.Status check=verify(world,drill);
             if(check==ComputerEntity.Status.OUT_OF_WALLS &&
                     RigNetwork.wallsCanContinue(world,drill)){
