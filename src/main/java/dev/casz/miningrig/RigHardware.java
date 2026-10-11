@@ -135,9 +135,17 @@ final class RigHardware {
         if(cargo!=null)refund(world,drill,cargo);
         clear();
     }
-    void moveTo(RigHardware next){
+    /** Ownership and the last flight waypoint follow a descending drill. */
+    void moveTo(RigHardware next,BlockPos nextPosition){
         next.clear();
-        next.cargo=cargo;next.elapsed=elapsed;next.requestedAt=requestedAt;
+        next.cargo=cargo;
+        if(cargo!=null && !cargo.path().isEmpty()){
+            List<BlockPos> redirected=new ArrayList<>(cargo.path());
+            redirected.set(redirected.size()-1,nextPosition.immutable());
+            next.cargo=new RigNetwork.Supply(cargo.stack(),redirected,
+                cargo.sourcePos(),cargo.sourceFace());
+        }
+        next.elapsed=elapsed;next.requestedAt=requestedAt;
         next.pendingReplacements=pendingReplacements;
         next.unfilledTicks=unfilledTicks;
         next.visual=visual;
