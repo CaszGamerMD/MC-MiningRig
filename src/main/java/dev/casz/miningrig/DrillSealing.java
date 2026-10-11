@@ -81,6 +81,14 @@ final class DrillSealing {
         next.visual=visual;
         delivery=null;deliveryTarget=null;visual=null; // ownership moves, never duplicates
     }
+    void resetForPlacement(ServerLevel world,BlockPos at){
+        dropCargo(world,at);
+        nextLayer();
+        wallFallback=false;wallSourceChecked=false;wallFinished=false;
+        cautionTicks=0;pending=null;pendingWall=false;
+        deliveryWall=false;flightTicks=0;attempts=0;wait=0;
+        discardVisual();
+    }
     void nextLayer(){
         fluidSpots.clear();finishedWalls.clear();pending=null;pendingWall=false;
         wait=0;attempts=0;wallFinished=false;wallSourceChecked=false;

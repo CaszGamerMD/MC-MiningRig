@@ -58,6 +58,31 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
 
     public DrillEntity(BlockPos pos,BlockState state){super(MiningRig.DRILL_ENTITY,pos,state);}
     public boolean relocating(){return relocating;}
+    /** A saved/previous drill can only be controlled by its own pairing token. */
+    public boolean matchesLink(String token){
+        return token!=null&&!token.isBlank()&&token.equals(linkedToken);
+    }
+    /**
+     * Player placement starts a NEW excavation. Do not reuse the saved
+     * excavation cursor/layers from another machine that occupied this spot,
+     * or an accidentally NBT-carrying drill item. Programmed depth lives on
+     * the computer; physical drill progress is reset on placement only.
+     * Moving downward intentionally does NOT call this method.
+     */
+    public void resetForPlacement(ServerLevel world){
+        sealing.resetForPlacement(world,worldPosition);
+        initialized=false;startY=worldPosition.getY();
+        completedLayers=0;cursor=0;workTicks=0;
+        placementCharge=0;placementBit=-1;
+        wallWorkCharge=0;wallWorkTarget=null;
+        for(int i=0;i<BIT_SLOTS;i++){assigned[i]=-1;progress[i]=0;}
+        relocating=false;contentsDropped=false;
+        // Binding comes exclusively from the newly placed item's pairing
+        // component. Never retain a prior block entity's old supervisor.
+        linkedToken="";computerPos=null;computerDimension="";
+        linkConfirmed=false;
+        setChanged();
+    }
     public void applyBinding(DrillBinding.Link link){
         linkedToken=link.token();computerPos=link.computer();
         computerDimension=link.dimension();linkConfirmed=false;setChanged();
@@ -353,7 +378,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         if(world.getBlockState(previous.above()).is(MiningRig.DRILL_UPPER))
             world.setBlock(previous.above(),Blocks.AIR.defaultBlockState(),Block.UPDATE_ALL);
         world.setBlock(previous,MiningRig.DRILL_UPPER.defaultBlockState(),Block.UPDATE_ALL);
-        computer.moved(previous,next);
+        computer.moved(linkedToken,previous,next);
         return ComputerEntity.Status.RUNNING;
     }
     /** Drops only on actual destruction, not on the machine moving to the next Y. */

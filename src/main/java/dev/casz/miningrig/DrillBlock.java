@@ -38,12 +38,16 @@ public final class DrillBlock extends BaseEntityBlock {
             level.setBlock(pos.above(),MiningRig.DRILL_UPPER.defaultBlockState(),Block.UPDATE_ALL);
         if(!(level instanceof ServerLevel server))return;
         DrillBinding.Link link=DrillBinding.read(stack);
-        if(link==null || !link.dimension().equals(server.dimension().identifier().toString()))return;
         if(level.getBlockEntity(pos) instanceof DrillEntity drill){
+            // A newly placed drill is a fresh excavation even if a dropped
+            // drill item carried previous block-entity progress data.
+            drill.resetForPlacement(server);
+            if(link==null || !link.dimension().equals(server.dimension().identifier().toString()))
+                return;
             drill.applyBinding(link);
             if(server.hasChunkAt(link.computer()) &&
                     server.getBlockEntity(link.computer()) instanceof ComputerEntity computer)
-                computer.placed(link.token(),pos);
+                computer.placedFresh(link.token(),pos);
         }
     }
     @Nullable @Override public BlockEntity newBlockEntity(BlockPos pos,BlockState state){return new DrillEntity(pos,state);}
