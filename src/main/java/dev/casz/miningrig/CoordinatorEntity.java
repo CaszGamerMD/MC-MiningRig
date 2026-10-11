@@ -50,6 +50,12 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
             boolean walls,int amount){
         return (walls?wallDepot:fillerDepot).take(drill,this,amount);
     }
+    /** Synchronously refund both CC depots before a paused rig unloads chunks. */
+    void returnCachedSupplies(ServerLevel world,DrillEntity drill){
+        if(drillBelow(world)!=drill)return;
+        fillerDepot.flush(world,this);
+        wallDepot.flush(world,this);
+    }
 
     private static final class Flight {
         final List<ItemStack> cargo;
