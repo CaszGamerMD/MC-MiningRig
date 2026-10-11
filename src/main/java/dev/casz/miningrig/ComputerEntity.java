@@ -41,7 +41,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         NO_OUTPUT("No Output storage"),OUT_OF_FILLER("Out of Filler / Fluid in hole"),
         OUT_OF_WALLS("Out of Walls"), FLUID_IN_HOLE("Fluid in hole"),
         FILL_FAILED("Fill blocked - help needed"),
-        WALLING("Replacing walls"),FILLING("Sealing fluids");
+        WALLING("Replacing walls"),FILLING("Sealing fluids"),
+        RECONNECTING("Reconnecting CC network");
         public final String display;
         Status(String value){display=value;}
     }
@@ -64,6 +65,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     private String tabletId;
     private long alertSerial,mutedAlertSerial;
     private final Set<String> ignoredDrills=new HashSet<>();
+    private final RigNetworkRepair repair=new RigNetworkRepair();
     public boolean activeAlert(){return alertSerial>mutedAlertSerial && hasFault();}
     private boolean hasFault(){
         for(int i=0;i<MAX_DRILLS;i++)
@@ -131,8 +133,13 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             active=true;
             RigChunkTickets.cover(desired,positions[i],radii[i]+1);
             if(server.hasChunkAt(positions[i]) &&
-                server.getBlockEntity(positions[i]) instanceof DrillEntity drill)
+                server.getBlockEntity(positions[i]) instanceof DrillEntity drill){
                 RigNetwork.includeLoadedNetwork(server,drill,desired);
+                if(drill.lastConnectedCoordinator()!=null){
+                    BlockPos keep=drill.lastConnectedCoordinator();
+                    desired.add(new ChunkPos(keep.getX()>>4,keep.getZ()>>4));
+                }
+            }
         }
         // The remote controller must also tick when nobody is nearby.
         if(active)desired.add(new ChunkPos(worldPosition.getX()>>4,worldPosition.getZ()>>4));
@@ -258,6 +265,10 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public void unlink(int index){
         if(index<0||index>=MAX_DRILLS)return;
         releaseDrillSupplies(index);
+        if(level instanceof ServerLevel server && positions[index]!=null
+                && server.hasChunkAt(positions[index])
+                && server.getBlockEntity(positions[index]) instanceof DrillEntity current)
+            repair.cancel(server,index,current);
         if(level instanceof ServerLevel server && positions[index]!=null &&
                 server.hasChunkAt(positions[index])
                 && server.getBlockEntity(positions[index]) instanceof DrillEntity drill
@@ -305,6 +316,10 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public void stop(int slot,Status reason){
         if(slot<0||slot>=MAX_DRILLS)return;
         releaseDrillSupplies(slot);
+        if(level instanceof ServerLevel server && positions[slot]!=null
+                && server.hasChunkAt(positions[slot])
+                && server.getBlockEntity(positions[slot]) instanceof DrillEntity drill)
+            repair.cancel(server,slot,drill);
         boolean newFault=isFault(reason)
             && (running[slot]||statuses[slot]!=reason);
         running[slot]=false;statuses[slot]=reason;
@@ -426,6 +441,21 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                     || !drill.matchesLink(computer.tokens[i])){
                 computer.stop(i,Status.NO_DRILL);continue;
             }
+            if(!RigTopology.joined(server,computer,drill)){
+                RigNetworkRepair.Result recovered=computer.repair.tick(server,i,drill,computer);
+                if(recovered==RigNetworkRepair.Result.FAILED){
+                    computer.stop(i,Status.NO_COLLECTOR);
+                    continue;
+                }
+                if(recovered!=RigNetworkRepair.Result.CONNECTED){
+                    if(computer.statuses[i]!=Status.RECONNECTING){
+                        drill.pauseSupply(server);
+                        computer.statuses[i]=Status.RECONNECTING;
+                        computer.setChanged();
+                    }
+                    continue;
+                }
+            }
             computer.activeSlot=i;
             Status result=drill.mineTick(server,computer);
             if(result==Status.RUNNING||result==Status.WALLING||result==Status.FILLING){
@@ -497,6 +527,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             if(skip>=256)break;
             out.putString("IgnoredDrill"+skip++,id);
         }
+        repair.save(out);
         for(int i=0;i<MAX_DRILLS;i++){
             out.putString("Token"+i,tokens[i]);
             out.putString("Name"+i,nicknames[i]);
@@ -520,6 +551,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             ignoredDrills.add(in.getStringOr("IgnoredDrill"+j,""));
         selected=Math.max(0,Math.min(MAX_DRILLS-1,in.getIntOr("Selected",0)));
         activeSlot=selected;
+        repair.load(in);
         for(int i=0;i<MAX_DRILLS;i++){
             tokens[i]=in.getStringOr("Token"+i,"");
             nicknames[i]=in.getStringOr("Name"+i,"Drill "+(i+1));
