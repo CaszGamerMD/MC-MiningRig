@@ -38,6 +38,10 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private final float[] progress=new float[BIT_SLOTS];
     private int startY, completedLayers, cursor;
     private boolean initialized, relocating, contentsDropped;
+    private String hardwareIdentity="";
+    @Nullable private BlockPos lastConnectedCoordinator;
+    @Nullable private BlockPos lastConnectedPosition;
+    private final RigHardware hardware=new RigHardware();
     private int page,storageBank;
     private boolean randomWalls;
     @Nullable private BlockPos lastWallSource;
@@ -48,6 +52,38 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private int placementBit=-1;
     private BlockPos wallWorkTarget;
     public int completedLayers(){return completedLayers;}
+    public String identity(){
+        if(hardwareIdentity.isBlank()){hardwareIdentity=java.util.UUID.randomUUID().toString();setChanged();}
+        return hardwareIdentity;
+    }
+    public int emptyBitSlots(){
+        int n=0;for(int i=0;i<BIT_SLOTS;i++)if(items.get(i).isEmpty())n++;
+        return n;
+    }
+    @Nullable public BlockPos lastConnectedCoordinator(){return lastConnectedCoordinator;}
+    @Nullable public BlockPos lastConnectedPosition(){return lastConnectedPosition;}
+    public void adoptController(ServerLevel world,ComputerEntity computer,String token){
+        linkedToken=token;
+        computerPos=computer.getBlockPos().immutable();
+        computerDimension=world.dimension().identifier().toString();
+        linkConfirmed=true;
+        setChanged();
+    }
+    public void detachController(){
+        linkedToken="";computerPos=null;computerDimension="";linkConfirmed=false;
+        setChanged();
+    }
+    /** Reset the excavation without removing the machine or its three bits. */
+    public void resetTask(ServerLevel world){
+        pauseSupply(world);
+        sealing.resetForPlacement(world,worldPosition);
+        initialized=false;startY=worldPosition.getY();
+        completedLayers=0;cursor=0;workTicks=0;
+        placementCharge=0;wallWorkCharge=0;
+        placementBit=-1;wallWorkTarget=null;
+        for(int i=0;i<BIT_SLOTS;i++){assigned[i]=-1;progress[i]=0;}
+        setChanged();
+    }
     public boolean fluidWarning(){return sealing.warning();}
     /** Only recovery mode requests the 192-item CC filler depot. */
     private long lastControllerTick=Long.MIN_VALUE;
@@ -172,8 +208,18 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         computerDimension=link.dimension();linkConfirmed=false;setChanged();
     }
     public static void tick(Level level,BlockPos pos,BlockState state,DrillEntity drill){
-        if(!(level instanceof ServerLevel server) || drill.computerPos==null
-                || drill.linkConfirmed || server.getGameTime()%20!=0)return;
+        if(!(level instanceof ServerLevel server))return;
+        RigTopology.drill(server,pos);
+        if(server.getGameTime()%10==0){
+            CoordinatorEntity nearest=RigNetwork.nearestDrillCoordinator(server,drill);
+            if(nearest!=null){
+                drill.lastConnectedCoordinator=nearest.getBlockPos().immutable();
+                drill.lastConnectedPosition=pos.immutable();
+            }
+        }
+        drill.hardware.tick(server,drill);
+        if(drill.computerPos==null || drill.linkConfirmed
+                || server.getGameTime()%20!=0)return;
         if(!server.dimension().identifier().toString().equals(drill.computerDimension)
                 || !server.hasChunkAt(drill.computerPos))return;
         if(server.getBlockEntity(drill.computerPos) instanceof ComputerEntity computer
@@ -181,14 +227,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
             drill.linkConfirmed=true;drill.setChanged();
         }
     }
-    public boolean canConnectAbove(ServerLevel world){
-        for(int n=1;n<=20;n++){
-            BlockPos at=worldPosition.above(n);
-            if(!world.hasChunkAt(at))return false;
-            if(world.getBlockEntity(at) instanceof CoordinatorEntity cc && cc.acceptsDrillFromBelow())return true;
-        }
-        return false;
-    }
+    public boolean canConnectAbove(ServerLevel world){return RigNetwork.nearestDrillCoordinator(world,this)!=null;}
     public int estimatedSeconds(int radius,int depth,boolean circle,boolean mining){
         if(completedLayers>=depth)return 0;
         if(!hasWorkingBits())return -1;
@@ -462,6 +501,11 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         }
         for(int i=0;i<SLOT_COUNT;i++)moved.items.set(i,items.get(i).copy());
         moved.initialized=true;moved.startY=startY;
+        moved.hardwareIdentity=identity();
+        moved.lastConnectedCoordinator=lastConnectedCoordinator;
+        moved.lastConnectedPosition=lastConnectedPosition;
+        hardware.moveTo(moved.hardware);
+        RigTopology.forgetDrill(world,previous);
         moved.completedLayers=nextLayer;moved.cursor=0;
         moved.workTicks=workTicks;
         moved.linkedToken=linkedToken;moved.computerPos=computerPos;
@@ -497,6 +541,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         if(contentsDropped || relocating || level==null || level.isClientSide())return;
         contentsDropped=true;
         sealing.dropCargo((ServerLevel)level,worldPosition);
+        hardware.drop((ServerLevel)level,this);
+        RigTopology.forgetDrill((ServerLevel)level,worldPosition);
         for(ItemStack stack:items)if(!stack.isEmpty())Block.popResource(level,worldPosition,stack.copy());
         for(int i=0;i<SLOT_COUNT;i++)items.set(i,ItemStack.EMPTY);
         setChanged();
@@ -545,6 +591,10 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         out.putInt("StartY",startY);out.putInt("Layers",completedLayers);
         out.putInt("Cursor",cursor);out.putBoolean("Initialized",initialized);
         out.putLong("WorkTicks",workTicks);
+        out.putString("DrillIdentity",identity());
+        if(lastConnectedCoordinator!=null)out.putLong("LastCC",lastConnectedCoordinator.asLong());
+        if(lastConnectedPosition!=null)out.putLong("LastCCDrill",lastConnectedPosition.asLong());
+        hardware.save(out);
         out.putBoolean("RandomWalls",randomWalls);
         if(lastWallSource!=null){
             out.putLong("LastWallSource",lastWallSource.asLong());
@@ -574,6 +624,12 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         startY=in.getIntOr("StartY",worldPosition.getY());completedLayers=in.getIntOr("Layers",0);
         cursor=in.getIntOr("Cursor",0);initialized=in.getBooleanOr("Initialized",false);
         workTicks=in.getLongOr("WorkTicks",0);
+        hardwareIdentity=in.getStringOr("DrillIdentity","");
+        lastConnectedCoordinator=in.getLong("LastCC").isPresent()
+            ?BlockPos.of(in.getLongOr("LastCC",0)):null;
+        lastConnectedPosition=in.getLong("LastCCDrill").isPresent()
+            ?BlockPos.of(in.getLongOr("LastCCDrill",0)):null;
+        hardware.load(in);
         randomWalls=in.getBooleanOr("RandomWalls",false);
         lastWallSource=in.getLong("LastWallSource").isPresent()
             ?BlockPos.of(in.getLongOr("LastWallSource",0)):null;
