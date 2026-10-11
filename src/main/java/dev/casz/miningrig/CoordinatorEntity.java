@@ -50,6 +50,9 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
             boolean walls,int amount){
         return (walls?wallDepot:fillerDepot).take(drill,this,amount);
     }
+    void returnWallCache(ServerLevel world,DrillEntity drill){
+        if(drillBelow(world)==drill)wallDepot.flush(world,this);
+    }
     /** Synchronously refund both CC depots before a paused rig unloads chunks. */
     void returnCachedSupplies(ServerLevel world,DrillEntity drill){
         if(drillBelow(world)!=drill)return;
