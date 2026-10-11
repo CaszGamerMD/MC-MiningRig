@@ -2,6 +2,10 @@ package dev.casz.miningrig.client;
 
 import java.util.EnumMap;
 import dev.casz.miningrig.CoordinatorMenu;
+import dev.casz.miningrig.CoordinatorRenamePayload;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -16,9 +20,23 @@ public final class CoordinatorScreen extends AbstractContainerScreen<Coordinator
     private final EnumMap<Direction,Button> buttons=new EnumMap<>(Direction.class);
     private Direction selected=Direction.UP;
     private Button typeButton,emptyButton;
+    private EditBox nickname;
+    private final String[] names={"","","","","",""};
+    public void updateNames(String state){
+        String[] parts=state.split("\t",-1);
+        for(int i=0;i<Math.min(6,parts.length);i++)names[i]=parts[i];
+        if(nickname!=null&&!nickname.isFocused())nickname.setValue(names[selected.get3DDataValue()]);
+    }
+    @Override public boolean keyPressed(KeyEvent event){
+        if(nickname!=null&&nickname.isFocused()&&!event.isEscape()){
+            nickname.keyPressed(event);
+            return true;
+        }
+        return super.keyPressed(event);
+    }
     public CoordinatorScreen(CoordinatorMenu menu,Inventory player,Component title){
-        super(menu,player,title,176,258);
-        inventoryLabelY=158;titleLabelY=7;
+        super(menu,player,title,176,292);
+        inventoryLabelY=190;titleLabelY=7;
     }
     private void click(int id){
         if(minecraft.gameMode!=null)minecraft.gameMode.handleInventoryButtonClick(menu.containerId,id);
@@ -27,7 +45,10 @@ public final class CoordinatorScreen extends AbstractContainerScreen<Coordinator
         super.init();buttons.clear();
         for(int i=0;i<6;i++){
             final Direction side=SIDES[i];
-            Button button=Button.builder(Component.literal("?"),b->{selected=side;})
+            Button button=Button.builder(Component.literal("?"),b->{
+                selected=side;
+                if(nickname!=null)nickname.setValue(names[side.get3DDataValue()]);
+            })
                 .bounds(leftPos+5+i*28,topPos+22,27,20).build();
             buttons.put(side,addRenderableWidget(button));
         }
@@ -35,14 +56,21 @@ public final class CoordinatorScreen extends AbstractContainerScreen<Coordinator
             .bounds(leftPos+7,topPos+57,100,18).build());
         emptyButton=addRenderableWidget(Button.builder(Component.literal("Pause"),b->click(8+selected.get3DDataValue()))
             .bounds(leftPos+110,topPos+57,58,18).build());
+        nickname=new EditBox(font,leftPos+7,topPos+83,104,18,Component.literal("Container name"));
+        nickname.setMaxLength(32);
+        addRenderableWidget(nickname);
+        addRenderableWidget(Button.builder(Component.literal("Save name"),b->{
+            ClientPlayNetworking.send(new CoordinatorRenamePayload(selected.get3DDataValue(),nickname.getValue()));
+            names[selected.get3DDataValue()]=nickname.getValue();
+        }).bounds(leftPos+113,topPos+83,56,18).build());
         addRenderableWidget(Button.builder(Component.literal("<"),b->click(6))
-            .bounds(leftPos+128,topPos+145,19,16).build());
+            .bounds(leftPos+128,topPos+177,19,16).build());
         addRenderableWidget(Button.builder(Component.literal(">"),b->click(7))
-            .bounds(leftPos+150,topPos+145,19,16).build());
+            .bounds(leftPos+150,topPos+177,19,16).build());
     }
     private String code(int mode){
         return switch(mode){
-            case 1->"F";case 2,3->"W";case 4->"O";case 5->"C";default->"-";
+            case 1->"F";case 2,3->"W";case 4->"O";case 5->"C";case 6->"H";default->"-";
         };
     }
     @Override protected void containerTick(){
@@ -61,23 +89,24 @@ public final class CoordinatorScreen extends AbstractContainerScreen<Coordinator
         emptyButton.active=external&&(mode==2||mode==3);
         typeButton.setMessage(Component.literal(switch(mode){
             case 1->"Filler input";case 2,3->"Wall input";case 4->"Output";
-            case 5->"Auto network";default->"Not assigned";
+            case 5->"Auto network";case 6->"Hardware";default->"Not assigned";
         }));
         emptyButton.setMessage(Component.literal(mode==3?"Continue":"Pause"));
     }
     @Override public void extractBackground(GuiGraphicsExtractor g,int mouseX,int mouseY,float delta){
         g.fill(leftPos,topPos,leftPos+imageWidth,topPos+imageHeight,0xff1b2530);
         g.fill(leftPos+4,topPos+16,leftPos+172,topPos+80,0xff32434b);
-        g.fill(leftPos+4,topPos+82,leftPos+172,topPos+145,0xff32434b);
-        for(int i=0;i<27;i++)g.fill(leftPos+7+(i%9)*18,topPos+87+(i/9)*18,
-            leftPos+25+(i%9)*18,topPos+105+(i/9)*18,0xff637887);
+        g.fill(leftPos+4,topPos+82,leftPos+172,topPos+110,0xff32434b);
+        g.fill(leftPos+4,topPos+115,leftPos+172,topPos+177,0xff32434b);
+        for(int i=0;i<27;i++)g.fill(leftPos+7+(i%9)*18,topPos+119+(i/9)*18,
+            leftPos+25+(i%9)*18,topPos+137+(i/9)*18,0xff637887);
     }
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mx,int my,float delta){
         super.extractRenderState(g,mx,my,delta);
-        g.text(font,"F: "+menu.fillerPending()+"/192",leftPos+7,topPos+78,0xffff726d,false);
-        g.text(font,"W: "+menu.wallPending()+"/192",leftPos+92,topPos+78,0xffffd34f,false);
-        g.text(font,"STORAGE "+menu.stored()+"/192",leftPos+7,topPos+148,0xff9fe5ff,false);
-        g.text(font,"PG "+(menu.page()+1)+"/8",leftPos+89,topPos+148,0xffffffff,false);
+        g.text(font,"F: "+menu.fillerPending()+"/192",leftPos+7,topPos+109,0xffff726d,false);
+        g.text(font,"W: "+menu.wallPending()+"/192",leftPos+92,topPos+109,0xffffd34f,false);
+        g.text(font,"STORAGE "+menu.stored()+"/192",leftPos+7,topPos+180,0xff9fe5ff,false);
+        g.text(font,"PG "+(menu.page()+1)+"/8",leftPos+89,topPos+180,0xffffffff,false);
         for(int i=0;i<6;i++){
             Direction side=SIDES[i];
             int mode=menu.mode(side);
@@ -86,6 +115,7 @@ public final class CoordinatorScreen extends AbstractContainerScreen<Coordinator
                 case 2,3->0xffffd34f;    // wall input yellow
                 case 4->0xff45df72;      // output green
                 case 5->0xff39e8dd;      // CC/drill teal
+                case 6->0xffd388ff;      // hardware input
                 default->0xff5e6c78;
             };
             int x=leftPos+5+i*28;
