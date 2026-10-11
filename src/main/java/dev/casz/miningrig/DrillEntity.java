@@ -338,7 +338,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         for(int j=0;j<rolls;j++){
             if(world.getRandom().nextInt(unbreaking+1)!=0)continue;
             int damage=bit.getDamageValue()+1;
-            if(damage>=bit.getMaxDamage()){items.set(slot,ItemStack.EMPTY);break;}
+            if(damage>=bit.getMaxDamage()){items.set(slot,ItemStack.EMPTY);hardware.requestReplacement();break;}
             bit.setDamageValue(damage);
         }
         setChanged();
@@ -399,7 +399,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
                     && !RigNetwork.hasInput(world,this,true))
                 return ComputerEntity.Status.NO_WALL_CONTAINER;
         }
-        if(!hasWorkingBits())return ComputerEntity.Status.OUT_OF_BITS;
+        if(!hasWorkingBits())return hardware.awaitingReplacement()&&!hardware.waitExpired()
+            ?ComputerEntity.Status.RUNNING:ComputerEntity.Status.OUT_OF_BITS;
         if(freeStorage()==0)return ComputerEntity.Status.FULL;
         sealing.maintainSupply(world,this,computer);
         // Operational order is explicitly WALL -> FLUID -> MINING.
@@ -458,12 +459,16 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
             int unbreaking=enchantmentLevel(world,bit,Enchantments.UNBREAKING);
             if(world.getRandom().nextInt(unbreaking+1)==0){
                 int wear=bit.getDamageValue()+1;
-                if(wear>=bit.getMaxDamage())items.set(lane,ItemStack.EMPTY);
+                if(wear>=bit.getMaxDamage()){
+                    items.set(lane,ItemStack.EMPTY);
+                    hardware.requestReplacement();
+                }
                 else bit.setDamageValue(wear);
             }
             setChanged();
         }
-        if(active==0)return ComputerEntity.Status.OUT_OF_BITS;
+        if(active==0)return hardware.awaitingReplacement()&&!hardware.waitExpired()
+            ?ComputerEntity.Status.RUNNING:ComputerEntity.Status.OUT_OF_BITS;
         if(cursor>=total){
             for(int lane=0;lane<BIT_SLOTS;lane++)if(assigned[lane]>=0)return ComputerEntity.Status.RUNNING;
             return descend(world,computer);
