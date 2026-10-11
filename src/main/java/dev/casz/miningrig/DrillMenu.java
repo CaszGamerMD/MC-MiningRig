@@ -26,7 +26,7 @@ public final class DrillMenu extends AbstractContainerMenu {
             @Override public boolean mayPlace(ItemStack stack) { return stack.getItem() instanceof DrillBit; }
             @Override public int getMaxStackSize(ItemStack stack) { return 1; }
         });
-        for(int i=0;i<9;i++)addSlot(new Slot(container,i+3,8+i*18,52) {
+        for(int i=0;i<9;i++)addSlot(new Slot(container,i+3,8+i*18,80) {
             @Override public boolean mayPlace(ItemStack stack) {
                 return drill.canPlaceItem(getContainerSlot(),stack);
             }
@@ -37,7 +37,7 @@ public final class DrillMenu extends AbstractContainerMenu {
                         :drill.getMaxStackSize(stack));
             }
         });
-        addStandardInventorySlots(player,8,100);
+        addStandardInventorySlots(player,8,149);
     }
     public int stored(){return data.get(switch(data.get(4)){case 1->2;case 2->3;default->0;});}
     public int page(){return data.get(1);}
