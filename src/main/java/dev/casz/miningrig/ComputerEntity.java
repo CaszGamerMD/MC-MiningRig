@@ -42,7 +42,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         OUT_OF_WALLS("Out of Walls"), FLUID_IN_HOLE("Fluid in hole"),
         FILL_FAILED("Fill blocked - help needed"),
         WALLING("Replacing walls"),FILLING("Sealing fluids"),
-        RECONNECTING("Reconnecting CC network");
+        RECONNECTING("Reconnecting CC network"),
+        REPAIR_FAILED("CC repair failed - check Hardware");
         public final String display;
         Status(String value){display=value;}
     }
@@ -99,6 +100,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     }
     private void autoDiscover(ServerLevel server){
         for(DrillEntity drill:RigTopology.networkDrills(server,this)){
+            boolean changed=false;
             String id=drill.identity();
             if(ignoredDrills.contains(id))continue;
             int slot=-1;
@@ -110,11 +112,12 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 if(slot<0)continue;
                 tokens[slot]=id;positions[slot]=drill.getBlockPos().immutable();
                 nicknames[slot]="Drill "+(slot+1);
-                statuses[slot]=Status.READY;
-            }else if(positions[slot]==null||!positions[slot].equals(drill.getBlockPos()))
-                positions[slot]=drill.getBlockPos().immutable();
-            if(!drill.matchesLink(id))drill.adoptController(server,this,id);
-            setChanged();
+                statuses[slot]=Status.READY;changed=true;
+            }else if(positions[slot]==null||!positions[slot].equals(drill.getBlockPos())){
+                positions[slot]=drill.getBlockPos().immutable();changed=true;
+            }
+            if(!drill.matchesLink(id)){drill.adoptController(server,this,id);changed=true;}
+            if(changed)setChanged();
         }
     }
     public void allowRescan(){ignoredDrills.clear();setChanged();}
@@ -280,6 +283,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public void toggle(){toggle(selected);}
     public void toggle(int slot){
         if(slot<0||slot>=MAX_DRILLS)return;
+        Status before=statuses[slot];
         if(running[slot]){stop(slot,Status.STOPPED);}
         else if(tokens[slot].isEmpty()||positions[slot]==null)
             statuses[slot]=tokens[slot].isEmpty()?Status.NO_DRILL:Status.WAITING;
@@ -304,6 +308,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 running[slot]=true;statuses[slot]=Status.RUNNING;
             }
         }else statuses[slot]=Status.NO_DRILL;
+        if(isFault(statuses[slot]) && statuses[slot]!=before)alertSerial++;
         setChanged();syncIfServer();
     }
     public void stop(Status reason){stop(activeSlot,reason);}
@@ -444,7 +449,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             if(!RigTopology.joined(server,computer,drill)){
                 RigNetworkRepair.Result recovered=computer.repair.tick(server,i,drill,computer);
                 if(recovered==RigNetworkRepair.Result.FAILED){
-                    computer.stop(i,Status.NO_COLLECTOR);
+                    computer.stop(i,Status.REPAIR_FAILED);
                     continue;
                 }
                 if(recovered!=RigNetworkRepair.Result.CONNECTED){
