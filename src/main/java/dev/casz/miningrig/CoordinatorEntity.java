@@ -80,7 +80,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
                 :i==7?stored():i==8?adjacentMask:i==9?page:i==10?drillMask:i==11?fillerDepot.stored():wallDepot.stored();
         }
         @Override public void set(int i,int v){
-            if(i<6)mode[i]=Math.max(0,Math.min(4,v));
+            if(i<6)mode[i]=Math.max(0,Math.min(5,v));
             else if(i==9)page=Math.max(0,Math.min(7,v));
         }
         @Override public int getCount(){return 13;}
@@ -108,7 +108,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     }
     public void cycle(Direction direction){
         int i=direction.get3DDataValue();
-        mode[i]=switch(mode[i]){case 0->1;case 1->2;case 2,3->4;default->0;};
+        mode[i]=switch(mode[i]){case 0->1;case 1->2;case 2,3->4;case 4->5;default->0;};
         setChanged();
     }
     public void toggleWallPreference(Direction direction){
@@ -129,11 +129,8 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         return null;
     }
     DrillEntity drillBelow(ServerLevel world){
-        for(int n=1;n<=20;n++){
-            BlockPos at=worldPosition.below(n);
-            if(!world.hasChunkAt(at))return null;
-            if(world.getBlockEntity(at) instanceof DrillEntity drill)return drill;
-        }
+        for(DrillEntity drill:RigTopology.drills(world,worldPosition))
+            if(RigNetwork.nearestDrillCoordinator(world,drill)==this)return drill;
         return null;
     }
     private void refresh(ServerLevel world){
@@ -167,6 +164,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     public static void tick(Level level,BlockPos pos,BlockState state,CoordinatorEntity cc){
         if(!(level instanceof ServerLevel world))return;
         long now=world.getGameTime();
+        RigTopology.coordinator(world,pos);
         if(now%10==0)cc.refresh(world);
         RigMachineSounds.coordinatorTick(world,pos);
         cc.advance(world,now);
@@ -332,6 +330,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         if(changed)setChanged();
     }
     public void dropContents(){
+        if(level instanceof ServerLevel server)RigTopology.forgetCoordinator(server,worldPosition);
         if(dropped||level==null||level.isClientSide())return;
         dropped=true;
         fillerDepot.flush((ServerLevel)level,this);
@@ -407,7 +406,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         flights.clear();
         for(int i=0;i<6;i++){
             int old=in.getIntOr("Face"+i,1);
-            mode[i]=Math.max(0,Math.min(4,in.getIntOr("Port"+i,old==2?RigNetwork.OUTPUT:0)));
+            mode[i]=Math.max(0,Math.min(5,in.getIntOr("Port"+i,old==2?RigNetwork.OUTPUT:0)));
         }
         for(int i=0;i<Math.min(MAX_FLIGHTS,in.getIntOr("FlightCount",0));i++){
             String key="Flight"+i;
