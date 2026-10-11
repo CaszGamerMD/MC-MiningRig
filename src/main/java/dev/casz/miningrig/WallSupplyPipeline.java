@@ -48,11 +48,11 @@ final class WallSupplyPipeline {
         this.bufferLimit=Math.max(3,Math.min(MAX_AHEAD,bufferLimit));
     }
     private final List<Packet> flights=new ArrayList<>();
-    private final List<ItemStack> ready=new ArrayList<>();
+    private final List<RigNetwork.Supply> ready=new ArrayList<>();
     private int requestedTotal,deliveredCount;
 
     int readyCount(){
-        int n=0;for(ItemStack stack:ready)n+=stack.getCount();return n;
+        int n=0;for(RigNetwork.Supply supply:ready)n+=supply.stack().getCount();return n;
     }
     int flightCount(){
         int n=0;for(Packet p:flights)n+=p.units();return n;
@@ -106,7 +106,7 @@ final class WallSupplyPipeline {
                         a.getY()+.55+(b.getY()-a.getY())*t+.1*Math.sin(Math.PI*t),
                         a.getZ()+.5+(b.getZ()-a.getZ())*t);
             }else{
-                ready.add(packet.cargo.stack().copy());
+                ready.add(packet.cargo);
                 deliveredCount+=packet.units();
                 packet.discard();
                 flights.remove(i);
@@ -135,28 +135,30 @@ final class WallSupplyPipeline {
     }
     /** Consume exactly one block only after the world accepts its placement. */
     ItemStack peek(){
-        return ready.isEmpty()?ItemStack.EMPTY:ready.get(0);
+        return ready.isEmpty()?ItemStack.EMPTY:ready.get(0).stack();
     }
     void consume(){
         if(ready.isEmpty())return;
-        ItemStack top=ready.get(0);
+        ItemStack top=ready.get(0).stack();
         top.shrink(1);
         if(top.isEmpty())ready.remove(0);
     }
-    private static void refund(ServerLevel world,DrillEntity drill,ItemStack stack){
-        if(stack.isEmpty())return;
-        if(RigNetwork.returnSurplus(world,drill,stack))return;
-        if(!drill.receive(List.of(stack)))
-            Block.popResource(world,drill.getBlockPos(),stack.copy());
+    private static void refund(ServerLevel world,DrillEntity drill,RigNetwork.Supply packet){
+        if(packet.stack().isEmpty())return;
+        ItemStack leftover=RigNetwork.returnToSource(world,packet);
+        if(leftover.isEmpty())return;
+        if(RigNetwork.returnSurplus(world,drill,leftover))return;
+        if(!drill.receive(List.of(leftover)))
+            Block.popResource(world,drill.getBlockPos(),leftover.copy());
     }
     void flush(ServerLevel world,DrillEntity drill){
         // Any over-requested wall supply is returned to drill output storage;
         // if its 64-item inventory cannot accept it, drop it rather than void.
         for(Packet p:flights){
-            p.discard();refund(world,drill,p.cargo.stack());
+            p.discard();refund(world,drill,p.cargo);
         }
         flights.clear();
-        for(ItemStack stack:ready)refund(world,drill,stack);
+        for(RigNetwork.Supply supply:ready)refund(world,drill,supply);
         ready.clear();
         requestedTotal=0;deliveredCount=0;
         drill.setChanged();
@@ -166,10 +168,26 @@ final class WallSupplyPipeline {
         next.flights.clear();
         next.flights.addAll(flights);
         next.ready.clear();
-        for(ItemStack stack:ready)next.ready.add(stack.copy());
+        for(RigNetwork.Supply cargo:ready)next.ready.add(new RigNetwork.Supply(
+            cargo.stack().copy(),cargo.path(),cargo.sourcePos(),cargo.sourceFace()));
         next.requestedTotal=requestedTotal;next.deliveredCount=deliveredCount;
         flights.clear();ready.clear();
         requestedTotal=0;deliveredCount=0;
+    }
+    private static void saveOrigin(ValueOutput out,String prefix,RigNetwork.Supply cargo){
+        if(cargo.sourcePos()!=null&&cargo.sourceFace()!=null){
+            out.putBoolean(prefix+"HasSource",true);
+            out.putLong(prefix+"Source",cargo.sourcePos().asLong());
+            out.putInt(prefix+"SourceFace",cargo.sourceFace().get3DDataValue());
+        }
+    }
+    private static RigNetwork.Supply withOrigin(ValueInput in,String prefix,
+            ItemStack stack,List<BlockPos> path){
+        boolean source=in.getBooleanOr(prefix+"HasSource",false);
+        return new RigNetwork.Supply(stack,path,
+            source?BlockPos.of(in.getLongOr(prefix+"Source",0)):null,
+            source?net.minecraft.core.Direction.from3DDataValue(
+                in.getIntOr(prefix+"SourceFace",0)):null);
     }
     void save(ValueOutput out){
         out.putInt(key+"WallBatchDemand",requestedTotal);
@@ -178,6 +196,7 @@ final class WallSupplyPipeline {
         for(int i=0;i<flights.size();i++){
             Packet packet=flights.get(i);
             out.store(key+"WallFlightItem"+i,ItemStack.CODEC,packet.cargo.stack());
+            saveOrigin(out,key+"WallFlight"+i,packet.cargo);
             out.putInt(key+"WallFlightTick"+i,packet.elapsed);
             List<BlockPos> path=packet.cargo.path();
             out.putInt(key+"WallFlightPathLength"+i,path.size());
@@ -185,8 +204,10 @@ final class WallSupplyPipeline {
                 out.putLong(key+"WallFlightPath"+i+"_"+j,path.get(j).asLong());
         }
         out.putInt(key+"WallBatchReady",ready.size());
-        for(int i=0;i<ready.size();i++)
-            out.store(key+"WallReadyItem"+i,ItemStack.CODEC,ready.get(i));
+        for(int i=0;i<ready.size();i++){
+            out.store(key+"WallReadyItem"+i,ItemStack.CODEC,ready.get(i).stack());
+            saveOrigin(out,key+"WallReady"+i,ready.get(i));
+        }
     }
     void load(ValueInput in){
         for(Packet packet:flights)packet.discard();
@@ -201,13 +222,14 @@ final class WallSupplyPipeline {
             for(int j=0;j<pathLen;j++)
                 path.add(BlockPos.of(in.getLongOr(key+"WallFlightPath"+i+"_"+j,0)));
             if(!item.isEmpty()&&path.size()>=2)
-                flights.add(new Packet(new RigNetwork.Supply(item,path),
+                flights.add(new Packet(withOrigin(in,key+"WallFlight"+i,item,path),
                     Math.max(0,in.getIntOr(key+"WallFlightTick"+i,0))));
         }
         int readyCount=Math.max(0,Math.min(MAX_SAVED_PACKETS,in.getIntOr(key+"WallBatchReady",0)));
         for(int i=0;i<readyCount;i++){
             ItemStack item=in.read(key+"WallReadyItem"+i,ItemStack.CODEC).orElse(ItemStack.EMPTY);
-            if(!item.isEmpty())ready.add(item);
+            if(!item.isEmpty())ready.add(withOrigin(in,key+"WallReady"+i,
+                item,List.of()));
         }
     }
 }
