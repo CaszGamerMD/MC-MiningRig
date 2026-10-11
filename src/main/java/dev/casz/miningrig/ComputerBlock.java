@@ -60,15 +60,8 @@ public final class ComputerBlock extends BaseEntityBlock {
             }
             return InteractionResult.SUCCESS;
         }
-        if(stack.is(MiningRig.DRILL.asItem())){
-            if(level instanceof net.minecraft.server.level.ServerLevel server){
-                int slot=computer.registerItem(server,stack);
-                player.sendSystemMessage(Component.literal(slot<0
-                    ? "Computer already controls four drills. Unlink one in the computer UI first."
-                    : "Drill linked in computer slot "+(slot+1)+". Place this drill to report its coordinates."));
-            }
-            return InteractionResult.SUCCESS;
-        }
+        // Drill blocks join this computer automatically when placed in range
+        // of any loaded coordinator on its CC network. No hand-pairing step.
         if (stack.is(Items.STICK) || stack.is(Items.BONE) || stack.is(Items.LAPIS_LAZULI)) {
             if (!level.isClientSide()) {
                 if (stack.is(Items.STICK)) computer.setRadius(computer.selectedRadius() + (player.isShiftKeyDown() ? -1 : 1));
