@@ -73,8 +73,14 @@ public final class RigNetwork {
         if(stack.isEmpty())return true;
         List<ItemStack> cargo=List.of(stack);
         for(CoordinatorEntity cc:members(world,drill))
-            if(cc.canReceive(cargo) && cc.receive(cargo))return true;
+            if((hasOutputHere(world,cc)||nextTowardOutput(world,cc)!=null)
+                    && cc.canReceive(cargo) && cc.receive(cargo))return true;
         return false;
+    }
+    /** Count also material whose prefetch flight has not reached the CC. */
+    public static boolean fillerDepotPending(ServerLevel world,DrillEntity drill){
+        CoordinatorEntity depot=nearestDrillCoordinator(world,drill);
+        return depot!=null && depot.cachedFillerPending()>0;
     }
     public static boolean hasOutput(ServerLevel world,DrillEntity drill){
         for(CoordinatorEntity cc:members(world,drill))

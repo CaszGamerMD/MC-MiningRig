@@ -494,7 +494,8 @@ final class DrillSealing {
                 target(world,at,null);
                 if(failed())return ComputerEntity.Status.FILL_FAILED;
                 if(!filler.hasSupply()){
-                    if(filler.hasFlights())return ComputerEntity.Status.RUNNING;
+                    if(filler.hasFlights() || RigNetwork.fillerDepotPending(world,drill))
+                        return ComputerEntity.Status.RUNNING;
                     return ComputerEntity.Status.OUT_OF_FILLER;
                 }
                 return applyFromStock(world,drill,filler,at,false);

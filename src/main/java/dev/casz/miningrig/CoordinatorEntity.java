@@ -44,6 +44,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     private final List<Flight> flights=new ArrayList<>();
     // Independent supply buffer, never mixed with normal mined-item output.
     private final CoordinatorFillerCache fillerDepot=new CoordinatorFillerCache();
+    int cachedFillerPending(){return fillerDepot.stored();}
     @Nullable RigNetwork.Supply takeCachedFiller(ServerLevel world,DrillEntity drill,int amount){
         return fillerDepot.take(drill,this,amount);
     }
