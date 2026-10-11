@@ -61,11 +61,12 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         return recentlyProcessing(world) && lastWallMode==2
             && !sealing.fallback() && sealing.needsWallSupply();
     }
+    public int wallDepotTarget(){return sealing.wallDepotTarget();}
     /** The Filler cache also feeds Air-mode wall patches, not only water. */
     public boolean activelyFilling(ServerLevel world){
         return recentlyProcessing(world) &&
             (sealing.fluidFilling() ||
-                (sealing.needsWallSupply() && (lastWallMode==1
+                (sealing.needsAirFiller() && (lastWallMode==1
                     || lastWallMode==2 && sealing.fallback())));
     }
     public void retryFailedFill(ServerLevel world){sealing.retryFailedFill(world,this);}
