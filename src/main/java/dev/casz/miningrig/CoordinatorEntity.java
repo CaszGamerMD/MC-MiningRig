@@ -182,6 +182,16 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         DrillEntity linkedDrill=cc.drillBelow(world);
         cc.fillerDepot.tick(world,cc,linkedDrill);
         cc.wallDepot.tick(world,cc,linkedDrill);
+        if(now%20==0)for(net.minecraft.server.level.ServerPlayer player:world.players())
+            if(player.containerMenu instanceof CoordinatorMenu menu && menu.coordinator()==cc){
+                StringBuilder names=new StringBuilder();
+                for(Direction side:Direction.values()){
+                    if(names.length()>0)names.append('\t');
+                    names.append(cc.containerNickname(side).replace('\t',' ').replace('\n',' '));
+                }
+                net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(player,
+                    new CoordinatorStatePayload(names.toString()));
+            }
         // Adjacent container output does not consume wireless travel bandwidth.
         for(int n=0;n<CONTAINER_ACTIONS_PER_TICK;n++)
             if(!cc.outputToContainer(world))break;
