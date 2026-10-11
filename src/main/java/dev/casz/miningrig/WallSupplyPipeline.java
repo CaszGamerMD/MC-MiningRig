@@ -90,6 +90,7 @@ final class WallSupplyPipeline {
         selectedIndex=-1;
     }
     int bundleRoom(int index){
+        if(index<0||index>=bundleSize()||index>ready.size())return 0;
         return Math.max(0,bufferLimit-readyCount()-flightCount()
             +(index>=0&&index<ready.size()?ready.get(index).stack().getCount():0));
     }
