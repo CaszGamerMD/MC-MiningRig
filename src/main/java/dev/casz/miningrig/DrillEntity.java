@@ -79,6 +79,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     public void pauseSupply(ServerLevel world){
         lastControllerTick=Long.MIN_VALUE;
         sealing.pauseSupply(world,this);
+        CoordinatorEntity cc=RigNetwork.nearestDrillCoordinator(world,this);
+        if(cc!=null)cc.returnCachedSupplies(world,this);
         setChanged();
     }
     /** The Filler cache also feeds Air-mode wall patches, not only water. */
