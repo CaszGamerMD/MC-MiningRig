@@ -40,6 +40,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private boolean initialized, relocating, contentsDropped;
     private int page,storageBank;
     private boolean randomWalls;
+    @Nullable private BlockPos lastWallSource;
+    private int lastWallSourceSlot=-1;
     private final DrillSealing sealing=new DrillSealing();
     private float placementCharge,wallWorkCharge;
     private long lastCuttingAudioTick=Long.MIN_VALUE;
@@ -63,6 +65,25 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     }
     public int wallDepotTarget(){return sealing.wallDepotTarget();}
     public boolean randomWalls(){return randomWalls;}
+    public boolean wasLastWallSource(BlockPos origin,int slot){
+        return origin.equals(lastWallSource)&&slot==lastWallSourceSlot;
+    }
+    public void recordWallSource(BlockPos origin,int slot){
+        lastWallSource=origin.immutable();
+        lastWallSourceSlot=slot;
+        setChanged();
+    }
+    private void chooseWallMode(boolean random){
+        if(randomWalls==random)return;
+        randomWalls=random;
+        lastWallSource=null;lastWallSourceSlot=-1;
+        if(level instanceof ServerLevel server){
+            sealing.clearWallSupply(server,this);
+            CoordinatorEntity cc=RigNetwork.nearestDrillCoordinator(server,this);
+            if(cc!=null)cc.returnWallCache(server,this);
+        }
+        setChanged();
+    }
     public int supplyStored(boolean wall){return sealing.supplyStored(wall);}
     public ItemStack supplyItem(boolean wall,int slot){return sealing.supplyItem(wall,slot);}
     public int supplyRoom(boolean wall,int slot){return sealing.supplyRoom(wall,slot);}
@@ -111,7 +132,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         @Override public void set(int index,int value) {
             if(index==1)page=Math.max(0,Math.min(7,value));
             else if(index==4){storageBank=Math.max(0,Math.min(2,value));page=0;}
-            else if(index==5){randomWalls=value!=0;setChanged();}
+            else if(index==5)chooseWallMode(value!=0);
         }
         @Override public int getCount() {return 6;}
     };
@@ -135,6 +156,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         completedLayers=0;cursor=0;workTicks=0;
         placementCharge=0;placementBit=-1;
         page=0;storageBank=0;
+        lastWallSource=null;lastWallSourceSlot=-1;
         wallWorkCharge=0;wallWorkTarget=null;
         lastCuttingAudioTick=Long.MIN_VALUE;
         for(int i=0;i<BIT_SLOTS;i++){assigned[i]=-1;progress[i]=0;}
@@ -451,6 +473,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         moved.placementCharge=placementCharge;
         moved.placementBit=placementBit;
         moved.randomWalls=randomWalls;
+        moved.lastWallSource=lastWallSource;
+        moved.lastWallSourceSlot=lastWallSourceSlot;
         moved.storageBank=storageBank;
         moved.page=page;
         sealing.copyTo(moved.sealing);
@@ -522,6 +546,10 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         out.putInt("Cursor",cursor);out.putBoolean("Initialized",initialized);
         out.putLong("WorkTicks",workTicks);
         out.putBoolean("RandomWalls",randomWalls);
+        if(lastWallSource!=null){
+            out.putLong("LastWallSource",lastWallSource.asLong());
+            out.putInt("LastWallSourceSlot",lastWallSourceSlot);
+        }
         out.putFloat("PlacementCharge",placementCharge);
         out.putInt("PlacementBit",placementBit);
         out.putFloat("WallWorkCharge",wallWorkCharge);
@@ -547,6 +575,9 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         cursor=in.getIntOr("Cursor",0);initialized=in.getBooleanOr("Initialized",false);
         workTicks=in.getLongOr("WorkTicks",0);
         randomWalls=in.getBooleanOr("RandomWalls",false);
+        lastWallSource=in.getLong("LastWallSource").isPresent()
+            ?BlockPos.of(in.getLongOr("LastWallSource",0)):null;
+        lastWallSourceSlot=in.getIntOr("LastWallSourceSlot",-1);
         placementCharge=in.getFloatOr("PlacementCharge",0);
         placementBit=in.getIntOr("PlacementBit",-1);
         wallWorkCharge=in.getFloatOr("WallWorkCharge",0);
