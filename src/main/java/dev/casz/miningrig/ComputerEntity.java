@@ -136,13 +136,22 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     }
     /** Invoked when a linked drill item becomes a block in the same dimension. */
     public boolean placed(String token,BlockPos place){
+        if(token==null || token.isBlank())return false;
         for(int i=0;i<MAX_DRILLS;i++){
             if(!tokens[i].isEmpty()&&tokens[i].equals(token)){
-                if(place.equals(positions[i]))return true;
+                // A completely different drill in an old drill's coordinates
+                // MUST NOT inherit that old slot's status or layer progress.
+                for(int j=0;j<MAX_DRILLS;j++){
+                    if(j!=i&&place.equals(positions[j])){
+                        positions[j]=null;running[j]=false;
+                        statuses[j]=Status.NO_DRILL;
+                    }
+                }
+                if(place.equals(positions[i])){setChanged();return true;}
                 positions[i]=place.immutable();
                 statuses[i]=Status.READY;
                 running[i]=false;
-                setChanged();return true;
+                setChanged();syncIfServer();return true;
             }
         }
         return false;
@@ -167,7 +176,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         else if(level instanceof ServerLevel server){
             BlockPos at=positions[slot];
             if(!server.hasChunkAt(at))statuses[slot]=Status.UNLOADED;
-            else if(!(server.getBlockEntity(at) instanceof DrillEntity drill))
+            else if(!(server.getBlockEntity(at) instanceof DrillEntity drill)
+                    || !drill.matchesLink(tokens[slot]))
                 statuses[slot]=Status.NO_DRILL;
             else if(RigNetwork.members(server,drill).isEmpty())
                 statuses[slot]=Status.NO_COLLECTOR;
@@ -186,9 +196,12 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         if(slot<0||slot>=MAX_DRILLS)return;
         running[slot]=false;statuses[slot]=reason;setChanged();syncIfServer();
     }
-    public void moved(BlockPos oldPos,BlockPos newPos){
+    public void moved(String token,BlockPos oldPos,BlockPos newPos){
+        if(token==null||token.isBlank())return;
         for(int i=0;i<MAX_DRILLS;i++)
-            if(oldPos.equals(positions[i])){positions[i]=newPos.immutable();setChanged();syncIfServer();}
+            if(token.equals(tokens[i])&&oldPos.equals(positions[i])){
+                positions[i]=newPos.immutable();setChanged();syncIfServer();
+            }
     }
     public String screenStatus(){
         int active=0,alerts=0;
@@ -232,7 +245,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             int eta=-1;
             if(!tokens[i].isEmpty()&&pos!=null){
                 if(!server.hasChunkAt(pos))status=Status.UNLOADED.display;
-                else if(server.getBlockEntity(pos) instanceof DrillEntity drill){
+                else if(server.getBlockEntity(pos) instanceof DrillEntity drill
+                        && drill.matchesLink(tokens[i])){
                     if(running[i]){
                         if(!drill.hasWorkingBits())status=Status.OUT_OF_BITS.display;
                         else if(drill.freeStorage()==0)status=Status.FULL.display;
@@ -248,7 +262,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 .append('\t').append(circles[i]?"O":"S")
                 .append('\t').append(wallModes[i])
                 .append('\t').append(pos==null||!server.hasChunkAt(pos)?0:
-                    server.getBlockEntity(pos) instanceof DrillEntity drill?drill.completedLayers():0);
+                    server.getBlockEntity(pos) instanceof DrillEntity drill
+                    && drill.matchesLink(tokens[i])?drill.completedLayers():0);
         }
         return out.toString();
     }
@@ -268,7 +283,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 // Do not stop or force-load a remote drill; resume when it loads.
                 continue;
             }
-            if(!(server.getBlockEntity(drillPos) instanceof DrillEntity drill)){
+            if(!(server.getBlockEntity(drillPos) instanceof DrillEntity drill)
+                    || !drill.matchesLink(computer.tokens[i])){
                 computer.stop(i,Status.NO_DRILL);continue;
             }
             computer.activeSlot=i;
