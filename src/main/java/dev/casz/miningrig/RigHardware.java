@@ -39,11 +39,23 @@ final class RigHardware {
     // Do not time out the drill simply because a Hardware chest is temporarily empty.
     boolean waitExpired(){return false;}
 
+    /** Pause the hardware supply flight, but retain this layer's missing-bit demand. */
+    void pause(ServerLevel world,DrillEntity drill){
+        if(cargo!=null){
+            refund(world,drill,cargo);
+            clear();
+            drill.setChanged();
+        }
+    }
     void tick(ServerLevel world,DrillEntity drill){
+        // New purchases are only made by a running drill. This also prevents
+        // refilling player-cleared slots in a paused or unassigned machine.
+        if(!drill.activelyMining(world))return;
         int missing=drill.emptyBitSlots();
         // Player-installed bits can satisfy a pending request. Never order or
         // retain hardware for slots that have already been filled manually.
         if(missing==0){
+            if(pendingReplacements!=0)drill.setChanged();
             pendingReplacements=0;
             if(cargo!=null){
                 refund(world,drill,cargo);
