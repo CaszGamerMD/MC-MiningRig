@@ -196,6 +196,17 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         cc.advance(world,now);
         cc.fillerDepot.tick(world,cc,cc.supplying(world,false));
         cc.wallDepot.tick(world,cc,cc.supplying(world,true));
+        // Visuals are not cargo. Prune stale displays left behind by
+        // /stop, disconnect, save/reload, or an interrupted flight.
+        if(now%100==0){
+            java.util.Set<java.util.UUID> active=new java.util.HashSet<>();
+            for(Flight flight:cc.flights)
+                if(flight.visual!=null&&flight.visual.isAlive())
+                    active.add(flight.visual.getUUID());
+            cc.fillerDepot.collectVisualIds(active);
+            cc.wallDepot.collectVisualIds(active);
+            RigMachineVisuals.cleanupCoordinator(world,pos,active,true);
+        }
         if(now%20==0)for(net.minecraft.server.level.ServerPlayer player:world.players())
             if(player.containerMenu instanceof CoordinatorMenu menu && menu.coordinator()==cc){
                 StringBuilder names=new StringBuilder();
@@ -349,6 +360,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
             new org.joml.Vector3f(0,0,0),new org.joml.Quaternionf(),
             new org.joml.Vector3f(.55f,.55f,.55f),new org.joml.Quaternionf()));
         item.setNoGravity(true);
+        RigMachineVisuals.tag(item,worldPosition);
         item.setPos(flight.origin.getX()+.5,flight.origin.getY()+.6,flight.origin.getZ()+.5);
         world.addFreshEntity(item);
         flight.visual=item;
@@ -404,7 +416,10 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         if(changed)setChanged();
     }
     public void dropContents(){
-        if(level instanceof ServerLevel server)RigTopology.forgetCoordinator(server,worldPosition);
+        if(level instanceof ServerLevel server){
+            RigTopology.forgetCoordinator(server,worldPosition);
+            RigMachineVisuals.cleanupCoordinator(server,worldPosition,java.util.Set.of(),false);
+        }
         if(dropped||level==null||level.isClientSide())return;
         dropped=true;
         fillerDepot.flush((ServerLevel)level,this);
