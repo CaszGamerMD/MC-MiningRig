@@ -29,7 +29,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Three independent mining lanes. Each equipped bit is one worker with its own
  * hardness-progress counter, so three bits can mine three blocks simultaneously.
- * Storage is nine visible stacks but is limited to 64 individual items total.
+ * Mining output, filler and wall materials are three separate 64-item bundles.
  */
 public final class DrillEntity extends BlockEntity implements Container, MenuProvider {
     public static final int BIT_SLOTS=3, SLOT_COUNT=67, CAPACITY=64;
@@ -38,7 +38,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private final float[] progress=new float[BIT_SLOTS];
     private int startY, completedLayers, cursor;
     private boolean initialized, relocating, contentsDropped;
-    private int page;
+    private int page,storageBank;
+    private boolean randomWalls;
     private final DrillSealing sealing=new DrillSealing();
     private float placementCharge,wallWorkCharge;
     private long lastCuttingAudioTick=Long.MIN_VALUE;
@@ -58,16 +59,31 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     /** CC staging begins during wall excavation, before the drill places
      * its first replacement block. All three phases keep their own stock. */
     public boolean activelyWalling(ServerLevel world){
-        return recentlyProcessing(world) && lastWallMode==2
-            && !sealing.fallback() && sealing.needsWallSupply();
+        return recentlyProcessing(world) && lastWallMode==2;
     }
     public int wallDepotTarget(){return sealing.wallDepotTarget();}
+    public boolean randomWalls(){return randomWalls;}
+    public int supplyStored(boolean wall){return sealing.supplyStored(wall);}
+    public ItemStack supplyItem(boolean wall,int slot){return sealing.supplyItem(wall,slot);}
+    public int supplyRoom(boolean wall,int slot){return sealing.supplyRoom(wall,slot);}
+    public ItemStack removeSupply(boolean wall,int slot,int count){
+        ItemStack result=sealing.removeSupply(wall,slot,count);
+        if(!result.isEmpty())setChanged();
+        return result;
+    }
+    public void setSupply(boolean wall,int slot,ItemStack stack){
+        sealing.setSupply(wall,slot,stack);
+        setChanged();
+    }
+    /** Prevent any further CC prefetch on a stop and return all unplaced stock. */
+    public void pauseSupply(ServerLevel world){
+        lastControllerTick=Long.MIN_VALUE;
+        sealing.pauseSupply(world,this);
+        setChanged();
+    }
     /** The Filler cache also feeds Air-mode wall patches, not only water. */
     public boolean activelyFilling(ServerLevel world){
-        return recentlyProcessing(world) &&
-            (sealing.fluidFilling() ||
-                (sealing.needsAirFiller() && (lastWallMode==1
-                    || lastWallMode==2 && sealing.fallback())));
+        return recentlyProcessing(world);
     }
     public void retryFailedFill(ServerLevel world){sealing.retryFailedFill(world,this);}
     public boolean canAutoRecoverFill(ServerLevel world){return sealing.canAutoRecover(world);}
@@ -79,9 +95,23 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private String computerDimension="";
     private boolean linkConfirmed;
     private final ContainerData menuData=new ContainerData() {
-        @Override public int get(int index) {return index==0?stored():index==1?page:0;}
-        @Override public void set(int index,int value) {if(index==1)page=Math.max(0,Math.min(7,value));}
-        @Override public int getCount() {return 2;}
+        @Override public int get(int index) {
+            return switch(index){
+                case 0 -> stored();
+                case 1 -> page;
+                case 2 -> supplyStored(false);
+                case 3 -> supplyStored(true);
+                case 4 -> storageBank;
+                case 5 -> randomWalls?1:0;
+                default -> 0;
+            };
+        }
+        @Override public void set(int index,int value) {
+            if(index==1)page=Math.max(0,Math.min(7,value));
+            else if(index==4){storageBank=Math.max(0,Math.min(2,value));page=0;}
+            else if(index==5){randomWalls=value!=0;setChanged();}
+        }
+        @Override public int getCount() {return 6;}
     };
 
     public DrillEntity(BlockPos pos,BlockState state){super(MiningRig.DRILL_ENTITY,pos,state);}
@@ -102,6 +132,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         initialized=false;startY=worldPosition.getY();
         completedLayers=0;cursor=0;workTicks=0;
         placementCharge=0;placementBit=-1;
+        page=0;storageBank=0;
         wallWorkCharge=0;wallWorkTarget=null;
         lastCuttingAudioTick=Long.MIN_VALUE;
         for(int i=0;i<BIT_SLOTS;i++){assigned[i]=-1;progress[i]=0;}
@@ -307,6 +338,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         }
         if(!hasWorkingBits())return ComputerEntity.Status.OUT_OF_BITS;
         if(freeStorage()==0)return ComputerEntity.Status.FULL;
+        sealing.maintainSupply(world,this,computer);
         // Operational order is explicitly WALL -> FLUID -> MINING.
         // The controller owns the setting; the sealing state owns the
         // per-coordinate count. Update live for every tick and after reload.
@@ -416,6 +448,9 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         moved.lastCuttingAudioTick=lastCuttingAudioTick;
         moved.placementCharge=placementCharge;
         moved.placementBit=placementBit;
+        moved.randomWalls=randomWalls;
+        moved.storageBank=storageBank;
+        moved.page=page;
         sealing.copyTo(moved.sealing);
         moved.sealing.nextLayer();
         moved.setChanged();
@@ -476,7 +511,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     @Override public void clearContent(){for(int i=0;i<SLOT_COUNT;i++)items.set(i,ItemStack.EMPTY);setChanged();}
     @Override public Component getDisplayName(){return Component.literal("Mining Drill");}
     @Nullable @Override public AbstractContainerMenu createMenu(int id,Inventory playerInventory,Player player) {
-        return new DrillMenu(id,playerInventory,new PagedRigContainer(this,menuData,1,3,9),menuData);
+        return new DrillMenu(id,playerInventory,new PagedDrillContainer(this,menuData),menuData);
     }
     @Override protected void saveAdditional(ValueOutput out){
         super.saveAdditional(out);
@@ -484,6 +519,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         out.putInt("StartY",startY);out.putInt("Layers",completedLayers);
         out.putInt("Cursor",cursor);out.putBoolean("Initialized",initialized);
         out.putLong("WorkTicks",workTicks);
+        out.putBoolean("RandomWalls",randomWalls);
         out.putFloat("PlacementCharge",placementCharge);
         out.putInt("PlacementBit",placementBit);
         out.putFloat("WallWorkCharge",wallWorkCharge);
@@ -508,6 +544,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         startY=in.getIntOr("StartY",worldPosition.getY());completedLayers=in.getIntOr("Layers",0);
         cursor=in.getIntOr("Cursor",0);initialized=in.getBooleanOr("Initialized",false);
         workTicks=in.getLongOr("WorkTicks",0);
+        randomWalls=in.getBooleanOr("RandomWalls",false);
         placementCharge=in.getFloatOr("PlacementCharge",0);
         placementBit=in.getIntOr("PlacementBit",-1);
         wallWorkCharge=in.getFloatOr("WallWorkCharge",0);
