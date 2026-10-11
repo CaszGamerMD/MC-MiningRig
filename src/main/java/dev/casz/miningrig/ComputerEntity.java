@@ -134,6 +134,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public void setDepth(int value){depths[selected]=Math.max(1,Math.min(256,value));settingsChanged();}
     public void setCircle(boolean value){circles[selected]=value;settingsChanged();}
     private void settingsChanged(){
+        releaseDrillSupplies(selected);
         running[selected]=false;
         if(!tokens[selected].isEmpty())statuses[selected]=Status.STOPPED;
         setChanged();syncIfServer();
@@ -201,13 +202,14 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     }
     public void unlink(int index){
         if(index<0||index>=MAX_DRILLS)return;
+        releaseDrillSupplies(index);
         tokens[index]="";positions[index]=null;running[index]=false;
         statuses[index]=Status.READY;nicknames[index]="Drill "+(index+1);setChanged();syncIfServer();
     }
     public void toggle(){toggle(selected);}
     public void toggle(int slot){
         if(slot<0||slot>=MAX_DRILLS)return;
-        if(running[slot]){running[slot]=false;statuses[slot]=Status.STOPPED;}
+        if(running[slot]){stop(slot,Status.STOPPED);}
         else if(tokens[slot].isEmpty()||positions[slot]==null)
             statuses[slot]=tokens[slot].isEmpty()?Status.NO_DRILL:Status.WAITING;
         else if(level instanceof ServerLevel server){
@@ -234,8 +236,15 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         setChanged();syncIfServer();
     }
     public void stop(Status reason){stop(activeSlot,reason);}
+    private void releaseDrillSupplies(int slot){
+        if(slot<0||slot>=MAX_DRILLS || !(level instanceof ServerLevel server)
+                || positions[slot]==null || !server.hasChunkAt(positions[slot]))return;
+        if(server.getBlockEntity(positions[slot]) instanceof DrillEntity drill
+                && drill.matchesLink(tokens[slot]))drill.pauseSupply(server);
+    }
     public void stop(int slot,Status reason){
         if(slot<0||slot>=MAX_DRILLS)return;
+        releaseDrillSupplies(slot);
         running[slot]=false;statuses[slot]=reason;setChanged();syncIfServer();
     }
     public void moved(String token,BlockPos oldPos,BlockPos newPos){
