@@ -64,6 +64,18 @@ public final class RigNetwork {
                     return true;
         return false;
     }
+    /**
+     * Return unneeded reserved wall/filler material to the connected CC
+     * network's ordinary output stream without filling the drill's 64-item
+     * mining buffer and prematurely stopping the restarted excavation.
+     */
+    public static boolean returnSurplus(ServerLevel world,DrillEntity drill,ItemStack stack){
+        if(stack.isEmpty())return true;
+        List<ItemStack> cargo=List.of(stack);
+        for(CoordinatorEntity cc:members(world,drill))
+            if(cc.canReceive(cargo) && cc.receive(cargo))return true;
+        return false;
+    }
     public static boolean hasOutput(ServerLevel world,DrillEntity drill){
         for(CoordinatorEntity cc:members(world,drill))
             if(hasOutputHere(world,cc))return true;

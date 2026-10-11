@@ -145,6 +145,7 @@ final class WallSupplyPipeline {
     }
     private static void refund(ServerLevel world,DrillEntity drill,ItemStack stack){
         if(stack.isEmpty())return;
+        if(RigNetwork.returnSurplus(world,drill,stack))return;
         if(!drill.receive(List.of(stack)))
             Block.popResource(world,drill.getBlockPos(),stack.copy());
     }

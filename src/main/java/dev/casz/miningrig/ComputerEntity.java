@@ -40,7 +40,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         NO_FILLER_CONTAINER("No Filler input"),NO_WALL_CONTAINER("No Walls input"),
         NO_OUTPUT("No Output storage"),OUT_OF_FILLER("Out of Filler / Fluid in hole"),
         OUT_OF_WALLS("Out of Walls"), FLUID_IN_HOLE("Fluid in hole"),
-        FILL_FAILED("Fill blocked - help needed");
+        FILL_FAILED("Fill blocked - help needed"),
+        WALLING("Replacing walls"),FILLING("Sealing fluids");
         public final String display;
         Status(String value){display=value;}
     }
@@ -300,7 +301,11 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             }
             computer.activeSlot=i;
             Status result=drill.mineTick(server,computer);
-            if(result!=Status.RUNNING)computer.stop(i,result);
+            if(result==Status.RUNNING||result==Status.WALLING||result==Status.FILLING){
+                if(computer.statuses[i]!=result){
+                    computer.statuses[i]=result;computer.setChanged();
+                }
+            }else computer.stop(i,result);
         }
         computer.syncActiveChunks(server);
         if(now%10==0){
