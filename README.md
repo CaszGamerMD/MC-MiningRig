@@ -1,10 +1,26 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.4.1 — coordinator visual overhaul and portable computer tablet**
+**Version 0.4.2 — accurate layer scheduling, reverse supply transport, compact CCs and tablet fixes**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.4.2: in-game feedback fixes
+
+**Collection Coordinator proportions:** steel housing is **4 model pixels smaller overall**, 12-pixel-wide centered body, leaving 2 pixels on either side for its adaptive input hopper, output pipe, and teal link panel. Attachments are inset to fit inside the one-block envelope. A geometry audit over 13 block models found **no coplanar outward-facing element overlaps** after transformation; Minecraft shaders and actual textures still need live review.
+
+**Bidirectional item visualization:** mined-item packets leaving the drill and CC are now rendered at **55% of the GROUND-item model size**, up from 25%. Filler/Wall input stock is reserved only when a drill specifically requests it, and an untouchable ground-model item visibly travels from the source chest through its CC-to-CC route to the drill *before* placement. Supply identity, path and current progress are persisted in the moving drill block; breaking the drill refunds/drops a reserved supply rather than deleting it. Reverse transit sends one requested block per trip while ordinary mining output remains batched to a maximum of three items per packet.
+
+**Layer order:** every working Y-level runs **Wall Step → Fluid Step → Mining Step**. Wall Off skips wall work; Air patches voids in the external ring from a Filler input; **Replace** (formerly Always) digs the one-block perimeter with legitimate bits then installs wall material. Only after wall work completes does fluid treatment examine the selected hole and one-block boundary. Normal core mining then clears the user-selected footprint and moves down by one Y. The drill's real **Layers: N / target** appears in the four-drill computer GUI to diagnose early stoppages. Falling-block debris that drops into the drill's next downward position is mined if its tier allows, instead of immediately ending the descent. Unbreakable blocks still halt mining.
+
+**Tool cost on placement:** wall/filler placement has a tool-dependent preparation speed equal to **1.3× the corresponding stone mining duration**. Each successful placement consumes standard mining-bit durability with a **30% chance of an extra wear roll** (both rolls respect Unbreaking). Replace-mode boundary excavation still requires and damages a suitable mining bit.
+
+**Unfillable spots:** falling sand/gravel, fluid displacement and other placement failures receive up to **24 attempts at a single target** with **8 game ticks between placed-block verification**. After that, the drill halts with **Fill blocked – help needed** instead of repeating indefinitely. This cannot diagnose every falling-block mod interaction, so test near gravity-affected blocks.
+
+**Mining Tablet:** a direction-specific thin selection/collision box fits the actual mounted tablet model rather than using a full cubic hitbox. The handheld tablet now keeps a **stable red/yellow/green state component** until the underlying machine's severity actually changes; blinking red/yellow lighting is a **client-side model flicker** rather than repeated server item replacement. Mounted tablets continue flashing normally.
+
+**Development test checklist:** run in a backed-up Minecraft 26.2 world; verify exactly 12 completed layers with surviving bits and available output, status when bits/storage halt early, the no-dupe descent transfer, falling sand retry/stop, wall-before-fluid behavior, reverse visual supply movement on multiple CC hops, bit wear with/without Unbreaking, CC face clipping, and handheld tablet stability.
 
 ## v0.4.1: redesigned Collection Coordinators and portable tablet
 
@@ -74,7 +90,7 @@ Right-click a CC and select one of its six direction boxes: **U, D, N, S, E, W**
 
 For an attached non-CC chest/container, click **Type** to cycle **Unassigned → Filler → Wall → Output**. When set to Wall, click **When Empty** to switch between **Pause** and **Continue**. Connected CC links are automatic and cannot be manually marked as item-direction-only; attached non-CC inventories are always one-way.
 
-Filler and wall inputs are **never automatically vacuumed**. A drill requests specific blocks as needed, and the network tries the **closest stocked input container first**, then other inputs in the same discovered CC component. Outputs are identified by CC faces set to Output. A drill must have an accessible Filler input and Output and, in Always mode, a Wall input **before starting**. Removing them mid-operation halts the drill with an error.
+Filler and wall inputs are **never automatically vacuumed**. A drill requests specific blocks as needed, and the network tries the **closest stocked input container first**, then other inputs in the same discovered CC component. Outputs are identified by CC faces set to Output. A drill must have an accessible Filler input and Output and, in Replace mode, a Wall input **before starting**. Removing them mid-operation halts the drill with an error.
 
 ### Fluid and wall behavior
 
@@ -84,7 +100,7 @@ The Mining Computer's **Wall** button cycles its per-drill **Wall the Hole** set
 
 - **Off:** Only repair actual fluid locations and nearby fluid boundaries.
 - **Air:** After each layer, fill every air/fluid opening in the one-block-wide outer wall with Filler blocks.
-- **Always:** Excavate one block beyond the chosen selection on every layer, then build the boundary using the separate Wall input.
+- **Replace:** Excavate one block beyond the chosen selection on every layer, then build the boundary using the separate Wall input.
   - **Wall → Pause:** If all wall inputs are exhausted, halt with **Out of Walls**.
   - **Wall → Continue:** Fall back to Air-style filling using Filler stock. The next untouched layer checks whether Wall material has been replenished.
 
@@ -147,6 +163,6 @@ One Collection Coordinator block handles all wireless item routing. Its internal
 
 Minecraft **26.2**, Fabric Loader **0.19.5**, Fabric API **0.161.0+26.2**, Java **25**, Gradle **9.7.0**, Loom **1.18.3**.
 
-Run `gradle build` using Java 25; or download the `caszual-mining-rig-0.4.1.jar` inside the `miningrig-26.2` artifact in the most recent successful GitHub Actions workflow.
+Run `gradle build` using Java 25; or download the `caszual-mining-rig-0.4.2.jar` inside the `miningrig-26.2` artifact in the most recent successful GitHub Actions workflow.
 
 **Status:** GitHub Actions compile verification is used, but it does *not* test actual Minecraft interaction, server permissions, chunk reloads, or multiplayer naming/GUI synchronization. Test in a backed-up world and treat this as a development build until in-game verified.
