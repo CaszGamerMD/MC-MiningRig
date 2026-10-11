@@ -80,6 +80,7 @@ public final class MiningRig implements ModInitializer {
                 new Item.Properties().pickaxe(material, 1.0f, -2.8f).durability(durability).enchantable(14));
     }
     @Override public void onInitialize() {
+        RigMachineSounds.initialize();
         RigChunkTickets.initialize();
         RigMenus.initialize();
         RigNetworking.initialize();

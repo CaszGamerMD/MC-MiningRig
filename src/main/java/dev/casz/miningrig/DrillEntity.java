@@ -41,6 +41,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private int page;
     private final DrillSealing sealing=new DrillSealing();
     private float placementCharge,wallWorkCharge;
+    private long lastCuttingAudioTick=Long.MIN_VALUE;
     private int placementBit=-1;
     private BlockPos wallWorkTarget;
     public int completedLayers(){return completedLayers;}
@@ -88,6 +89,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         completedLayers=0;cursor=0;workTicks=0;
         placementCharge=0;placementBit=-1;
         wallWorkCharge=0;wallWorkTarget=null;
+        lastCuttingAudioTick=Long.MIN_VALUE;
         for(int i=0;i<BIT_SLOTS;i++){assigned[i]=-1;progress[i]=0;}
         relocating=false;contentsDropped=false;
         // Binding comes exclusively from the newly placed item's pairing
@@ -210,6 +212,15 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         placementCharge+=speed(world,tool,Blocks.STONE.defaultBlockState())/1.3f;
         return placementCharge>=1;
     }
+    private void playCuttingAudio(ServerLevel world){
+        long now=world.getGameTime();
+        // Only one audio bed for all three concurrent bits; moving block
+        // entities carry the timer down to the next excavation level.
+        if(lastCuttingAudioTick!=Long.MIN_VALUE && now>=lastCuttingAudioTick
+                && now-lastCuttingAudioTick<24)return;
+        lastCuttingAudioTick=now;
+        RigMachineSounds.cutting(world,worldPosition);
+    }
     private void damageBit(ServerLevel world,int slot,float multiplier){
         if(slot<0||slot>=BIT_SLOTS)return;
         ItemStack bit=items.get(slot);
@@ -250,6 +261,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         int efficiency=enchantmentLevel(world,items.get(slot),Enchantments.EFFICIENCY);
         if(efficiency>0)power+=efficiency*efficiency+1;
         float hardness=state.getDestroySpeed(world,target);
+        playCuttingAudio(world);
         wallWorkCharge+=hardness<=0?1:Math.min(1,power/Math.max(.00001f,hardness*30.0f));
         if(wallWorkCharge<1)return ComputerEntity.Status.RUNNING;
         List<ItemStack> drops=Block.getDrops(state,world,target,null,null,items.get(slot));
@@ -324,6 +336,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
             }
             if(state.getDestroySpeed(world,p)<0 || state.hasBlockEntity() || !drillBit.canMine(state))
                 return ComputerEntity.Status.BLOCKED;
+            playCuttingAudio(world);
             progress[lane]+=speed(world,bit,state);
             if(progress[lane]<1.0f)continue;
             List<ItemStack> drops=Block.getDrops(state,world,p,null,null,bit);
@@ -384,6 +397,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         moved.computerDimension=computerDimension;
         moved.linkConfirmed=linkConfirmed;
         moved.lastControllerTick=lastControllerTick;
+        moved.lastCuttingAudioTick=lastCuttingAudioTick;
         moved.placementCharge=placementCharge;
         moved.placementBit=placementBit;
         sealing.copyTo(moved.sealing);

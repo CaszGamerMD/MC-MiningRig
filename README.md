@@ -1,10 +1,20 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.4.7 — tablet texture repair and two-stage filler caches**
+**Version 0.4.8 — positional machinery audio**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.4.8 — quiet machine sounds
+
+- **Collection Coordinator:** A very soft, low electrical ambient hum plays from the CC's position while it is loaded, using the **Blocks** audio slider. Nearby CCs have staggered playback phases so they do not all restart simultaneously. Default sound volume is **10%** of normal.
+- **Mining Drill:** A subdued mechanical grinding sound starts during **actual block excavation** (including clearing wall blocks in Replace mode), repeats at most once every **24 ticks**, and moves with the drill as it descends. With all three drill bits running, the machine still plays only **one sound bed**, not three overlapping copies. Sound volume is **36%** of normal.
+- **No idle drilling:** The drilling sound does **not** start while the drill is paused, stopped, out of bits, verifying placements, or waiting for Filler and Wall stock. Playback naturally finishes when cutting stops.
+- **Sound sources:** This first pass references compatible, built-in Minecraft beacon-ambient and grindstone sounds through registered mod sound events, so it requires **no external resource pack** or extra dependencies. The source effects can be replaced by original recordings later without changing the machine logic.
+- **Audio controls:** Both are positional and respect Minecraft's **Blocks** sound slider. Each sound has a subtitle for accessibility.
+
+Please check the balance around several connected CCs, next to a digging drill, during ocean fluid recovery (drilling should stop), and when the drill descends. GitHub Actions verifies code compilation but not perceived audio loudness.
 
 ## v0.4.7 — Fixed handheld tablet and two-stage filler buffering
 
