@@ -57,7 +57,7 @@ final class CoordinatorFillerCache {
             Math.abs(a.getZ()-b.getZ());
         return Math.max(2,(int)Math.ceil(d*0.8));
     }
-    private void moveDisplay(ServerLevel world,Flight f){
+    private void moveDisplay(ServerLevel world,CoordinatorEntity cc,Flight f){
         List<BlockPos> path=f.cargo.path();
         if(path.size()<2)return;
         if(f.visual==null){
@@ -73,6 +73,7 @@ final class CoordinatorFillerCache {
                 new org.joml.Vector3f(),new org.joml.Quaternionf(),
                 new org.joml.Vector3f(.55f,.55f,.55f),new org.joml.Quaternionf()));
             display.setNoGravity(true);
+            RigMachineVisuals.tag(display,cc.getBlockPos());
             BlockPos first=path.get(0);
             display.setPos(first.getX()+.5,first.getY()+.55,first.getZ()+.5);
             world.addFreshEntity(display);
@@ -111,7 +112,7 @@ final class CoordinatorFillerCache {
                 f.discard();
                 inbound.remove(i);
                 changed=true;
-            }else {moveDisplay(world,f);i++;}
+            }else {moveDisplay(world,cc,f);i++;}
         }
         // The supply cache exists only during active FILLING mode. It is not
         // general coordinator inventory and cannot be routed out by mistake.
@@ -161,6 +162,11 @@ final class CoordinatorFillerCache {
         if(remainder.isEmpty())return;
         if(cc.canReceive(List.of(remainder))&&cc.receive(List.of(remainder)))return;
         Block.popResource(world,cc.getBlockPos(),remainder);
+    }
+    void collectVisualIds(java.util.Set<java.util.UUID> active){
+        for(Flight flight:inbound)
+            if(flight.visual!=null && flight.visual.isAlive())
+                active.add(flight.visual.getUUID());
     }
     void flush(ServerLevel world,CoordinatorEntity cc){
         for(Flight f:inbound){
