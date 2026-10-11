@@ -35,6 +35,9 @@ public final class CoordinatorMenu extends AbstractContainerMenu {
         }
         addStandardInventorySlots(player,8,166);
     }
+    public CoordinatorEntity coordinator(){
+        return coordinator instanceof PagedRigContainer view?view.coordinator():null;
+    }
     public int mode(Direction side){return data.get(side.get3DDataValue());}
     public boolean connected(Direction side){return ((data.get(6)>>>side.get3DDataValue())&1)!=0;}
     public boolean drillSide(Direction side){return ((data.get(10)>>>side.get3DDataValue())&1)!=0;}
