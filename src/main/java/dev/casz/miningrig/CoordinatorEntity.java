@@ -50,7 +50,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         containerNames[slot]=value.strip().replace('\n',' ').replace('\r',' ').replace('\t',' ');
         setChanged();return true;
     }
-    private int wirelessMask,adjacentMask,drillMask,page;
+    private int wirelessMask,adjacentMask,drillMask,page,collectorCursor;
     private boolean dropped;
     private final List<Flight> flights=new ArrayList<>();
     // Independent supply buffer, never mixed with normal mined-item output.
@@ -62,11 +62,15 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         return (walls?wallDepot:fillerDepot).take(drill,this,amount);
     }
     void returnWallCache(ServerLevel world,DrillEntity drill){
-        if(drillBelow(world)==drill)wallDepot.flush(world,this);
+        if(RigNetwork.nearestDrillCoordinator(world,drill)==this)wallDepot.flush(world,this);
     }
     /** Synchronously refund both CC depots before a paused rig unloads chunks. */
     void returnCachedSupplies(ServerLevel world,DrillEntity drill){
-        if(drillBelow(world)!=drill)return;
+        if(RigNetwork.nearestDrillCoordinator(world,drill)!=this)return;
+        for(DrillEntity other:serviceDrills(world)){
+            if(other!=drill && (other.activelyFilling(world)||other.activelyWalling(world)))
+                return; // Shared depot still belongs to another active drill
+        }
         fillerDepot.flush(world,this);
         wallDepot.flush(world,this);
     }
@@ -139,9 +143,19 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         }
         return null;
     }
-    DrillEntity drillBelow(ServerLevel world){
+    java.util.List<DrillEntity> serviceDrills(ServerLevel world){
+        java.util.List<DrillEntity> result=new java.util.ArrayList<>();
         for(DrillEntity drill:RigTopology.drills(world,worldPosition))
-            if(RigNetwork.nearestDrillCoordinator(world,drill)==this)return drill;
+            if(RigNetwork.nearestDrillCoordinator(world,drill)==this)result.add(drill);
+        return result;
+    }
+    DrillEntity drillBelow(ServerLevel world){
+        java.util.List<DrillEntity> connected=serviceDrills(world);
+        return connected.isEmpty()?null:connected.get(0);
+    }
+    DrillEntity supplying(ServerLevel world,boolean wall){
+        for(DrillEntity drill:serviceDrills(world))
+            if(wall?drill.activelyWalling(world):drill.activelyFilling(world))return drill;
         return null;
     }
     private void refresh(ServerLevel world){
@@ -179,9 +193,8 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         if(now%10==0)cc.refresh(world);
         RigMachineSounds.coordinatorTick(world,pos);
         cc.advance(world,now);
-        DrillEntity linkedDrill=cc.drillBelow(world);
-        cc.fillerDepot.tick(world,cc,linkedDrill);
-        cc.wallDepot.tick(world,cc,linkedDrill);
+        cc.fillerDepot.tick(world,cc,cc.supplying(world,false));
+        cc.wallDepot.tick(world,cc,cc.supplying(world,true));
         if(now%20==0)for(net.minecraft.server.level.ServerPlayer player:world.players())
             if(player.containerMenu instanceof CoordinatorMenu menu && menu.coordinator()==cc){
                 StringBuilder names=new StringBuilder();
@@ -248,12 +261,20 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         int budget=route?PACKET_SIZE:
             Math.min(PACKET_SIZE,Math.max(0,freeStorage()-inboundFromDrill()));
         if(budget==0)return;
-        DrillEntity drill=drillBelow(world);
-        if(drill==null)return;
-        List<ItemStack> cargo=peek(drill,DrillEntity.BIT_SLOTS,budget);
-        if(cargo.isEmpty()||!canReceive(cargo))return;
-        List<ItemStack> taken=take(drill,DrillEntity.BIT_SLOTS,budget);
-        if(!taken.isEmpty())startFlight(world,taken,drill.getBlockPos(),worldPosition,true,now);
+        List<DrillEntity> connected=serviceDrills(world);
+        if(connected.isEmpty())return;
+        for(int n=0;n<connected.size();n++){
+            int index=Math.floorMod(collectorCursor+n,connected.size());
+            DrillEntity drill=connected.get(index);
+            List<ItemStack> cargo=peek(drill,DrillEntity.BIT_SLOTS,budget);
+            if(cargo.isEmpty()||!canReceive(cargo))continue;
+            List<ItemStack> taken=take(drill,DrillEntity.BIT_SLOTS,budget);
+            if(!taken.isEmpty()){
+                collectorCursor=(index+1)%connected.size();
+                startFlight(world,taken,drill.getBlockPos(),worldPosition,true,now);
+                return;
+            }
+        }
     }
     private boolean outputToContainer(ServerLevel world){
         for(Direction side:Direction.values()){
