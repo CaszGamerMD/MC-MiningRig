@@ -1,0 +1,20 @@
+{
+  "coordinator_hum": {
+    "subtitle": "subtitles.miningrig.coordinator_hum",
+    "sounds": [
+      {
+        "name": "minecraft:block.beacon.ambient",
+        "type": "event"
+      }
+    ]
+  },
+  "drill_grind": {
+    "subtitle": "subtitles.miningrig.drill_grind",
+    "sounds": [
+      {
+        "name": "minecraft:block.grindstone.use",
+        "type": "event"
+      }
+    ]
+  }
+}
