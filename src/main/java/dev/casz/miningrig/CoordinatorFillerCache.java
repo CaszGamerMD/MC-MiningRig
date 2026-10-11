@@ -124,11 +124,14 @@ final class CoordinatorFillerCache {
             if(changed)cc.setChanged();
             return;
         }
+        // Replace can calculate its exact ring demand, unlike unpredictable
+        // ocean fluid flow. Do not vacuum 192 Wall blocks for a 16-block ring.
+        int target=walls?Math.min(CAPACITY,drill.wallDepotTarget()):CAPACITY;
         int spawned=0;
-        while(stored()<CAPACITY && inbound.size()<MAX_FLIGHTS
+        while(stored()<target && inbound.size()<MAX_FLIGHTS
                 && spawned<DISPATCH_PER_TICK){
             RigNetwork.Supply cargo=RigNetwork.reserveForCache(world,drill,walls,
-                Math.min(PACKET,CAPACITY-stored()));
+                Math.min(PACKET,target-stored()));
             if(cargo==null)break;
             if(cargo.path().size()<2)available.add(cargo);
             else inbound.add(new Flight(cargo,0));
