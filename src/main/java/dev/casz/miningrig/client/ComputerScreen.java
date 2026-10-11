@@ -1,121 +1,241 @@
 package dev.casz.miningrig.client;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import dev.casz.miningrig.ComputerMenu;
 import dev.casz.miningrig.ComputerRenamePayload;
+import dev.casz.miningrig.ComputerSettingsPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 
-/** Four readable drill status cards, with controls and a text box to rename selected drill. */
+/** Full-screen black/green console, shared by placed computer and tablet. */
 public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
+    private static final int GREEN=0xff72ff9b,MUTED=0xff9bbbad,WHITE=0xffe5fff0;
+    private static final int DARK=0xff060f0b,PANEL=0xff122319;
     private final String[][] rows=new String[4][11];
-    private int selected;
-    private EditBox rename;
-    private boolean initial=true;
+    private final List<String[]> storage=new ArrayList<>();
+    private final List<Button> drillButtons=new ArrayList<>();
+    private int selected,tab,storagePage;
+    private boolean initial=true,alert;
+    private EditBox rename,radius,depth,tries;
+    private Button drillTab,networkTab,prev,next;
+    private int bodyTop,editorTop;
     public ComputerScreen(ComputerMenu menu,Inventory player,Component title){
-        super(menu,player,title,360,330);
-        titleLabelY=8;inventoryLabelY=326;
-        for(int i=0;i<4;i++){
+        super(menu,player,title,460,330);
+        for(int i=0;i<4;i++)
             rows[i]=new String[]{"0","Drill "+(i+1),"Not placed","Empty","-1","2","12","O","0","0","24"};
-        }
+        titleLabelY=7;inventoryLabelY=9000;
     }
     private void click(int id){
         if(minecraft.gameMode!=null)minecraft.gameMode.handleInventoryButtonClick(menu.containerId,id);
     }
+    private Button add(String name,int x,int y,int w,int h,int id,boolean drillOnly){
+        Button button=addRenderableWidget(Button.builder(Component.literal(name),b->click(id))
+            .bounds(x,y,w,h).build());
+        if(drillOnly)drillButtons.add(button);
+        return button;
+    }
     @Override protected void init(){
+        imageWidth=Math.max(460,width-24);
+        imageHeight=Math.max(310,height-24);
         super.init();
+        bodyTop=topPos+80;
+        editorTop=topPos+imageHeight-112;
+        drillButtons.clear();
+        drillTab=addRenderableWidget(Button.builder(Component.literal("DRILLS"),b->{
+            tab=0;refreshTabs();
+        }).bounds(leftPos+12,topPos+32,96,22).build());
+        networkTab=addRenderableWidget(Button.builder(Component.literal("NETWORK STORAGE"),b->{
+            tab=1;refreshTabs();
+        }).bounds(leftPos+112,topPos+32,142,22).build());
+        add("START ALL",leftPos+imageWidth-352,topPos+32,108,22,42,true);
+        add("STOP ALL",leftPos+imageWidth-240,topPos+32,108,22,43,true);
+        add("MUTE ALERT",leftPos+imageWidth-128,topPos+32,116,22,41,false);
+        int rowHeight=Math.max(36,Math.min(57,(editorTop-bodyTop-12)/4));
+        int x=leftPos+imageWidth-290;
         for(int i=0;i<4;i++){
-            final int n=i;
-            addRenderableWidget(Button.builder(Component.literal("Select"),btn->click(n))
-                .bounds(leftPos+260,topPos+20+i*48,48,19).build());
-            addRenderableWidget(Button.builder(Component.literal("Start/Stop"),btn->click(10+n))
-                .bounds(leftPos+260,topPos+41+i*48,86,17).build());
+            int n=i,y=bodyTop+i*rowHeight;
+            add("SELECT",x,y+2,66,21,n,true);
+            add("START/STOP",x+70,y+2,95,21,10+n,true);
+            add("RESET",x+169,y+2,58,21,50+n,true);
+            add("REMOVE",x+231,y+2,58,21,20+n,true);
         }
-        addRenderableWidget(Button.builder(Component.literal("R-"),b->click(30)).bounds(leftPos+8,topPos+223,36,18).build());
-        addRenderableWidget(Button.builder(Component.literal("R+"),b->click(31)).bounds(leftPos+46,topPos+223,36,18).build());
-        addRenderableWidget(Button.builder(Component.literal("D-"),b->click(32)).bounds(leftPos+91,topPos+223,36,18).build());
-        addRenderableWidget(Button.builder(Component.literal("D+"),b->click(33)).bounds(leftPos+129,topPos+223,36,18).build());
-        addRenderableWidget(Button.builder(Component.literal("Shape"),b->click(34)).bounds(leftPos+171,topPos+223,43,18).build());
-        addRenderableWidget(Button.builder(Component.literal("Wall"),b->click(35))
-            .bounds(leftPos+216,topPos+223,55,18).build());
-        addRenderableWidget(Button.builder(Component.literal("Unlink"),b->click(20+selected))
-            .bounds(leftPos+274,topPos+223,74,18).build());
-        // Safety control is shared by the local block UI and remote tablet.
-        // The limit applies separately at EVERY fill coordinate, not to
-        // the total number of blocks in the hole.
-        addRenderableWidget(Button.builder(Component.literal("-25"),b->click(38))
-            .bounds(leftPos+156,topPos+253,42,18).build());
-        addRenderableWidget(Button.builder(Component.literal("-1"),b->click(36))
-            .bounds(leftPos+201,topPos+253,42,18).build());
-        addRenderableWidget(Button.builder(Component.literal("+1"),b->click(37))
-            .bounds(leftPos+246,topPos+253,42,18).build());
-        addRenderableWidget(Button.builder(Component.literal("+25"),b->click(39))
-            .bounds(leftPos+291,topPos+253,58,18).build());
-        rename=new EditBox(font,leftPos+8,topPos+296,236,19,Component.literal("Drill nickname"));
-        rename.setMaxLength(24);rename.setValue(rows[selected][1]);
+        // RESET is handled through the selected-drill control, never by unlink.
+        add("RESET TASK",leftPos+14,editorTop+79,104,22,40,true);
+        add("RESCAN",leftPos+122,editorTop+79,85,22,44,true);
+        add("SHAPE",leftPos+211,editorTop+79,68,22,34,true);
+        add("WALL MODE",leftPos+283,editorTop+79,103,22,35,true);
+        prev=addRenderableWidget(Button.builder(Component.literal("PREVIOUS"),b->{
+            storagePage=Math.max(0,storagePage-1);
+        }).bounds(leftPos+imageWidth-205,topPos+58,93,19).build());
+        next=addRenderableWidget(Button.builder(Component.literal("NEXT"),b->{
+            storagePage++;
+        }).bounds(leftPos+imageWidth-108,topPos+58,93,19).build());
+        int fieldY=editorTop+30;
+        rename=new EditBox(font,leftPos+14,fieldY,Math.max(96,(imageWidth-375)/2),20,
+            Component.literal("Drill nickname"));
+        rename.setMaxLength(24);
+        rename.setValue(rows[selected][1]);
         addRenderableWidget(rename);
-        addRenderableWidget(Button.builder(Component.literal("Save name"),b->{
+        addRenderableWidget(Button.builder(Component.literal("SAVE NAME"),b->{
             ClientPlayNetworking.send(new ComputerRenamePayload(selected,rename.getValue()));
-        }).bounds(leftPos+250,topPos+296,99,19).build());
+        }).bounds(leftPos+18+rename.getWidth(),fieldY,83,20).build());
+        int first=leftPos+Math.max(235,imageWidth/2);
+        radius=new EditBox(font,first,fieldY,48,20,Component.literal("Radius"));
+        depth=new EditBox(font,first+78,fieldY,48,20,Component.literal("Depth"));
+        tries=new EditBox(font,first+156,fieldY,65,20,Component.literal("Fill tries"));
+        for(EditBox box:new EditBox[]{radius,depth,tries}){
+            box.setMaxLength(5);addRenderableWidget(box);
+        }
+        addRenderableWidget(Button.builder(Component.literal("APPLY"),b->{
+            try{
+                ClientPlayNetworking.send(new ComputerSettingsPayload(selected,
+                    Integer.parseInt(radius.getValue().strip()),
+                    Integer.parseInt(depth.getValue().strip()),
+                    Integer.parseInt(tries.getValue().strip())));
+            }catch(NumberFormatException ignored){}
+        }).bounds(first+225,fieldY,62,20).build());
+        updateFields();
+        refreshTabs();
+    }
+    private void updateFields(){
+        if(rename!=null)rename.setValue(rows[selected][1]);
+        if(radius!=null)radius.setValue(rows[selected][5]);
+        if(depth!=null)depth.setValue(rows[selected][6]);
+        if(tries!=null)tries.setValue(rows[selected][10]);
+    }
+    private void refreshTabs(){
+        boolean drilling=tab==0;
+        for(Button button:drillButtons)button.visible=drilling;
+        prev.visible=!drilling;next.visible=!drilling;
+        for(EditBox input:new EditBox[]{rename,radius,depth,tries})
+            if(input!=null){input.visible=drilling;input.setFocused(false);}
+        // Name and APPLY widgets are rendered only on the Drill page via their layout region.
+    }
+    @Override public boolean keyPressed(KeyEvent event){
+        for(EditBox box:new EditBox[]{rename,radius,depth,tries})
+            if(box!=null&&box.isFocused()&&!event.isEscape()){
+                box.keyPressed(event);
+                return true; // suppress E/inventory and other gameplay bindings
+            }
+        return super.keyPressed(event);
     }
     public void updateState(String raw){
         String[] lines=raw.split("\n",-1);
         if(lines.length<5)return;
-        try {
-            int next=Integer.parseInt(lines[0]);
-            if(next<0||next>3)return;
-            boolean changed=next!=selected || initial;
-            selected=next;initial=false;
+        try{
+            int nextSelected=Integer.parseInt(lines[0]);
+            if(nextSelected<0||nextSelected>=4)return;
+            boolean changed=nextSelected!=selected||initial;
+            selected=nextSelected;initial=false;
             for(int i=0;i<4;i++){
-                String[] entry=lines[i+1].split("\t",-1);
-                if(entry.length>=11)rows[i]=Arrays.copyOf(entry,11);
+                String[] values=lines[i+1].split("\t",-1);
+                if(values.length>=11)rows[i]=Arrays.copyOf(values,11);
             }
-            if(changed && rename!=null)rename.setValue(rows[selected][1]);
+            storage.clear();
+            for(int i=5;i<lines.length;i++){
+                String[] parts=lines[i].split("\t",-1);
+                if(parts.length>=2&&parts[0].equals("ALERT"))alert=parts[1].equals("1");
+                if(parts.length>=6&&parts[0].equals("STORAGE"))
+                    storage.add(Arrays.copyOf(parts,6));
+            }
+            if(changed)updateFields();
+            storagePage=Math.min(storagePage,Math.max(0,(storage.size()-1)/10));
         }catch(NumberFormatException ignored){}
     }
-    private static String eta(String s){
+    @Override public void containerTick(){
+        super.containerTick();
+        // The text boxes remain editable until APPLY; server snapshots don't stomp focus.
+        refreshButtonLabels();
+    }
+    private void refreshButtonLabels(){
+        drillTab.setMessage(Component.literal(tab==0?"[ DRILLS ]":"DRILLS"));
+        networkTab.setMessage(Component.literal(tab==1?"[ NETWORK STORAGE ]":"NETWORK STORAGE"));
+    }
+    private static String eta(String value){
         try{
-            int seconds=Integer.parseInt(s);
-            if(seconds<0)return "ETA: --";
-            if(seconds==0)return "ETA: Complete";
-            if(seconds>=3600)return "ETA ~"+(seconds/3600)+"h "+((seconds%3600)/60)+"m";
-            if(seconds>=60)return "ETA ~"+(seconds/60)+"m "+(seconds%60)+"s";
-            return "ETA ~"+seconds+"s";
-        }catch(NumberFormatException e){return "ETA: --";}
+            int seconds=Integer.parseInt(value);
+            if(seconds<0)return "--";
+            if(seconds==0)return "Complete";
+            if(seconds>=3600)return (seconds/3600)+"h "+((seconds%3600)/60)+"m";
+            if(seconds>=60)return (seconds/60)+"m "+(seconds%60)+"s";
+            return seconds+"s";
+        }catch(NumberFormatException e){return "--";}
     }
     @Override public void extractBackground(GuiGraphicsExtractor g,int mx,int my,float delta){
-        g.fill(leftPos,topPos,leftPos+imageWidth,topPos+imageHeight,0xff13202b);
-        for(int i=0;i<4;i++){
-            int y=topPos+18+i*48;
-            g.fill(leftPos+5,y,leftPos+354,y+46,i==selected?0xff315970:0xff243742);
-            g.fill(leftPos+5,y,leftPos+8,y+46,i==selected?0xff64cbff:0xff647885);
+        g.fill(0,0,width,height,0xff020604);
+        g.fill(leftPos,topPos,leftPos+imageWidth,topPos+imageHeight,DARK);
+        g.fill(leftPos+5,topPos+5,leftPos+imageWidth-5,topPos+27,PANEL);
+        g.fill(leftPos+8,topPos+28,leftPos+imageWidth-8,topPos+78,0xff0c1e13);
+        if(tab==0){
+            int rowHeight=Math.max(36,Math.min(57,(editorTop-bodyTop-12)/4));
+            for(int i=0;i<4;i++){
+                int y=bodyTop+i*rowHeight;
+                g.fill(leftPos+8,y,leftPos+imageWidth-8,y+rowHeight-3,
+                    i==selected?0xff1c4230:0xff11271b);
+                g.fill(leftPos+8,y,leftPos+11,y+rowHeight-3,
+                    i==selected?GREEN:0xff365d45);
+            }
+            g.fill(leftPos+8,editorTop,leftPos+imageWidth-8,
+                topPos+imageHeight-6,PANEL);
+        }else{
+            g.fill(leftPos+8,bodyTop,leftPos+imageWidth-8,
+                topPos+imageHeight-8,PANEL);
         }
-        g.fill(leftPos+5,topPos+218,leftPos+354,topPos+246,0xff263946);
-        g.fill(leftPos+5,topPos+250,leftPos+354,topPos+276,0xff263946);
-        g.fill(leftPos+5,topPos+285,leftPos+354,topPos+322,0xff263946);
     }
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mx,int my,float delta){
         super.extractRenderState(g,mx,my,delta);
-        for(int i=0;i<4;i++){
-            String[] r=rows[i];
-            int y=topPos+22+i*48;
-            String name=r[1].length()>21?r[1].substring(0,21):r[1];
-            g.text(font,(i+1)+". "+name,leftPos+13,y,0xffd5edff,false);
-            g.text(font,"XYZ: "+r[2],leftPos+13,y+12,0xffa0c4d5,false);
-            g.text(font,"Layers: "+r[9]+"/"+r[6],leftPos+160,y+12,0xffffeab3,false);
-            String status=r[3].length()>23?r[3].substring(0,23):r[3];
-            g.text(font,status,leftPos+13,y+24,0xfffee0a4,false);
-            g.text(font,eta(r[4]),leftPos+140,y+24,0xff8bffae,false);
+        g.text(font,"CASZUAL MINING COMPUTER",leftPos+14,topPos+12,GREEN,false);
+        if(alert)g.text(font,"! ACTIVE ALERT !",leftPos+imageWidth-126,topPos+14,
+            0xffff7777,false);
+        if(tab==0){
+            int rowHeight=Math.max(36,Math.min(57,(editorTop-bodyTop-12)/4));
+            for(int i=0;i<4;i++){
+                String[] r=rows[i];
+                int y=bodyTop+i*rowHeight;
+                String name=r[1].length()>26?r[1].substring(0,26):r[1];
+                g.text(font,(i+1)+". "+name,leftPos+16,y+4,WHITE,false);
+                g.text(font,r[3],leftPos+16,y+16,GREEN,false);
+                g.text(font,"XYZ "+r[2]+"   |   "+r[9]+"/"+r[6]+" layers   |   ETA "+eta(r[4]),
+                    leftPos+16,y+29,MUTED,false);
+            }
+            g.text(font,"SELECTED DRILL SETTINGS",leftPos+16,editorTop+6,GREEN,false);
+            g.text(font,"Nickname",leftPos+14,editorTop+20,MUTED,false);
+            int first=leftPos+Math.max(235,imageWidth/2);
+            g.text(font,"Radius",first,editorTop+19,MUTED,false);
+            g.text(font,"Depth",first+78,editorTop+19,MUTED,false);
+            g.text(font,"Fill tries",first+156,editorTop+19,MUTED,false);
+            g.text(font,"Footprint: "+(rows[selected][7].equals("O")?"Circle":"Square")
+                +"   Wall: "+switch(rows[selected][8]){
+                    case "1"->"Air";case "2"->"Replace";default->"Off";
+                },leftPos+14,editorTop+60,WHITE,false);
+        }else{
+            g.text(font,"CONNECTED CONTAINER VOLUMES    "+storage.size()+" total",
+                leftPos+16,topPos+63,GREEN,false);
+            g.text(font,"NAME",leftPos+18,bodyTop+12,GREEN,false);
+            g.text(font,"TYPE",leftPos+imageWidth/3,bodyTop+12,GREEN,false);
+            g.text(font,"COORDINATES",leftPos+imageWidth*2/3-56,bodyTop+12,GREEN,false);
+            g.text(font,"ITEMS",leftPos+imageWidth-88,bodyTop+12,GREEN,false);
+            int last=Math.min(storage.size(),(storagePage+1)*10);
+            for(int i=storagePage*10;i<last;i++){
+                String[] record=storage.get(i);
+                int y=bodyTop+31+(i-storagePage*10)*19;
+                g.fill(leftPos+14,y-2,leftPos+imageWidth-14,y+15,
+                    (i%2==0)?0xff1a3222:0xff12281b);
+                g.text(font,record[1],leftPos+18,y,WHITE,false);
+                g.text(font,record[2],leftPos+imageWidth/3,y,MUTED,false);
+                g.text(font,record[3],leftPos+imageWidth*2/3-56,y,MUTED,false);
+                g.text(font,record[4]+"/"+record[5],leftPos+imageWidth-88,y,GREEN,false);
+            }
+            g.text(font,"Page "+(storagePage+1)+"/"+Math.max(1,(storage.size()+9)/10),
+                leftPos+imageWidth-191,topPos+imageHeight-18,MUTED,false);
         }
-        g.text(font,"Selected: R "+rows[selected][5]+" | D "+rows[selected][6]
-            +" | "+(rows[selected][7].equals("O")?"Circle":"Square")+" | Wall: "+switch(rows[selected][8]){case "1"->"Air";case "2"->"Replace";default->"Off";},leftPos+9,topPos+207,0xffffffff,false);
-        g.text(font,"Fill tries / block: "+rows[selected][10],
-            leftPos+9,topPos+257,0xffbde4f5,false);
-        g.text(font,"Nickname for selected drill:",leftPos+9,topPos+286,0xffbde4f5,false);
     }
 }
