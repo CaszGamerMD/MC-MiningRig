@@ -27,19 +27,12 @@ import net.minecraft.world.level.block.state.BlockState;
  */
 public final class RigNetwork {
     private RigNetwork(){}
-    public static final int FILLER=1, WALL_PAUSE=2, WALL_CONTINUE=3, OUTPUT=4;
+    public static final int FILLER=1, WALL_PAUSE=2, WALL_CONTINUE=3, OUTPUT=4, HARDWARE=5;
     private record Source(CoordinatorEntity coordinator,Direction side,Container container,BlockPos pos,int distance){}
 
     public static List<CoordinatorEntity> members(ServerLevel world,DrillEntity drill){
-        CoordinatorEntity start=null;
-        BlockPos at=drill.getBlockPos();
-        for(int y=1;y<=20;y++){
-            BlockPos p=at.above(y);
-            if(!world.hasChunkAt(p))break;
-            if(world.getBlockEntity(p) instanceof CoordinatorEntity cc){start=cc;break;}
-        }
-        if(start==null)return List.of();
-        return component(world,start);
+        CoordinatorEntity start=nearestDrillCoordinator(world,drill);
+        return start==null?List.of():component(world,start);
     }
     public static List<CoordinatorEntity> component(ServerLevel world,CoordinatorEntity start){
         Queue<CoordinatorEntity> pending=new ArrayDeque<>();
@@ -119,7 +112,68 @@ public final class RigNetwork {
         result.sort(Comparator.comparingInt(Source::distance));
         return result;
     }
-    public static boolean isFiller(ItemStack stack){
+    public static boolean isHardware(ItemStack stack){
+        return stack.getItem() instanceof DrillBit || stack.is(MiningRig.COORDINATOR.asItem());
+    }
+    /** Reserve a single hardware item along the connected CC network. */
+    @org.jetbrains.annotations.Nullable public static Supply reserveHardware(ServerLevel world,
+            CoordinatorEntity destination,boolean coordinator){
+        for(CoordinatorEntity cc:component(world,destination))
+            for(Direction side:Direction.values()){
+                if(cc.portMode(side)!=HARDWARE)continue;
+                Container box=cc.external(world,side);
+                if(box==null)continue;
+                Direction face=side.getOpposite();
+                int[] slots=box instanceof WorldlyContainer sided?sided.getSlotsForFace(face):null;
+                int count=slots==null?box.getContainerSize():slots.length;
+                for(int i=0;i<count;i++){
+                    int slot=slots==null?i:slots[i];
+                    if(slot<0||slot>=box.getContainerSize())continue;
+                    ItemStack stack=box.getItem(slot);
+                    if(stack.isEmpty()||!isHardware(stack)
+                        ||(coordinator?!stack.is(MiningRig.COORDINATOR.asItem())
+                            :!(stack.getItem() instanceof DrillBit)))continue;
+                    if(box instanceof WorldlyContainer sided &&
+                        !sided.canTakeItemThroughFace(slot,stack,face))continue;
+                    List<BlockPos> route=routeBetween(world,cc,destination);
+                    if(route.isEmpty())continue;
+                    ItemStack result=box.removeItem(slot,1);
+                    if(result.isEmpty())continue;
+                    box.setChanged();
+                    List<BlockPos> path=new ArrayList<>();
+                    path.add(cc.getBlockPos().relative(side));path.addAll(route);
+                    return new Supply(result,path,cc.getBlockPos().relative(side),face);
+                }
+            }
+        return null;
+    }
+    private static List<BlockPos> routeBetween(ServerLevel world,
+            CoordinatorEntity source,CoordinatorEntity target){
+        Queue<CoordinatorEntity> queue=new ArrayDeque<>();
+        Map<BlockPos,BlockPos> prev=new HashMap<>();
+        Set<BlockPos> visited=new HashSet<>();
+        queue.add(source);visited.add(source.getBlockPos());
+        while(!queue.isEmpty()){
+            CoordinatorEntity cc=queue.remove();
+            if(cc.getBlockPos().equals(target.getBlockPos()))break;
+            for(Direction side:Direction.values()){
+                CoordinatorEntity other=cc.nearest(world,side);
+                if(other!=null && visited.add(other.getBlockPos())){
+                    prev.put(other.getBlockPos(),cc.getBlockPos());queue.add(other);
+                }
+            }
+        }
+        if(!visited.contains(target.getBlockPos()))return List.of();
+        List<BlockPos> positions=new ArrayList<>();
+        BlockPos pos=target.getBlockPos();
+        positions.add(pos);
+        while(!pos.equals(source.getBlockPos())){
+            pos=prev.get(pos);if(pos==null)return List.of();
+            positions.add(0,pos);
+        }
+        return positions;
+    }
+        public static boolean isFiller(ItemStack stack){
         if(!(stack.getItem() instanceof BlockItem item))return false;
         BlockState state=item.getBlock().defaultBlockState();
         return !state.hasBlockEntity() && !state.isAir()
@@ -140,12 +194,7 @@ public final class RigNetwork {
     }
     @org.jetbrains.annotations.Nullable
     public static CoordinatorEntity nearestDrillCoordinator(ServerLevel world,DrillEntity drill){
-        for(int y=1;y<=20;y++){
-            BlockPos p=drill.getBlockPos().above(y);
-            if(!world.hasChunkAt(p))break;
-            if(world.getBlockEntity(p) instanceof CoordinatorEntity cc)return cc;
-        }
-        return null;
+        return RigTopology.nearest(world,drill.getBlockPos());
     }
     /**
      * Insert unused material back into the original Filler/Wall input (only
@@ -186,12 +235,7 @@ public final class RigNetwork {
         return remaining;
     }
     private static List<BlockPos> route(ServerLevel world,CoordinatorEntity source,DrillEntity drill){
-        CoordinatorEntity start=null;
-        for(int i=1;i<=20;i++){
-            BlockPos p=drill.getBlockPos().above(i);
-            if(!world.hasChunkAt(p))break;
-            if(world.getBlockEntity(p) instanceof CoordinatorEntity cc){start=cc;break;}
-        }
+        CoordinatorEntity start=nearestDrillCoordinator(world,drill);
         if(start==null)return List.of();
         Map<BlockPos,BlockPos> prev=new HashMap<>();
         Queue<CoordinatorEntity> todo=new ArrayDeque<>();
