@@ -1,10 +1,30 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.4.6 — ocean-sealing recovery and configurable per-coordinate fill tries**
+**Version 0.4.7 — tablet texture repair and two-stage filler caches**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.4.7 — Fixed handheld tablet and two-stage filler buffering
+
+### Handheld tablet texture repair
+
+The handheld tablet's red/yellow item models now inherit the proven dark handheld model and override **only the lamp material** with built-in Minecraft redstone/yellow textures. This removes the custom animated texture lookup that could produce a large black/magenta missing-texture rendering. **The placed tablet remains unchanged**, including its animated computer-linked status indicator. Handheld red/yellow indicators are steady colors in this compatibility-first fix (they still change when the linked computer's severity changes); this avoids the old whole-item jitter and broken sprites.
+
+### Drill + Collection Coordinator both stock Filler
+
+When the nearest Collection Coordinator detects that its linked drill is actively **Sealing fluids**, it switches on its own **192-item dedicated Filler depot**. The drill independently maintains its **64-item Filler supply**. These dedicated buffers do **not** take over the normal mined-item/output inventories:
+
+- The **nearest CC only** reserves Filler from connected input storage, fills its depot using **up to eight 3-block incoming packets per tick**, and maintains up to **32 simultaneous supply flights** (with bounded cosmetic visuals). Shipments can traverse connected CCs before reaching the depot.
+- The drill draws preferentially from **this ready CC cache**, in ordinary animated 3-block CC→drill packets, and replenishes its own 64-block supply immediately as room becomes available. If the CC cache is not yet filled, the original direct source→drill supply path remains available.
+- A pending depot shipment counts as **real available incoming Filler**, avoiding a premature Out of Filler status while items are still on their way to the CC. All requested cargo is preserved in block-entity save data through restarts and drill movement.
+- Each cached and drill-ready stack tracks **which input container and face it originally came from**. When sealing finishes, surplus Filler first attempts to **merge back into that source inventory**, respecting container capacity and sided input rules. If the source is gone or full, material goes into a CC with a valid path toward a configured **Output**. If output storage also cannot accept it, it falls back to the drill's inventory or a dropped item rather than vanishing.
+- A cache automatically drains/refunds when the filling drill disconnects, stops filling, or is removed. These are **real stored items**, not creative-mode generated stock.
+
+The fluid repair order remains **outer liquid wall → interior liquid cells → resumed mining**. Individual coordinates must verify as solid, and the configurable per-coordinate Fill Attempts limit remains supported.
+
+**Development testing:** in a backup ocean world, try Filler inputs feeding multiple CC hops, watch both buffers refill after each placement, then stop the water flow and verify unused material returns to its input chest first. Test with that input chest full to confirm the Output fallback. Verify the handheld tablet no longer shows black/magenta.
 
 ## v0.4.6 — ocean mining: wall-fluid → interior-fluid → excavation
 
