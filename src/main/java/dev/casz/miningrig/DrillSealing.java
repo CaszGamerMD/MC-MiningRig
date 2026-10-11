@@ -190,6 +190,10 @@ final class DrillSealing {
         attemptTarget=null;allowedAttempts=configuredLimit;gravityDropDepth=0;
         replaceCleared=false;fluidMode=false;
     }
+    private boolean outsideHole(BlockPos pos,DrillEntity drill,ComputerEntity computer){
+        return !contains(computer,pos.getX()-drill.getBlockPos().getX(),
+            pos.getZ()-drill.getBlockPos().getZ(),false);
+    }
     private void scanFluids(ServerLevel world,DrillEntity drill,ComputerEntity computer){
         int r=computer.radius()+1;
         BlockPos base=drill.getBlockPos();
@@ -296,7 +300,7 @@ final class DrillSealing {
         if(walls)finishedWalls.add(p);
         else fluidSpots.remove(p);
         attempts=0;pending=null;wait=0;
-        attemptTarget=null;allowedAttempts=MAX_FILL_ATTEMPTS;gravityDropDepth=0;
+        attemptTarget=null;allowedAttempts=configuredLimit;gravityDropDepth=0;
     }
     private ComputerEntity.Status verify(ServerLevel world,DrillEntity drill){
         if(pending==null)return null;
@@ -468,17 +472,41 @@ final class DrillSealing {
             ComputerEntity.Status checked=verifyStock(world,drill);
             if(checked!=null)return checked;
         }
-        for(Iterator<BlockPos> it=fluidSpots.iterator();it.hasNext();){
-            BlockPos at=it.next();
-            if(!world.hasChunkAt(at))return ComputerEntity.Status.BLOCKED;
-            if(immune(world.getBlockState(at))||solid(world,at)){
-                it.remove();continue;
+        // This is a STRICT two-stage sealing order, even with Wall Mode Off:
+        // (1) plug FLUID in the one-block exterior ring, one coordinate until
+        // verified solid; (2) do the same inside the mining footprint.
+        //
+        // Scan both regions on each tick, but always prioritize the ring.
+        // Fluid source updates in an ocean can re-wet a finished ring cell.
+        for(int phase=0;phase<2;phase++){
+            boolean wallPhase=phase==0;
+            for(Iterator<BlockPos> it=fluidSpots.iterator();it.hasNext();){
+                BlockPos at=it.next();
+                if(outsideHole(at,drill,computer)!=wallPhase)continue;
+                if(!world.hasChunkAt(at))return ComputerEntity.Status.BLOCKED;
+                if(immune(world.getBlockState(at))||solid(world,at)){
+                    it.remove();continue;
+                }
+                // Don't skip this individual coordinate just because its
+                // water temporarily turned into air. Keep filling until a
+                // permanent solid block exists here.
+                target(world,at,null);
+                if(failed())return ComputerEntity.Status.FILL_FAILED;
+                if(!filler.hasSupply()){
+                    if(filler.hasFlights())return ComputerEntity.Status.RUNNING;
+                    return ComputerEntity.Status.OUT_OF_FILLER;
+                }
+                return applyFromStock(world,drill,filler,at,false);
             }
-            if(!filler.hasSupply()){
-                if(filler.hasFlights())return ComputerEntity.Status.RUNNING;
-                return ComputerEntity.Status.OUT_OF_FILLER;
+            // Check again for outer-wall fluid introduced by a neighbor
+            // update before advancing from boundary sealing to inner area.
+            if(wallPhase){
+                scanFluids(world,drill,computer);
+                for(BlockPos at:fluidSpots)
+                    if(outsideHole(at,drill,computer)
+                            && !immune(world.getBlockState(at)) && !solid(world,at))
+                        return ComputerEntity.Status.RUNNING;
             }
-            return applyFromStock(world,drill,filler,at,false);
         }
         // Only after all detected fluid has passed solid-block verification
         // is the unused filler released to ordinary mined-item output.
