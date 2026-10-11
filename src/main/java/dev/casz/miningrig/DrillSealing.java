@@ -23,7 +23,7 @@ import org.jetbrains.annotations.Nullable;
  * network path, with one non-pickup, ground-model display per reserved item.
  */
 final class DrillSealing {
-    private static final int VERIFY_TICKS=8;
+    private static final int VERIFY_TICKS=2;
     private static final int DEFAULT_FILL_ATTEMPTS=24;
     private final LinkedHashSet<BlockPos> fluidSpots=new LinkedHashSet<>();
     private final LinkedHashSet<BlockPos> finishedWalls=new LinkedHashSet<>();
@@ -126,7 +126,7 @@ final class DrillSealing {
     private int settleTicks(ItemStack item){
         return item.getItem() instanceof BlockItem block
             && block.getBlock() instanceof FallingBlock
-            ?VERIFY_TICKS+Math.min(40,gravityDropDepth/3)
+            ?8+Math.min(40,gravityDropDepth/3)
             :VERIFY_TICKS;
     }
     private boolean failed(){return attempts>=allowedAttempts;}
