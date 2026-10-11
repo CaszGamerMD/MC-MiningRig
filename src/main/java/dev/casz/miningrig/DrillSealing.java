@@ -36,7 +36,7 @@ final class DrillSealing {
     private boolean replaceCleared,fluidMode,legacyWallPhase;
     @Nullable private RigNetwork.Supply delivery;
     @Nullable private BlockPos deliveryTarget;
-    private boolean deliveryWall;
+    private boolean deliveryWall,pendingSourceWalls;
     private int flightTicks;
     @Nullable private Display.ItemDisplay visual;
 
@@ -86,7 +86,8 @@ final class DrillSealing {
         next.legacyWallPhase=legacyWallPhase;
         walls.moveTo(next.walls);filler.moveTo(next.filler);
         next.delivery=delivery;next.deliveryTarget=deliveryTarget;
-        next.deliveryWall=deliveryWall;next.flightTicks=flightTicks;
+        next.deliveryWall=deliveryWall;next.pendingSourceWalls=pendingSourceWalls;
+        next.flightTicks=flightTicks;
         next.visual=visual;
         delivery=null;deliveryTarget=null;visual=null; // ownership moves, never duplicates
     }
@@ -96,7 +97,7 @@ final class DrillSealing {
         wallFallback=false;wallSourceChecked=false;wallFinished=false;
         cautionTicks=0;pending=null;pendingWall=false;
         replaceCleared=false;fluidMode=false;legacyWallPhase=false;
-        deliveryWall=false;flightTicks=0;attempts=0;wait=0;
+        deliveryWall=false;pendingSourceWalls=false;flightTicks=0;attempts=0;wait=0;
         discardVisual();
     }
     void nextLayer(){
@@ -167,6 +168,7 @@ final class DrillSealing {
         }
         BlockPos target=deliveryTarget;
         ItemStack material=delivery.stack();
+        pendingSourceWalls=deliveryWall;
         discardVisual();
         delivery=null;deliveryTarget=null;
         if(target==null || !(material.getItem() instanceof BlockItem item)){
@@ -216,7 +218,7 @@ final class DrillSealing {
             return null;
         }
         if(attempts>=MAX_FILL_ATTEMPTS)return ComputerEntity.Status.FILL_FAILED;
-        return beginPlacement(world,drill,pending,pendingWall);
+        return beginPlacement(world,drill,pending,pendingSourceWalls);
     }
     private ComputerEntity.Status applyFromStock(ServerLevel world,DrillEntity drill,
             WallSupplyPipeline stock,BlockPos target,boolean wall){
@@ -392,6 +394,7 @@ final class DrillSealing {
         out.putBoolean("FillPending",pending!=null);
         if(pending!=null)out.putLong("FillPosition",pending.asLong());
         out.putInt("FillType",pendingWall?2:1);out.putInt("FillWait",wait);
+        out.putBoolean("PendingWallSource",pendingSourceWalls);
         out.putInt("FillAttempts",attempts);
         out.putBoolean("WallFallback",wallFallback);
         out.putInt("CautionTicks",cautionTicks);
@@ -423,6 +426,7 @@ final class DrillSealing {
         pending=in.getBooleanOr("FillPending",false)
             ?BlockPos.of(in.getLongOr("FillPosition",0)):null;
         pendingWall=in.getIntOr("FillType",0)==2;
+        pendingSourceWalls=in.getBooleanOr("PendingWallSource",pendingWall);
         wait=Math.max(0,in.getIntOr("FillWait",0));
         attempts=Math.max(0,in.getIntOr("FillAttempts",0));
         wallFallback=in.getBooleanOr("WallFallback",false);
