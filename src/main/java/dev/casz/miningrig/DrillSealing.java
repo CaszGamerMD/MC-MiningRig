@@ -73,6 +73,9 @@ final class DrillSealing {
         walls.tick(world,drill);
         if(computer.wallMode()==2)walls.request(world,drill,64);
     }
+    void clearWallSupply(ServerLevel world,DrillEntity drill){
+        walls.flush(world,drill);
+    }
     /** Pausing returns drill stock to the original bins, then the output CC. */
     void pauseSupply(ServerLevel world,DrillEntity drill){
         walls.flush(world,drill);
