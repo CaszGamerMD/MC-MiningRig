@@ -42,6 +42,11 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     private int wirelessMask,adjacentMask,drillMask,page;
     private boolean dropped;
     private final List<Flight> flights=new ArrayList<>();
+    // Independent supply buffer, never mixed with normal mined-item output.
+    private final CoordinatorFillerCache fillerDepot=new CoordinatorFillerCache();
+    @Nullable RigNetwork.Supply takeCachedFiller(ServerLevel world,DrillEntity drill,int amount){
+        return fillerDepot.take(drill,this,amount);
+    }
 
     private static final class Flight {
         final List<ItemStack> cargo;
@@ -111,7 +116,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         }
         return null;
     }
-    private DrillEntity drillBelow(ServerLevel world){
+    DrillEntity drillBelow(ServerLevel world){
         for(int n=1;n<=20;n++){
             BlockPos at=worldPosition.below(n);
             if(!world.hasChunkAt(at))return null;
@@ -152,6 +157,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         long now=world.getGameTime();
         if(now%10==0)cc.refresh(world);
         cc.advance(world,now);
+        cc.fillerDepot.tick(world,cc,cc.drillBelow(world));
         // Adjacent container output does not consume wireless travel bandwidth.
         for(int n=0;n<CONTAINER_ACTIONS_PER_TICK;n++)
             if(!cc.outputToContainer(world))break;
@@ -313,6 +319,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     public void dropContents(){
         if(dropped||level==null||level.isClientSide())return;
         dropped=true;
+        fillerDepot.flush((ServerLevel)level,this);
         for(Flight flight:flights){
             flight.discard();
             for(ItemStack item:flight.cargo)
@@ -360,6 +367,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     @Override protected void saveAdditional(ValueOutput out){
         super.saveAdditional(out);ContainerHelper.saveAllItems(out,items);
         for(int i=0;i<6;i++)out.putInt("Port"+i,mode[i]);
+        fillerDepot.save(out);
         out.putInt("FlightCount",flights.size());
         for(int i=0;i<flights.size();i++){
             Flight f=flights.get(i);
@@ -376,6 +384,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     }
     @Override protected void loadAdditional(ValueInput in){
         super.loadAdditional(in);ContainerHelper.loadAllItems(in,items);
+        fillerDepot.load(in);
         for(Flight flight:flights)flight.discard();
         flights.clear();
         for(int i=0;i<6;i++){

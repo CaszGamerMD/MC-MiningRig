@@ -45,6 +45,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private BlockPos wallWorkTarget;
     public int completedLayers(){return completedLayers;}
     public boolean fluidWarning(){return sealing.warning();}
+    /** Only recovery mode requests the 192-item CC filler depot. */
+    public boolean fluidFilling(){return sealing.fluidFilling();}
     public void retryFailedFill(ServerLevel world){sealing.retryFailedFill(world,this);}
     public boolean canAutoRecoverFill(ServerLevel world){return sealing.canAutoRecover(world);}
     @Nullable public BlockPos failedFillPosition(){return sealing.stuckPosition();}

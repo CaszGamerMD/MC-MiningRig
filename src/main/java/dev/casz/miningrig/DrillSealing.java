@@ -48,6 +48,7 @@ final class DrillSealing {
     @Nullable private Display.ItemDisplay visual;
 
     boolean warning(){return !fluidSpots.isEmpty()||pending!=null||cautionTicks>0;}
+    boolean fluidFilling(){return fluidMode;}
     boolean fallback(){return wallFallback;}
     /** Saved failing coordinate; do not report a generic error with no target. */
     @Nullable BlockPos stuckPosition(){
