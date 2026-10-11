@@ -77,10 +77,11 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
 
     private static final class Flight {
         final List<ItemStack> cargo;
-        final BlockPos origin,target;
+        final BlockPos origin;
+        BlockPos target;
         final boolean fromDrill;
-        final long start;
-        final int duration;
+        long start;
+        int duration;
         @Nullable Display.ItemDisplay visual;
         Flight(List<ItemStack> cargo,BlockPos origin,BlockPos target,boolean fromDrill,long start,int duration){
             this.cargo=cargo;this.origin=origin.immutable();this.target=target.immutable();
@@ -314,14 +315,21 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         if(stored()==0||flights.size()>=MAX_FLIGHTS)return false;
         // Only route along a shortest path to a configured output, avoiding
         // the ping-pong loops that occurred with freely bidirectional CCs.
-        CoordinatorEntity next=RigNetwork.nextTowardOutput(world,this);
-        if(next==null)return false;
-        List<ItemStack> cargo=peek(this,0,PACKET_SIZE);
-        if(cargo.isEmpty()||!next.canReceive(cargo))return false;
-        List<ItemStack> taken=take(this,0,PACKET_SIZE);
-        if(taken.isEmpty())return false;
-        startFlight(world,taken,worldPosition,next.worldPosition,false,now);
-        return true;
+        CoordinatorEntity next;
+        // Choose the first *routable item*, not just the first inventory slot.
+        // A chest full of stone should never strand diamonds in later CC slots.
+        for(int i=0;i<SLOTS;i++){
+            ItemStack stack=items.get(i);
+            if(stack.isEmpty())continue;
+            ItemStack packet=stack.copyWithCount(Math.min(PACKET_SIZE,stack.getCount()));
+            next=RigNetwork.nextTowardOutput(world,this,packet);
+            if(next==null||!next.canReceive(List.of(packet)))continue;
+            ItemStack cargo=removeItem(i,packet.getCount());
+            if(cargo.isEmpty())continue;
+            startFlight(world,List.of(cargo),worldPosition,next.worldPosition,false,now);
+            return true;
+        }
+        return false;
     }
     private int liveDisplays(){
         int count=0;
@@ -366,6 +374,30 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
             else if(!flight.fromDrill)delivered=receive(flight.cargo);
             // Full target: leave the packet safely in transit and retry next tick,
             // rather than ejecting it into the world or voiding it.
+            if(!delivered && !flight.fromDrill && now-flight.start>flight.duration+60){
+                // Either the destination CC filled since the packet launched
+                // or the original output chest stopped accepting this item.
+                // Return ownership to the sender if room became available;
+                // the next dispatch will select a freshly usable output.
+                if(canReceive(flight.cargo)){
+                    delivered=receive(flight.cargo);
+                }else if(!flight.cargo.isEmpty()){
+                    CoordinatorEntity alternate=RigNetwork.nextTowardOutput(world,this,
+                        flight.cargo.get(0),flight.target);
+                    if(alternate!=null && alternate.canReceive(flight.cargo)){
+                        flight.discard();
+                        flight.target=alternate.getBlockPos().immutable();
+                        flight.start=now;
+                        int distance=Math.abs(flight.origin.getX()-flight.target.getX())
+                            +Math.abs(flight.origin.getY()-flight.target.getY())
+                            +Math.abs(flight.origin.getZ()-flight.target.getZ());
+                        flight.duration=Math.max(3,(int)Math.ceil(distance*2.5));
+                        changed=true;
+                    }
+                }
+            }
+            // No deletion while an inventory is blocked; in-flight cargo is
+            // serialized and retried or rerouted when capacity opens.
             if(!delivered)continue;
             flight.discard();iterator.remove();changed=true;
         }
