@@ -310,6 +310,12 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 // 24-attempt latch or the exact same error repeats forever.
                 if(statuses[slot]==Status.FILL_FAILED)drill.retryFailedFill(server);
                 running[slot]=true;statuses[slot]=Status.RUNNING;
+                int oldActive=activeSlot;
+                activeSlot=slot;
+                // Reserve filler/wall cargo immediately on Start, not after
+                // the wall pass or when a fluid placement first blocks mining.
+                drill.primeSupply(server,this);
+                activeSlot=oldActive;
             }
         }else statuses[slot]=Status.NO_DRILL;
         if(isFault(statuses[slot]) && statuses[slot]!=before)alertSerial++;
