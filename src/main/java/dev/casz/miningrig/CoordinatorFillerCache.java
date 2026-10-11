@@ -103,7 +103,7 @@ final class CoordinatorFillerCache {
     }
     void tick(ServerLevel world,CoordinatorEntity cc,DrillEntity drill){
         boolean changed=false;
-        for(int i=inbound.size()-1;i>=0;i--){
+        for(int i=0;i<inbound.size();){
             Flight f=inbound.get(i);
             f.ticks++;
             if(arrived(f)){
@@ -111,7 +111,7 @@ final class CoordinatorFillerCache {
                 f.discard();
                 inbound.remove(i);
                 changed=true;
-            }else moveDisplay(world,f);
+            }else {moveDisplay(world,f);i++;}
         }
         // The supply cache exists only during active FILLING mode. It is not
         // general coordinator inventory and cannot be routed out by mistake.
