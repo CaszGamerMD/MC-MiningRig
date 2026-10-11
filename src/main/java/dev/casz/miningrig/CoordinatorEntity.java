@@ -66,13 +66,13 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     private final ContainerData data=new ContainerData(){
         @Override public int get(int i){
             return i<6?(((wirelessMask|drillMask)&(1<<i))!=0?5:mode[i]):i==6?wirelessMask|adjacentMask
-                :i==7?stored():i==8?adjacentMask:i==9?page:drillMask;
+                :i==7?stored():i==8?adjacentMask:i==9?page:i==10?drillMask:fillerDepot.stored();
         }
         @Override public void set(int i,int v){
             if(i<6)mode[i]=Math.max(0,Math.min(4,v));
             else if(i==9)page=Math.max(0,Math.min(7,v));
         }
-        @Override public int getCount(){return 11;}
+        @Override public int getCount(){return 12;}
     };
     public CoordinatorEntity(BlockPos pos,BlockState state){super(MiningRig.COORDINATOR_ENTITY,pos,state);}
     public boolean acceptsDrillFromBelow(){return true;}
