@@ -11,6 +11,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.FallingBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
@@ -23,12 +24,18 @@ import org.jetbrains.annotations.Nullable;
  */
 final class DrillSealing {
     private static final int VERIFY_TICKS=8;
-    private static final int MAX_FILL_ATTEMPTS=24;
+    private static final int DEFAULT_FILL_ATTEMPTS=24;
     private final LinkedHashSet<BlockPos> fluidSpots=new LinkedHashSet<>();
     private final LinkedHashSet<BlockPos> finishedWalls=new LinkedHashSet<>();
     @Nullable private BlockPos pending;
     private boolean pendingWall;
     private int wait,attempts;
+    // Attempts MUST belong to one physical target, never the layer as a
+    // whole. A sand/gravel column may be much deeper than 24 blocks.
+    @Nullable private BlockPos attemptTarget;
+    private int allowedAttempts=DEFAULT_FILL_ATTEMPTS;
+    private int configuredLimit=DEFAULT_FILL_ATTEMPTS;
+    private int gravityDropDepth;
     private boolean wallFallback,wallFinished,wallSourceChecked;
     private int cautionTicks;
     private final WallSupplyPipeline walls=new WallSupplyPipeline("Replace",true,48);
@@ -42,6 +49,78 @@ final class DrillSealing {
 
     boolean warning(){return !fluidSpots.isEmpty()||pending!=null||cautionTicks>0;}
     boolean fallback(){return wallFallback;}
+    /** Saved failing coordinate; do not report a generic error with no target. */
+    @Nullable BlockPos stuckPosition(){
+        return attempts>=allowedAttempts?attemptTarget:null;
+    }
+    int failedAttempts(){return attempts;}
+    int attemptLimit(){return allowedAttempts;}
+    void setTryLimit(int limit){
+        configuredLimit=Math.max(ComputerEntity.MIN_FILL_TRIES,
+            Math.min(ComputerEntity.MAX_FILL_TRIES,limit));
+        allowedAttempts=configuredLimit;
+    }
+    int fallDepth(){return gravityDropDepth;}
+    private void target(ServerLevel world,BlockPos at,@Nullable ItemStack stack){
+        if(attemptTarget==null || !attemptTarget.equals(at)){
+            attemptTarget=at.immutable();
+            attempts=0;
+            allowedAttempts=configuredLimit;
+            gravityDropDepth=0;
+        }
+        if(stack==null || !(stack.getItem() instanceof BlockItem item)
+                || !(item.getBlock() instanceof FallingBlock))return;
+        // Sand/gravel can drop through an ocean shaft far deeper than 24.
+        // Count the potentially unsupported positions immediately beneath
+        // this exact coordinate. Do not treat ordinary stacked falling
+        // blocks as a "failed 24 attempts" job.
+        int gap=0;
+        for(int y=at.getY()-1;y>=world.getMinY();y--){
+            BlockPos below=new BlockPos(at.getX(),y,at.getZ());
+            if(!world.hasChunkAt(below))break;
+            BlockState state=world.getBlockState(below);
+            if(!state.isAir()&&state.getFluidState().isEmpty()
+                    && !state.canBeReplaced())break;
+            gap++;
+        }
+        gravityDropDepth=Math.max(gravityDropDepth,gap);
+        // A few extra tries beyond the physical drop height are useful for
+        // flowing water and entity settling, but the check is still finite.
+        // The operator chooses the attempt ceiling in the Mining Computer.
+        // Still measure gravity depth to extend settling time, but do not
+        // override the configured maximum with an automatic retry allowance.
+    }
+    private int settleTicks(ItemStack item){
+        return item.getItem() instanceof BlockItem block
+            && block.getBlock() instanceof FallingBlock
+            ?VERIFY_TICKS+Math.min(40,gravityDropDepth/3)
+            :VERIFY_TICKS;
+    }
+    private boolean failed(){return attempts>=allowedAttempts;}
+
+    /**
+     * Restart is an explicit retry of the SAME target, not a new excavation.
+     * Previously 'attempts=24' persisted forever and pressing Start/Stop
+     * immediately halted with the same error without placing any blocks.
+     */
+    void retryFailedFill(ServerLevel world,DrillEntity drill){
+        if(!failed())return;
+        attempts=0;
+        if(pending!=null && solid(world,pending)){
+            markDone(pending,pendingWall);
+        }else{
+            // Keep pending position and reserve/ready stock: don't skip a wet
+            // or now-air coordinate just because the fluid has flowed away.
+            wait=0;
+        }
+        drill.setChanged();
+    }
+    /** A real environmental repair (stable solid at the failed target) is
+     * enough to auto-resume; an unchanged fluid/air spot needs user retry. */
+    boolean canAutoRecover(ServerLevel world){
+        return failed() && pending!=null
+            && world.hasChunkAt(pending) && solid(world,pending);
+    }
     void retryWallSource(ServerLevel world,DrillEntity drill){
         if(wallSourceChecked)return;
         wallSourceChecked=true;
@@ -79,6 +158,10 @@ final class DrillSealing {
         next.finishedWalls.clear();next.finishedWalls.addAll(finishedWalls);
         next.pending=pending;next.pendingWall=pendingWall;
         next.wait=wait;next.attempts=attempts;
+        next.attemptTarget=attemptTarget;
+        next.allowedAttempts=allowedAttempts;
+        next.configuredLimit=configuredLimit;
+        next.gravityDropDepth=gravityDropDepth;
         next.wallFallback=wallFallback;next.wallFinished=wallFinished;
         next.wallSourceChecked=wallSourceChecked;
         next.cautionTicks=cautionTicks;
@@ -98,12 +181,18 @@ final class DrillSealing {
         cautionTicks=0;pending=null;pendingWall=false;
         replaceCleared=false;fluidMode=false;legacyWallPhase=false;
         deliveryWall=false;pendingSourceWalls=false;flightTicks=0;attempts=0;wait=0;
+        attemptTarget=null;allowedAttempts=configuredLimit;gravityDropDepth=0;
         discardVisual();
     }
     void nextLayer(){
         fluidSpots.clear();finishedWalls.clear();pending=null;pendingWall=false;
         wait=0;attempts=0;wallFinished=false;wallSourceChecked=false;
+        attemptTarget=null;allowedAttempts=configuredLimit;gravityDropDepth=0;
         replaceCleared=false;fluidMode=false;
+    }
+    private boolean outsideHole(BlockPos pos,DrillEntity drill,ComputerEntity computer){
+        return !contains(computer,pos.getX()-drill.getBlockPos().getX(),
+            pos.getZ()-drill.getBlockPos().getZ(),false);
     }
     private void scanFluids(ServerLevel world,DrillEntity drill,ComputerEntity computer){
         int r=computer.radius()+1;
@@ -181,7 +270,8 @@ final class DrillSealing {
             pending=target;pendingWall=legacyWallPhase;wait=0;attempts=0;
             return ComputerEntity.Status.RUNNING;
         }
-        if(attempts>=MAX_FILL_ATTEMPTS){
+        target(world,target,material);
+        if(failed()){
             refund(world,drill,material);
             return ComputerEntity.Status.FILL_FAILED;
         }
@@ -190,13 +280,14 @@ final class DrillSealing {
             return ComputerEntity.Status.BLOCKED;
         }
         attempts++;
-        pending=target;pendingWall=legacyWallPhase;wait=VERIFY_TICKS;
+        pending=target;pendingWall=legacyWallPhase;wait=settleTicks(material);
         drill.placementWear(world);
         drill.setChanged();
         return ComputerEntity.Status.RUNNING;
     }
     private ComputerEntity.Status beginPlacement(ServerLevel world,DrillEntity drill,BlockPos p,boolean wallMaterial){
-        if(attempts>=MAX_FILL_ATTEMPTS)return ComputerEntity.Status.FILL_FAILED;
+        target(world,p,null);
+        if(failed())return ComputerEntity.Status.FILL_FAILED;
         if(!drill.placementReady(world))return ComputerEntity.Status.RUNNING;
         RigNetwork.Supply result=RigNetwork.reserve(world,drill,wallMaterial);
         if(result==null)return wallMaterial?ComputerEntity.Status.OUT_OF_WALLS:
@@ -209,6 +300,7 @@ final class DrillSealing {
         if(walls)finishedWalls.add(p);
         else fluidSpots.remove(p);
         attempts=0;pending=null;wait=0;
+        attemptTarget=null;allowedAttempts=configuredLimit;gravityDropDepth=0;
     }
     private ComputerEntity.Status verify(ServerLevel world,DrillEntity drill){
         if(pending==null)return null;
@@ -217,22 +309,30 @@ final class DrillSealing {
             markDone(pending,pendingWall);drill.setChanged();
             return null;
         }
-        if(attempts>=MAX_FILL_ATTEMPTS)return ComputerEntity.Status.FILL_FAILED;
+        if(failed())return ComputerEntity.Status.FILL_FAILED;
         return beginPlacement(world,drill,pending,pendingSourceWalls);
     }
     private ComputerEntity.Status applyFromStock(ServerLevel world,DrillEntity drill,
             WallSupplyPipeline stock,BlockPos target,boolean wall){
-        if(attempts>=MAX_FILL_ATTEMPTS)return ComputerEntity.Status.FILL_FAILED;
         if(!drill.placementReady(world))return ComputerEntity.Status.RUNNING;
         ItemStack available=stock.peek();
         if(available.isEmpty())return ComputerEntity.Status.RUNNING;
         if(!(available.getItem() instanceof BlockItem item))return ComputerEntity.Status.BLOCKED;
+        target(world,target,available);
+        if(failed())return ComputerEntity.Status.FILL_FAILED;
         BlockState state=world.getBlockState(target);
-        if(immune(state)||solid(world,target))return ComputerEntity.Status.BLOCKED;
+        if(immune(state))return ComputerEntity.Status.BLOCKED;
+        if(solid(world,target)){
+            // Water finished draining or someone repaired the spot during
+            // transit. Treat the stable block as success, not 'blocked'.
+            markDone(target,wall);
+            drill.setChanged();
+            return ComputerEntity.Status.RUNNING;
+        }
         if(!world.setBlock(target,item.getBlock().defaultBlockState(),Block.UPDATE_ALL))
             return ComputerEntity.Status.BLOCKED;
         stock.consume();
-        pending=target.immutable();pendingWall=wall;wait=VERIFY_TICKS;attempts++;
+        pending=target.immutable();pendingWall=wall;wait=settleTicks(available);attempts++;
         drill.placementWear(world);drill.setChanged();
         return ComputerEntity.Status.RUNNING;
     }
@@ -242,8 +342,16 @@ final class DrillSealing {
         if(solid(world,pending)){
             markDone(pending,pendingWall);drill.setChanged();return null;
         }
-        if(attempts>=MAX_FILL_ATTEMPTS)return ComputerEntity.Status.FILL_FAILED;
-        pending=null;wait=0;return null;
+        if(failed())return ComputerEntity.Status.FILL_FAILED;
+        // Retry EXACTLY this position, rather than selecting another fluid
+        // cell from a newly reordered LinkedHashSet and carrying its 24 tries.
+        WallSupplyPipeline stock=pendingWall?walls:filler;
+        if(!stock.hasSupply()){
+            if(stock.hasFlights())return ComputerEntity.Status.RUNNING;
+            return pendingWall?ComputerEntity.Status.OUT_OF_WALLS:
+                ComputerEntity.Status.OUT_OF_FILLER;
+        }
+        return applyFromStock(world,drill,stock,pending,pendingWall);
     }
     private List<BlockPos> ring(DrillEntity drill,ComputerEntity computer){
         List<BlockPos> positions=new ArrayList<>();
@@ -364,17 +472,41 @@ final class DrillSealing {
             ComputerEntity.Status checked=verifyStock(world,drill);
             if(checked!=null)return checked;
         }
-        for(Iterator<BlockPos> it=fluidSpots.iterator();it.hasNext();){
-            BlockPos at=it.next();
-            if(!world.hasChunkAt(at))return ComputerEntity.Status.BLOCKED;
-            if(immune(world.getBlockState(at))||solid(world,at)){
-                it.remove();continue;
+        // This is a STRICT two-stage sealing order, even with Wall Mode Off:
+        // (1) plug FLUID in the one-block exterior ring, one coordinate until
+        // verified solid; (2) do the same inside the mining footprint.
+        //
+        // Scan both regions on each tick, but always prioritize the ring.
+        // Fluid source updates in an ocean can re-wet a finished ring cell.
+        for(int phase=0;phase<2;phase++){
+            boolean wallPhase=phase==0;
+            for(Iterator<BlockPos> it=fluidSpots.iterator();it.hasNext();){
+                BlockPos at=it.next();
+                if(outsideHole(at,drill,computer)!=wallPhase)continue;
+                if(!world.hasChunkAt(at))return ComputerEntity.Status.BLOCKED;
+                if(immune(world.getBlockState(at))||solid(world,at)){
+                    it.remove();continue;
+                }
+                // Don't skip this individual coordinate just because its
+                // water temporarily turned into air. Keep filling until a
+                // permanent solid block exists here.
+                target(world,at,null);
+                if(failed())return ComputerEntity.Status.FILL_FAILED;
+                if(!filler.hasSupply()){
+                    if(filler.hasFlights())return ComputerEntity.Status.RUNNING;
+                    return ComputerEntity.Status.OUT_OF_FILLER;
+                }
+                return applyFromStock(world,drill,filler,at,false);
             }
-            if(!filler.hasSupply()){
-                if(filler.hasFlights())return ComputerEntity.Status.RUNNING;
-                return ComputerEntity.Status.OUT_OF_FILLER;
+            // Check again for outer-wall fluid introduced by a neighbor
+            // update before advancing from boundary sealing to inner area.
+            if(wallPhase){
+                scanFluids(world,drill,computer);
+                for(BlockPos at:fluidSpots)
+                    if(outsideHole(at,drill,computer)
+                            && !immune(world.getBlockState(at)) && !solid(world,at))
+                        return ComputerEntity.Status.RUNNING;
             }
-            return applyFromStock(world,drill,filler,at,false);
         }
         // Only after all detected fluid has passed solid-block verification
         // is the unused filler released to ordinary mined-item output.
@@ -396,6 +528,11 @@ final class DrillSealing {
         out.putInt("FillType",pendingWall?2:1);out.putInt("FillWait",wait);
         out.putBoolean("PendingWallSource",pendingSourceWalls);
         out.putInt("FillAttempts",attempts);
+        out.putBoolean("HasAttemptTarget",attemptTarget!=null);
+        if(attemptTarget!=null)out.putLong("AttemptTarget",attemptTarget.asLong());
+        out.putInt("AllowedAttempts",allowedAttempts);
+        out.putInt("ConfiguredFillTries",configuredLimit);
+        out.putInt("GravityDropDepth",gravityDropDepth);
         out.putBoolean("WallFallback",wallFallback);
         out.putInt("CautionTicks",cautionTicks);
         out.putBoolean("ReplaceCleared",replaceCleared);
@@ -429,6 +566,13 @@ final class DrillSealing {
         pendingSourceWalls=in.getBooleanOr("PendingWallSource",pendingWall);
         wait=Math.max(0,in.getIntOr("FillWait",0));
         attempts=Math.max(0,in.getIntOr("FillAttempts",0));
+        attemptTarget=in.getBooleanOr("HasAttemptTarget",false)
+            ?BlockPos.of(in.getLongOr("AttemptTarget",0)):pending;
+        configuredLimit=Math.max(ComputerEntity.MIN_FILL_TRIES,
+            Math.min(ComputerEntity.MAX_FILL_TRIES,
+                in.getIntOr("ConfiguredFillTries",DEFAULT_FILL_ATTEMPTS)));
+        allowedAttempts=configuredLimit;
+        gravityDropDepth=Math.max(0,in.getIntOr("GravityDropDepth",0));
         wallFallback=in.getBooleanOr("WallFallback",false);
         cautionTicks=Math.max(0,in.getIntOr("CautionTicks",0));
         replaceCleared=in.getBooleanOr("ReplaceCleared",false);

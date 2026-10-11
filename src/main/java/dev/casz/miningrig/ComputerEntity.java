@@ -55,6 +55,10 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     private final boolean[] circles={true,true,true,true};
     // 0 OFF, 1 AIR boundary sealing, 2 ALWAYS (extended mining and wall blocks)
     private final int[] wallModes={0,0,0,0};
+    // A per-coordinate safety ceiling, configured independently for each
+    // linked drill. Higher limits permit tall sand/gravel shafts in oceans.
+    public static final int MIN_FILL_TRIES=1,MAX_FILL_TRIES=4096,DEFAULT_FILL_TRIES=24;
+    private final int[] fillTries={24,24,24,24};
     private int selected, activeSlot;
     private long lastBroadcast;
     private String tabletId;
@@ -91,6 +95,27 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public boolean selectedCircle(){return circles[selected];}
     public int selectedWallMode(){return wallModes[selected];}
     public int wallMode(){return wallModes[activeSlot];}
+    public int fillAttemptLimit(){return fillTries[activeSlot];}
+    public int selectedFillAttemptLimit(){return fillTries[selected];}
+    public void setFillAttemptLimit(int value){
+        int newValue=Math.max(MIN_FILL_TRIES,Math.min(MAX_FILL_TRIES,value));
+        if(newValue==fillTries[selected])return;
+        fillTries[selected]=newValue;
+        // Adjusting a safety limit is permitted while drilling, and does
+        // not reset mining progress, wall stage or reserved filler cargo.
+        if(level instanceof ServerLevel server && !running[selected]
+                && statuses[selected]==Status.FILL_FAILED && positions[selected]!=null
+                && server.hasChunkAt(positions[selected])
+                && server.getBlockEntity(positions[selected]) instanceof DrillEntity drill
+                && drill.matchesLink(tokens[selected])
+                && newValue>drill.failedFillAttempts()){
+            // Keep already-spent attempts at this same coordinate. A higher
+            // limit simply gives the drill more attempts to finish the job.
+            running[selected]=true;
+            statuses[selected]=Status.FILLING;
+        }
+        setChanged();syncIfServer();
+    }
     public void setWallMode(int value){
         wallModes[selected]=Math.floorMod(value,3);
         settingsChanged();
@@ -199,7 +224,12 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 statuses[slot]=Status.NO_OUTPUT;
             else if(wallModes[slot]==2&&!RigNetwork.hasInput(server,drill,true))
                 statuses[slot]=Status.NO_WALL_CONTAINER;
-            else {running[slot]=true;statuses[slot]=Status.RUNNING;}
+            else {
+                // An explicit restart after 'Fill blocked' must reset the
+                // 24-attempt latch or the exact same error repeats forever.
+                if(statuses[slot]==Status.FILL_FAILED)drill.retryFailedFill(server);
+                running[slot]=true;statuses[slot]=Status.RUNNING;
+            }
         }else statuses[slot]=Status.NO_DRILL;
         setChanged();syncIfServer();
     }
@@ -264,6 +294,12 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                         else if(drill.freeStorage()==0)status=Status.FULL.display;
                         else if(!drill.canConnectAbove(server))status="Mining / No collector";
                     }
+                    if(!running[i] && statuses[i]==Status.FILL_FAILED
+                            && drill.failedFillPosition()!=null){
+                        BlockPos failed=drill.failedFillPosition();
+                        status="Fill blocked @ "+failed.getX()+","
+                            +failed.getY()+","+failed.getZ();
+                    }
                     eta=drill.estimatedSeconds(radii[i],depths[i],circles[i],running[i]);
                 }else status=Status.NO_DRILL.display;
             }
@@ -275,7 +311,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 .append('\t').append(wallModes[i])
                 .append('\t').append(pos==null||!server.hasChunkAt(pos)?0:
                     server.getBlockEntity(pos) instanceof DrillEntity drill
-                    && drill.matchesLink(tokens[i])?drill.completedLayers():0);
+                    && drill.matchesLink(tokens[i])?drill.completedLayers():0)
+                .append('\t').append(fillTries[i]);
         }
         return out.toString();
     }
@@ -287,6 +324,21 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         if(now%20==0 && server.getBlockState(pos.above()).isAir())
             server.setBlock(pos.above(),MiningRig.COMPUTER_UPPER.defaultBlockState(),Block.UPDATE_ALL);
         computer.syncActiveChunks(server);
+        // A halted drill recovers automatically once the exact failed block
+        // becomes permanently solid; do not require unlinking or replacing it.
+        if(now%20==0)for(int i=0;i<MAX_DRILLS;i++){
+            if(computer.running[i]||computer.statuses[i]!=Status.FILL_FAILED
+                    ||computer.positions[i]==null
+                    ||!server.hasChunkAt(computer.positions[i]))continue;
+            if(server.getBlockEntity(computer.positions[i]) instanceof DrillEntity drill
+                    && drill.matchesLink(computer.tokens[i])
+                    && drill.canAutoRecoverFill(server)){
+                drill.retryFailedFill(server);
+                computer.running[i]=true;
+                computer.statuses[i]=Status.FILLING;
+                computer.setChanged();
+            }
+        }
         for(int i=0;i<MAX_DRILLS;i++){
             if(!computer.running[i])continue;
             BlockPos drillPos=computer.positions[i];
@@ -373,6 +425,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             out.putInt("Radius"+i,radii[i]);out.putInt("Depth"+i,depths[i]);
             out.putBoolean("Circle"+i,circles[i]);
             out.putInt("WallMode"+i,wallModes[i]);
+            out.putInt("FillTries"+i,fillTries[i]);
         }
     }
     @Override protected void loadAdditional(ValueInput in){
@@ -391,6 +444,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             depths[i]=Math.max(1,Math.min(256,in.getIntOr("Depth"+i,12)));
             circles[i]=in.getBooleanOr("Circle"+i,true);
             wallModes[i]=Math.max(0,Math.min(2,in.getIntOr("WallMode"+i,0)));
+            fillTries[i]=Math.max(MIN_FILL_TRIES,
+                Math.min(MAX_FILL_TRIES,in.getIntOr("FillTries"+i,DEFAULT_FILL_TRIES)));
         }
         // Migrate one-drill prototype saves into the four-drill supervisor.
         if(tokens[0].isEmpty() && in.getBooleanOr("Linked",false)){

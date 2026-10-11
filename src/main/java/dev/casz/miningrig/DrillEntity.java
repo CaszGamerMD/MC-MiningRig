@@ -45,6 +45,10 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private BlockPos wallWorkTarget;
     public int completedLayers(){return completedLayers;}
     public boolean fluidWarning(){return sealing.warning();}
+    public void retryFailedFill(ServerLevel world){sealing.retryFailedFill(world,this);}
+    public boolean canAutoRecoverFill(ServerLevel world){return sealing.canAutoRecover(world);}
+    @Nullable public BlockPos failedFillPosition(){return sealing.stuckPosition();}
+    public int failedFillAttempts(){return sealing.failedAttempts();}
     private long workTicks;
     private String linkedToken="";
     private BlockPos computerPos;
@@ -267,6 +271,9 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         if(!hasWorkingBits())return ComputerEntity.Status.OUT_OF_BITS;
         if(freeStorage()==0)return ComputerEntity.Status.FULL;
         // Operational order is explicitly WALL -> FLUID -> MINING.
+        // The controller owns the setting; the sealing state owns the
+        // per-coordinate count. Update live for every tick and after reload.
+        sealing.setTryLimit(computer.fillAttemptLimit());
         ComputerEntity.Status walls=sealing.wallStep(world,this,computer);
         if(walls!=null)return walls==ComputerEntity.Status.RUNNING
             ?ComputerEntity.Status.WALLING:walls;
