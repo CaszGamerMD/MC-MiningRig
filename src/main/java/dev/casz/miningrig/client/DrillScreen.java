@@ -41,7 +41,7 @@ public final class DrillScreen extends AbstractContainerScreen<DrillMenu> {
     }
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mouseX,int mouseY,float delta){
         if(wallChoice!=null)wallChoice.setMessage(Component.literal(
-            menu.randomWalls()?"Wall: Rand":"Wall: Order"));
+            menu.randomWalls()?"Wall: Random":"Wall: Order"));
         super.extractRenderState(g,mouseX,mouseY,delta);
         g.text(font,"3 DRILL BITS",leftPos+7,topPos+27,0xffffffff,false);
         g.text(font,menu.bankName()+" "+menu.stored()+"/64",leftPos+7,topPos+116,0xff9fe5ff,false);
