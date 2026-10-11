@@ -6,59 +6,15 @@
       {
         "when": "red",
         "model": {
-          "type": "minecraft:range_dispatch",
-          "property": "minecraft:time",
-          "source": "random",
-          "wobble": false,
-          "entries": [
-            {
-              "threshold": 0,
-              "model": {
-                "type": "minecraft:model",
-                "model": "miningrig:item/mining_tablet_dark"
-              }
-            },
-            {
-              "threshold": 0.5,
-              "model": {
-                "type": "minecraft:model",
-                "model": "miningrig:item/mining_tablet_red"
-              }
-            }
-          ],
-          "fallback": {
-            "type": "minecraft:model",
-            "model": "miningrig:item/mining_tablet_dark"
-          }
+          "type": "minecraft:model",
+          "model": "miningrig:item/mining_tablet_red"
         }
       },
       {
         "when": "yellow",
         "model": {
-          "type": "minecraft:range_dispatch",
-          "property": "minecraft:time",
-          "source": "random",
-          "wobble": false,
-          "entries": [
-            {
-              "threshold": 0,
-              "model": {
-                "type": "minecraft:model",
-                "model": "miningrig:item/mining_tablet_dark"
-              }
-            },
-            {
-              "threshold": 0.5,
-              "model": {
-                "type": "minecraft:model",
-                "model": "miningrig:item/mining_tablet_yellow"
-              }
-            }
-          ],
-          "fallback": {
-            "type": "minecraft:model",
-            "model": "miningrig:item/mining_tablet_dark"
-          }
+          "type": "minecraft:model",
+          "model": "miningrig:item/mining_tablet_yellow"
         }
       },
       {

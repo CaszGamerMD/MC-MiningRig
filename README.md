@@ -1,10 +1,16 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.4.4 — two-phase Replace walls and full-buffer fluid recovery**
+**Version 0.4.5 — correctly oriented CC links and stable tablet warning light**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.4.5 — correct coordinator vertical link and handheld indicator animation
+
+- **Vertical Collection Coordinator faces:** Corrected the Minecraft blockstate X rotations on every up/down attachment: the side with a linked drill **below** now shows the teal link on the **bottom** face, not on top. An upward-facing CC connection is displayed on the top. This also fixes up/down orientations for filler input and storage output models.
+- **Mining Tablet handheld light:** Removed the old `minecraft:time` **random-range model swap** for red/yellow states. That random selection produced irregular whole-model flickering which resembled Z-fighting. The handheld model stays *completely still*, and **only its lamp's dedicated pixel texture animates**, alternating 10-tick OFF/ON frames (a 20-tick cycle), like the placed Mining Computer's status blink. The installed tablet still uses its separate blockstate-driven lamp animation.
+- **Zero block/item ID changes.** A previously linked tablet and existing CCs work without conversion. Java 25 / Minecraft 26.2 Fabric build verified by CI; in-game shader and multiplayer rendering still need a playtest.
 
 ## v0.4.4 — Clear every wall block before material deliveries
 

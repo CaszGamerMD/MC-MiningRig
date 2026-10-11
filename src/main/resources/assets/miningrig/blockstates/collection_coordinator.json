@@ -116,7 +116,7 @@
       },
       "apply": {
         "model": "miningrig:block/collection_port_input",
-        "x": 90
+        "x": 270
       }
     },
     {
@@ -125,7 +125,7 @@
       },
       "apply": {
         "model": "miningrig:block/collection_port_output",
-        "x": 90
+        "x": 270
       }
     },
     {
@@ -134,7 +134,7 @@
       },
       "apply": {
         "model": "miningrig:block/collection_port_link",
-        "x": 90
+        "x": 270
       }
     },
     {
@@ -143,7 +143,7 @@
       },
       "apply": {
         "model": "miningrig:block/collection_port_input",
-        "x": 270
+        "x": 90
       }
     },
     {
@@ -152,7 +152,7 @@
       },
       "apply": {
         "model": "miningrig:block/collection_port_output",
-        "x": 270
+        "x": 90
       }
     },
     {
@@ -161,7 +161,7 @@
       },
       "apply": {
         "model": "miningrig:block/collection_port_link",
-        "x": 270
+        "x": 90
       }
     }
   ]
