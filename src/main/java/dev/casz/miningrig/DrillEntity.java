@@ -56,6 +56,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         if(hardwareIdentity.isBlank()){hardwareIdentity=java.util.UUID.randomUUID().toString();setChanged();}
         return hardwareIdentity;
     }
+    public boolean waitingForHardware(){return hardware.awaitingReplacement()&&!hardware.waitExpired();}
     public int emptyBitSlots(){
         int n=0;for(int i=0;i<BIT_SLOTS;i++)if(items.get(i).isEmpty())n++;
         return n;
