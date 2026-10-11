@@ -39,6 +39,17 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     // 0 unconfigured, 1 filler input, 2 wall input (pause), 3 wall input (continue), 4 output.
     // CC links and the upward drill link need no direction setting.
     private final int[] mode={0,0,0,0,0,0};
+    private final String[] containerNames={"","","","","",""};
+    public String containerNickname(Direction face){
+        return containerNames[face.get3DDataValue()];
+    }
+    public boolean nameContainer(Direction face,String value){
+        int slot=face.get3DDataValue();
+        if(value==null || value.length()>32)return false;
+        if(!(level instanceof ServerLevel world)||external(world,face)==null)return false;
+        containerNames[slot]=value.strip().replace('\n',' ').replace('\r',' ').replace('\t',' ');
+        setChanged();return true;
+    }
     private int wirelessMask,adjacentMask,drillMask,page;
     private boolean dropped;
     private final List<Flight> flights=new ArrayList<>();
@@ -381,7 +392,10 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     }
     @Override protected void saveAdditional(ValueOutput out){
         super.saveAdditional(out);ContainerHelper.saveAllItems(out,items);
-        for(int i=0;i<6;i++)out.putInt("Port"+i,mode[i]);
+        for(int i=0;i<6;i++){
+            out.putInt("Port"+i,mode[i]);
+            out.putString("ContainerName"+i,containerNames[i]);
+        }
         fillerDepot.save(out);
         wallDepot.save(out);
         out.putInt("FlightCount",flights.size());
@@ -407,6 +421,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         for(int i=0;i<6;i++){
             int old=in.getIntOr("Face"+i,1);
             mode[i]=Math.max(0,Math.min(5,in.getIntOr("Port"+i,old==2?RigNetwork.OUTPUT:0)));
+            containerNames[i]=in.getStringOr("ContainerName"+i,"");
         }
         for(int i=0;i<Math.min(MAX_FLIGHTS,in.getIntOr("FlightCount",0));i++){
             String key="Flight"+i;
