@@ -77,6 +77,9 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         wallWorkCharge=0;wallWorkTarget=null;
         for(int i=0;i<BIT_SLOTS;i++){assigned[i]=-1;progress[i]=0;}
         relocating=false;contentsDropped=false;
+        // Binding comes exclusively from the newly placed item's pairing
+        // component. Never retain a prior block entity's old supervisor.
+        linkedToken="";computerPos=null;computerDimension="";
         linkConfirmed=false;
         setChanged();
     }
