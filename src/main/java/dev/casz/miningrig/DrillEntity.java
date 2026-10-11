@@ -520,7 +520,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         moved.hardwareIdentity=identity();
         moved.lastConnectedCoordinator=lastConnectedCoordinator;
         moved.lastConnectedPosition=lastConnectedPosition;
-        hardware.moveTo(moved.hardware);
+        hardware.moveTo(moved.hardware,next);
         RigTopology.forgetDrill(world,previous);
         moved.completedLayers=nextLayer;moved.cursor=0;
         moved.workTicks=workTicks;
