@@ -37,7 +37,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private final int[] assigned={-1,-1,-1};
     private final float[] progress=new float[BIT_SLOTS];
     private int startY, completedLayers, cursor;
-    private boolean initialized, relocating, contentsDropped;
+    private boolean initialized, relocating, contentsDropped, layerBitsRequested;
     private String hardwareIdentity="";
     @Nullable private BlockPos lastConnectedCoordinator;
     @Nullable private BlockPos lastConnectedPosition;
@@ -78,7 +78,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     public void resetTask(ServerLevel world){
         pauseSupply(world);
         sealing.resetForPlacement(world,worldPosition);
-        initialized=false;startY=worldPosition.getY();
+        initialized=false;layerBitsRequested=false;startY=worldPosition.getY();
         completedLayers=0;cursor=0;workTicks=0;
         placementCharge=0;wallWorkCharge=0;
         placementBit=-1;wallWorkTarget=null;
@@ -189,7 +189,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
      */
     public void resetForPlacement(ServerLevel world){
         sealing.resetForPlacement(world,worldPosition);
-        initialized=false;startY=worldPosition.getY();
+        initialized=false;layerBitsRequested=false;startY=worldPosition.getY();
         completedLayers=0;cursor=0;workTicks=0;
         placementCharge=0;placementBit=-1;
         page=0;storageBank=0;
@@ -389,6 +389,13 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         lastWallMode=computer.wallMode();
         if(completedLayers>=computer.depth() || worldPosition.getY()-1<world.getMinY())
             return ComputerEntity.Status.DONE;
+        if(!layerBitsRequested){
+            // Exactly one missing-slot scan at the start of each layer. Supply
+            // flights run independently from excavation and fluid/wall phases.
+            hardware.requestLayerBits(emptyBitSlots());
+            layerBitsRequested=true;
+            setChanged();
+        }
         workTicks++;
         // If the CC spine or its required inventories disappear while a rig is
         // running, do not mine indefinitely into an isolated 64-item buffer.
@@ -507,6 +514,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         }
         for(int i=0;i<SLOT_COUNT;i++)moved.items.set(i,items.get(i).copy());
         moved.initialized=true;moved.startY=startY;
+        moved.layerBitsRequested=false; // the descending drill starts a new layer
         moved.hardwareIdentity=identity();
         moved.lastConnectedCoordinator=lastConnectedCoordinator;
         moved.lastConnectedPosition=lastConnectedPosition;
@@ -596,6 +604,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         ContainerHelper.saveAllItems(out,items);
         out.putInt("StartY",startY);out.putInt("Layers",completedLayers);
         out.putInt("Cursor",cursor);out.putBoolean("Initialized",initialized);
+        out.putBoolean("LayerBitsRequested",layerBitsRequested);
         out.putLong("WorkTicks",workTicks);
         out.putString("DrillIdentity",identity());
         if(lastConnectedCoordinator!=null)out.putLong("LastCC",lastConnectedCoordinator.asLong());
@@ -629,6 +638,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         if(items.get(0).isEmpty())items.set(0,in.read("Tip",ItemStack.CODEC).orElse(ItemStack.EMPTY));
         startY=in.getIntOr("StartY",worldPosition.getY());completedLayers=in.getIntOr("Layers",0);
         cursor=in.getIntOr("Cursor",0);initialized=in.getBooleanOr("Initialized",false);
+        layerBitsRequested=in.getBooleanOr("LayerBitsRequested",false);
         workTicks=in.getLongOr("WorkTicks",0);
         hardwareIdentity=in.getStringOr("DrillIdentity","");
         lastConnectedCoordinator=in.getLong("LastCC").isPresent()
