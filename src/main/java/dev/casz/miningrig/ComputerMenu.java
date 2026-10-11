@@ -36,7 +36,7 @@ public final class ComputerMenu extends AbstractContainerMenu {
                 computer.getBlockPos().getY()+.5,computer.getBlockPos().getZ()+.5)<=64));
     }
     @Override public boolean clickMenuButton(Player player,int id){
-        if(computer==null)return id>=0&&id<=39;
+        if(computer==null)return id>=0&&id<=44;
         if(id>=0&&id<4)computer.select(id);
         else if(id>=10&&id<14)computer.toggle(id-10);
         else if(id>=20&&id<24)computer.unlink(id-20);
@@ -50,6 +50,11 @@ public final class ComputerMenu extends AbstractContainerMenu {
         else if(id==37)computer.setFillAttemptLimit(computer.selectedFillAttemptLimit()+1);
         else if(id==38)computer.setFillAttemptLimit(computer.selectedFillAttemptLimit()-25);
         else if(id==39)computer.setFillAttemptLimit(computer.selectedFillAttemptLimit()+25);
+        else if(id==40)computer.resetTask(computer.selected());
+        else if(id==41)computer.muteAlerts();
+        else if(id==42)computer.startAll();
+        else if(id==43)computer.stopAll();
+        else if(id==44)computer.allowRescan();
         else return false;
         broadcastChanges();return true;
     }
