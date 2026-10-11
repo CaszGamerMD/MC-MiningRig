@@ -43,10 +43,12 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     private boolean dropped;
     private final List<Flight> flights=new ArrayList<>();
     // Independent supply buffer, never mixed with normal mined-item output.
-    private final CoordinatorFillerCache fillerDepot=new CoordinatorFillerCache();
-    int cachedFillerPending(){return fillerDepot.stored();}
-    @Nullable RigNetwork.Supply takeCachedFiller(ServerLevel world,DrillEntity drill,int amount){
-        return fillerDepot.take(drill,this,amount);
+    private final CoordinatorFillerCache fillerDepot=new CoordinatorFillerCache(false,"");
+    private final CoordinatorFillerCache wallDepot=new CoordinatorFillerCache(true,"Wall");
+    int cachedSupplyPending(boolean walls){return (walls?wallDepot:fillerDepot).stored();}
+    @Nullable RigNetwork.Supply takeCachedSupply(ServerLevel world,DrillEntity drill,
+            boolean walls,int amount){
+        return (walls?wallDepot:fillerDepot).take(drill,this,amount);
     }
 
     private static final class Flight {
@@ -66,13 +68,13 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     private final ContainerData data=new ContainerData(){
         @Override public int get(int i){
             return i<6?(((wirelessMask|drillMask)&(1<<i))!=0?5:mode[i]):i==6?wirelessMask|adjacentMask
-                :i==7?stored():i==8?adjacentMask:i==9?page:i==10?drillMask:fillerDepot.stored();
+                :i==7?stored():i==8?adjacentMask:i==9?page:i==10?drillMask:i==11?fillerDepot.stored():wallDepot.stored();
         }
         @Override public void set(int i,int v){
             if(i<6)mode[i]=Math.max(0,Math.min(4,v));
             else if(i==9)page=Math.max(0,Math.min(7,v));
         }
-        @Override public int getCount(){return 12;}
+        @Override public int getCount(){return 13;}
     };
     public CoordinatorEntity(BlockPos pos,BlockState state){super(MiningRig.COORDINATOR_ENTITY,pos,state);}
     public boolean acceptsDrillFromBelow(){return true;}
@@ -159,7 +161,9 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         if(now%10==0)cc.refresh(world);
         RigMachineSounds.coordinatorTick(world,pos);
         cc.advance(world,now);
-        cc.fillerDepot.tick(world,cc,cc.drillBelow(world));
+        DrillEntity linkedDrill=cc.drillBelow(world);
+        cc.fillerDepot.tick(world,cc,linkedDrill);
+        cc.wallDepot.tick(world,cc,linkedDrill);
         // Adjacent container output does not consume wireless travel bandwidth.
         for(int n=0;n<CONTAINER_ACTIONS_PER_TICK;n++)
             if(!cc.outputToContainer(world))break;
@@ -322,6 +326,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         if(dropped||level==null||level.isClientSide())return;
         dropped=true;
         fillerDepot.flush((ServerLevel)level,this);
+        wallDepot.flush((ServerLevel)level,this);
         for(Flight flight:flights){
             flight.discard();
             for(ItemStack item:flight.cargo)
@@ -370,6 +375,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
         super.saveAdditional(out);ContainerHelper.saveAllItems(out,items);
         for(int i=0;i<6;i++)out.putInt("Port"+i,mode[i]);
         fillerDepot.save(out);
+        wallDepot.save(out);
         out.putInt("FlightCount",flights.size());
         for(int i=0;i<flights.size();i++){
             Flight f=flights.get(i);
@@ -387,6 +393,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     @Override protected void loadAdditional(ValueInput in){
         super.loadAdditional(in);ContainerHelper.loadAllItems(in,items);
         fillerDepot.load(in);
+        wallDepot.load(in);
         for(Flight flight:flights)flight.discard();
         flights.clear();
         for(int i=0;i<6;i++){

@@ -48,12 +48,26 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     public boolean fluidWarning(){return sealing.warning();}
     /** Only recovery mode requests the 192-item CC filler depot. */
     private long lastControllerTick=Long.MIN_VALUE;
+    private int lastWallMode;
     public boolean fluidFilling(){return sealing.fluidFilling();}
-    /** CC prefetch runs only for a drill that is actually processing ticks. */
-    public boolean activelyFilling(ServerLevel world){
+    private boolean recentlyProcessing(ServerLevel world){
         long now=world.getGameTime();
-        return sealing.fluidFilling() && lastControllerTick>=0 &&
-            now>=lastControllerTick && now-lastControllerTick<=2;
+        return lastControllerTick>=0 && now>=lastControllerTick
+            && now-lastControllerTick<=2;
+    }
+    /** CC staging begins during wall excavation, before the drill places
+     * its first replacement block. All three phases keep their own stock. */
+    public boolean activelyWalling(ServerLevel world){
+        return recentlyProcessing(world) && lastWallMode==2
+            && !sealing.fallback() && sealing.needsWallSupply();
+    }
+    public int wallDepotTarget(){return sealing.wallDepotTarget();}
+    /** The Filler cache also feeds Air-mode wall patches, not only water. */
+    public boolean activelyFilling(ServerLevel world){
+        return recentlyProcessing(world) &&
+            (sealing.fluidFilling() ||
+                (sealing.needsAirFiller() && (lastWallMode==1
+                    || lastWallMode==2 && sealing.fallback())));
     }
     public void retryFailedFill(ServerLevel world){sealing.retryFailedFill(world,this);}
     public boolean canAutoRecoverFill(ServerLevel world){return sealing.canAutoRecover(world);}
@@ -277,6 +291,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     /** Called once each server tick, not every 8 ticks; speed follows vanilla break progress. */
     public ComputerEntity.Status mineTick(ServerLevel world,ComputerEntity computer) {
         lastControllerTick=world.getGameTime();
+        lastWallMode=computer.wallMode();
         if(completedLayers>=computer.depth() || worldPosition.getY()-1<world.getMinY())
             return ComputerEntity.Status.DONE;
         workTicks++;
@@ -397,6 +412,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         moved.computerDimension=computerDimension;
         moved.linkConfirmed=linkConfirmed;
         moved.lastControllerTick=lastControllerTick;
+        moved.lastWallMode=lastWallMode;
         moved.lastCuttingAudioTick=lastCuttingAudioTick;
         moved.placementCharge=placementCharge;
         moved.placementBit=placementBit;

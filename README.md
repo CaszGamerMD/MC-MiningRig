@@ -1,10 +1,24 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.4.9 — CC Placement Guide**
+**Version 0.4.10 — full-speed Wall/Filler supply buffers**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.4.10 — continuously stocked Wall + Filler depots
+
+Both **Replace walling** and **fluid sealing** now use the same fast, two-stage delivery strategy:
+
+- The **nearest Collection Coordinator** above each actively working drill now has *two independent, persistent supply depots*: up to **192 Filler** and up to **192 Wall blocks**. These reserves are separate from the coordinator's 192-item mined-output inventory. The Wall depot is capped to the **remaining outside-ring block count minus stock already reserved at the drill**, so small rings do not pull hundreds of unnecessary blocks. The CC stages Wall supplies **while the drill is still excavating the outside ring**, rather than waiting until the wall has been cleared.
+- The drill keeps its own **64-item Filler** and **64-item Wall** supply buffers (including ready and incoming reserved blocks). In Replace mode, the drill requests the number of remaining wall positions, capped at the 64-block buffer; replacement starts from material already on its way. Fluid sealing keeps Filler at 64, while **Air-mode wall repairs also use that same 64-block Filler reserve** instead of requesting one block at a time.
+- Both CC and drill buffers begin replenishing as soon as a shipment is taken or a placed block consumes stock. Wall shipments already heading into the closest CC are not double-reserved directly from input chests; Air-mode walls only pull Filler when there are actual voids to repair. Each visual packet holds **at most 3 items**, with multiple independent flights. The incoming network flight time was shortened from approximately **2.5 ticks per block to 0.8 ticks per block** (minimum 2 ticks per leg), so a 20-block link takes around **16 game ticks**, rather than 50. The items remain visibly animated, uncollectable in flight, and use the 55%-size ground-model display.
+- Filler and Wall packets retain source-container coordinates, insertion side, inventory ownership and flight progress through saves, unloading, and drill descent. Surplus supply tries the **original input container** first, then a reachable **output**, then the safe drill-inventory/world-drop fallback. CC depots stop restocking when a drill stops or changes to a different work mode.
+- The CC GUI now shows **F: N/192** and **W: N/192**, allowing live inspection of both depots. Normal CC storage is still displayed separately.
+
+The mine's execution order remains **clear Replace wall → place each wall and verify → seal outer fluids → seal inner fluids → mine the layer**. The configurable per-position Fill Attempts limit is unchanged.
+
+**Testing:** use a backup world with a deep drill, multiple CC hops and separate Wall/Filler input chests. Verify prefetch during wall excavation, 64-block drill stock while placing, both 192-block CC depots, shorter visible flights, Pause/Continue when Wall stock runs out, and leftovers returning to their original chests. CI validates compilation, not actual in-game throughput.
 
 ## v0.4.9 — CC Placement Guide
 

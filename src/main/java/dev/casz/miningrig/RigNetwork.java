@@ -78,9 +78,13 @@ public final class RigNetwork {
         return false;
     }
     /** Count also material whose prefetch flight has not reached the CC. */
-    public static boolean fillerDepotPending(ServerLevel world,DrillEntity drill){
+    public static boolean supplyDepotPending(ServerLevel world,DrillEntity drill,
+            boolean walls){
         CoordinatorEntity depot=nearestDrillCoordinator(world,drill);
-        return depot!=null && depot.cachedFillerPending()>0;
+        return depot!=null && depot.cachedSupplyPending(walls)>0;
+    }
+    public static boolean fillerDepotPending(ServerLevel world,DrillEntity drill){
+        return supplyDepotPending(world,drill,false);
     }
     public static boolean hasOutput(ServerLevel world,DrillEntity drill){
         for(CoordinatorEntity cc:members(world,drill))
@@ -223,18 +227,23 @@ public final class RigNetwork {
      */
     public static Supply reservePacket(ServerLevel world,DrillEntity drill,boolean walls,int requested){
         int max=Math.max(0,Math.min(3,requested));
-        if(!walls&&max>0){
+        if(max>0){
             CoordinatorEntity near=nearestDrillCoordinator(world,drill);
             if(near!=null){
-                Supply staged=near.takeCachedFiller(world,drill,max);
+                Supply staged=near.takeCachedSupply(world,drill,walls,max);
                 if(staged!=null)return staged;
+                // A Wall shipment has already left its input chest and is
+                // on the way to the depot. Wait for it instead of reserving
+                // a second copy directly from the same container.
+                if(walls && near.cachedSupplyPending(true)>0)return null;
             }
         }
         return reserveFromInput(world,drill,walls,max);
     }
     /** For CC prefetch: bypass its own cache to avoid recirculation. */
-    public static Supply reserveForCache(ServerLevel world,DrillEntity drill,int amount){
-        Supply cargo=reserveFromInput(world,drill,false,amount);
+    public static Supply reserveForCache(ServerLevel world,DrillEntity drill,
+            boolean walls,int amount){
+        Supply cargo=reserveFromInput(world,drill,walls,amount);
         if(cargo==null)return null;
         List<BlockPos> path=new ArrayList<>(cargo.path());
         if(!path.isEmpty()&&path.get(path.size()-1).equals(drill.getBlockPos()))

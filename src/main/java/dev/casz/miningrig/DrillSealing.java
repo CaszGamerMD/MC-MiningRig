@@ -38,9 +38,11 @@ final class DrillSealing {
     private int gravityDropDepth;
     private boolean wallFallback,wallFinished,wallSourceChecked;
     private int cautionTicks;
-    private final WallSupplyPipeline walls=new WallSupplyPipeline("Replace",true,48);
+    private final WallSupplyPipeline walls=new WallSupplyPipeline("Replace",true,64);
     private final WallSupplyPipeline filler=new WallSupplyPipeline("Fluid",false,64);
     private boolean replaceCleared,fluidMode,legacyWallPhase;
+    private int wallPositionsRemaining;
+    private boolean airWallNeeded;
     @Nullable private RigNetwork.Supply delivery;
     @Nullable private BlockPos deliveryTarget;
     private boolean deliveryWall,pendingSourceWalls;
@@ -49,6 +51,10 @@ final class DrillSealing {
 
     boolean warning(){return !fluidSpots.isEmpty()||pending!=null||cautionTicks>0;}
     boolean fluidFilling(){return fluidMode;}
+    boolean needsWallSupply(){return !wallFinished;}
+    boolean needsAirFiller(){return !wallFinished && airWallNeeded;}
+    int wallDepotTarget(){return Math.max(0,wallPositionsRemaining
+        -walls.readyCount()-walls.flightCount());}
     boolean fallback(){return wallFallback;}
     /** Saved failing coordinate; do not report a generic error with no target. */
     @Nullable BlockPos stuckPosition(){
@@ -167,6 +173,8 @@ final class DrillSealing {
         next.wallSourceChecked=wallSourceChecked;
         next.cautionTicks=cautionTicks;
         next.replaceCleared=replaceCleared;next.fluidMode=fluidMode;
+        next.wallPositionsRemaining=wallPositionsRemaining;
+        next.airWallNeeded=airWallNeeded;
         next.legacyWallPhase=legacyWallPhase;
         walls.moveTo(next.walls);filler.moveTo(next.filler);
         next.delivery=delivery;next.deliveryTarget=deliveryTarget;
@@ -181,6 +189,7 @@ final class DrillSealing {
         wallFallback=false;wallSourceChecked=false;wallFinished=false;
         cautionTicks=0;pending=null;pendingWall=false;
         replaceCleared=false;fluidMode=false;legacyWallPhase=false;
+        wallPositionsRemaining=0;airWallNeeded=false;
         deliveryWall=false;pendingSourceWalls=false;flightTicks=0;attempts=0;wait=0;
         attemptTarget=null;allowedAttempts=configuredLimit;gravityDropDepth=0;
         discardVisual();
@@ -190,6 +199,7 @@ final class DrillSealing {
         wait=0;attempts=0;wallFinished=false;wallSourceChecked=false;
         attemptTarget=null;allowedAttempts=configuredLimit;gravityDropDepth=0;
         replaceCleared=false;fluidMode=false;
+        wallPositionsRemaining=0;airWallNeeded=false;
     }
     private boolean outsideHole(BlockPos pos,DrillEntity drill,ComputerEntity computer){
         return !contains(computer,pos.getX()-drill.getBlockPos().getX(),
@@ -333,7 +343,9 @@ final class DrillSealing {
         if(!world.setBlock(target,item.getBlock().defaultBlockState(),Block.UPDATE_ALL))
             return ComputerEntity.Status.BLOCKED;
         stock.consume();
-        pending=target.immutable();pendingWall=wall;wait=settleTicks(available);attempts++;
+        pending=target.immutable();pendingWall=wall;
+        pendingSourceWalls=stock==walls;
+        wait=settleTicks(available);attempts++;
         drill.placementWear(world);drill.setChanged();
         return ComputerEntity.Status.RUNNING;
     }
@@ -346,10 +358,16 @@ final class DrillSealing {
         if(failed())return ComputerEntity.Status.FILL_FAILED;
         // Retry EXACTLY this position, rather than selecting another fluid
         // cell from a newly reordered LinkedHashSet and carrying its 24 tries.
-        WallSupplyPipeline stock=pendingWall?walls:filler;
+        WallSupplyPipeline stock=pendingSourceWalls?walls:filler;
         if(!stock.hasSupply()){
-            if(stock.hasFlights())return ComputerEntity.Status.RUNNING;
-            return pendingWall?ComputerEntity.Status.OUT_OF_WALLS:
+            if(stock.hasFlights() || RigNetwork.supplyDepotPending(world,drill,pendingSourceWalls))
+                return ComputerEntity.Status.RUNNING;
+            if(pendingSourceWalls && RigNetwork.wallsCanContinue(world,drill)){
+                wallFallback=true;
+                pendingSourceWalls=false;
+                return ComputerEntity.Status.RUNNING;
+            }
+            return pendingSourceWalls?ComputerEntity.Status.OUT_OF_WALLS:
                 ComputerEntity.Status.OUT_OF_FILLER;
         }
         return applyFromStock(world,drill,stock,pending,pendingWall);
@@ -372,6 +390,12 @@ final class DrillSealing {
     private ComputerEntity.Status replaceWall(ServerLevel world,DrillEntity drill,
                                               ComputerEntity computer){
         List<BlockPos> perimeter=ring(drill,computer);
+        // Stage the required Wall blocks WHILE the ring is being excavated.
+        // Never pull beyond the unbuilt positions already covered by stock.
+        wallPositionsRemaining=0;
+        for(BlockPos at:perimeter)
+            if(!finishedWalls.contains(at)&&!immune(world.getBlockState(at)))
+                wallPositionsRemaining++;
         if(!replaceCleared){
             for(BlockPos at:perimeter){
                 if(!world.hasChunkAt(at))return ComputerEntity.Status.BLOCKED;
@@ -411,14 +435,16 @@ final class DrillSealing {
                 return ComputerEntity.Status.RUNNING;
             }
         }
+        wallPositionsRemaining=remaining;
         if(remaining==0){
             walls.flush(world,drill);
             replaceCleared=false;wallFinished=true;drill.setChanged();
             return null;
         }
-        walls.request(world,drill,remaining);
+        walls.request(world,drill,Math.min(64,remaining));
         if(!walls.hasSupply()){
-            if(walls.hasFlights())return ComputerEntity.Status.RUNNING;
+            if(walls.hasFlights() || RigNetwork.supplyDepotPending(world,drill,true))
+                return ComputerEntity.Status.RUNNING;
             if(RigNetwork.wallsCanContinue(world,drill)){
                 walls.flush(world,drill);
                 wallFallback=true;replaceCleared=false;
@@ -431,13 +457,35 @@ final class DrillSealing {
     /** Wall handling always precedes the fluid check and core excavation. */
     ComputerEntity.Status wallStep(ServerLevel world,DrillEntity drill,ComputerEntity computer){
         retryWallSource(world,drill);
-        if(computer.wallMode()==0||wallFinished)return null;
+        if(computer.wallMode()==0||wallFinished){
+            wallPositionsRemaining=0;airWallNeeded=false;
+            return null;
+        }
         legacyWallPhase=true;
         if(delivery!=null)return advanceDelivery(world,drill);
-        if(computer.wallMode()==2&&!wallFallback)return replaceWall(world,drill,computer);
-        // Air mode and depleted-wall Continue fallback retain simple patching.
+        if(computer.wallMode()==2&&!wallFallback){
+            airWallNeeded=false;
+            return replaceWall(world,drill,computer);
+        }
+        wallPositionsRemaining=0;
+        airWallNeeded=pending!=null&&pendingWall;
+        for(BlockPos at:ring(drill,computer)){
+            if(finishedWalls.contains(at)||!world.hasChunkAt(at))continue;
+            BlockState state=world.getBlockState(at);
+            if(!immune(state)&&!solid(world,at)){
+                airWallNeeded=true;break;
+            }
+        }
+        // Air-mode walls draw from the SAME 64-item Filler reservoir used for
+        // ocean sealing. No more one-by-one source-to-drill supply waits.
+        // Do not reserve 64 blocks on fully solid ring layers: that caused
+        // needless chest withdrawal/refund cycles before any actual work.
+        if(airWallNeeded){
+            filler.tick(world,drill);
+            filler.request(world,drill,64);
+        }
         if(pending!=null&&pendingWall){
-            ComputerEntity.Status check=verify(world,drill);
+            ComputerEntity.Status check=verifyStock(world,drill);
             if(check!=null)return check;
         }
         for(BlockPos at:ring(drill,computer)){
@@ -445,10 +493,15 @@ final class DrillSealing {
             if(!world.hasChunkAt(at))return ComputerEntity.Status.BLOCKED;
             BlockState state=world.getBlockState(at);
             if(immune(state)||solid(world,at)){finishedWalls.add(at);continue;}
-            return beginPlacement(world,drill,at,false);
+            if(!filler.hasSupply()){
+                if(filler.hasFlights() || RigNetwork.supplyDepotPending(world,drill,false))
+                    return ComputerEntity.Status.RUNNING;
+                return ComputerEntity.Status.OUT_OF_FILLER;
+            }
+            return applyFromStock(world,drill,filler,at,true);
         }
         walls.flush(world,drill);
-        wallFinished=true;drill.setChanged();
+        wallFinished=true;airWallNeeded=false;drill.setChanged();
         return null;
     }
     /**
@@ -462,6 +515,10 @@ final class DrillSealing {
         scanFluids(world,drill,computer);
         if(!fluidSpots.isEmpty()||pending!=null&&!pendingWall)fluidMode=true;
         if(!fluidMode){
+            // Air-mode walls may already have prefetched Filler. Return unused
+            // stock if there is no fluid work after the wall step.
+            if(filler.readyCount()>0 || filler.hasFlights())
+                filler.flush(world,drill);
             if(cautionTicks>0)cautionTicks--;
             return null;
         }

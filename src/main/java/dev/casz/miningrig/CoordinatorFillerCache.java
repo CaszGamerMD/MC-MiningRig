@@ -16,16 +16,20 @@ import net.minecraft.world.level.storage.ValueOutput;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A separate 192-block Filler depot at the CC directly above a filling drill.
+ * One independent 192-block Filler or Wall supply depot at the nearest CC.
  *
- * The depot is actively restocked, 3 blocks per packet, at the same time that
- * the drill fills its own 64-block buffer. Every unit has one owner: original
+ * Each requested material type is prefetched, 3 blocks per packet, at the
+ * same time that the drill replenishes its own 64-block buffer. Every unit has one owner: original
  * container -> inbound packet -> CC cache -> drill packet -> placed block.
  * No player can extract the ItemDisplay entities during transit.
  */
 final class CoordinatorFillerCache {
     private static final int CAPACITY=192,PACKET=3,MAX_FLIGHTS=32,
         DISPATCH_PER_TICK=8,MAX_VISIBLE=24;
+    // Each instance owns its own depot and saved NBT namespace.
+    private final boolean walls;
+    private final String key;
+    CoordinatorFillerCache(boolean walls,String key){this.walls=walls;this.key=key;}
     private static final class Flight {
         final RigNetwork.Supply cargo;
         int ticks;
@@ -51,7 +55,7 @@ final class CoordinatorFillerCache {
     private static int legTicks(BlockPos a,BlockPos b){
         int d=Math.abs(a.getX()-b.getX())+Math.abs(a.getY()-b.getY())+
             Math.abs(a.getZ()-b.getZ());
-        return Math.max(3,(int)Math.ceil(d*2.5));
+        return Math.max(2,(int)Math.ceil(d*0.8));
     }
     private void moveDisplay(ServerLevel world,Flight f){
         List<BlockPos> path=f.cargo.path();
@@ -115,16 +119,19 @@ final class CoordinatorFillerCache {
         // Farther CCs must not all siphon extra filler from the same network.
         if(drill!=null && RigNetwork.nearestDrillCoordinator(world,drill)!=cc)
             drill=null;
-        if(drill==null || !drill.activelyFilling(world)){
+        if(drill==null || !(walls?drill.activelyWalling(world):drill.activelyFilling(world))){
             if(!isEmpty())flush(world,cc);
             if(changed)cc.setChanged();
             return;
         }
+        // Replace can calculate its exact ring demand, unlike unpredictable
+        // ocean fluid flow. Do not vacuum 192 Wall blocks for a 16-block ring.
+        int target=walls?Math.min(CAPACITY,drill.wallDepotTarget()):CAPACITY;
         int spawned=0;
-        while(stored()<CAPACITY && inbound.size()<MAX_FLIGHTS
+        while(stored()<target && inbound.size()<MAX_FLIGHTS
                 && spawned<DISPATCH_PER_TICK){
-            RigNetwork.Supply cargo=RigNetwork.reserveForCache(world,drill,
-                Math.min(PACKET,CAPACITY-stored()));
+            RigNetwork.Supply cargo=RigNetwork.reserveForCache(world,drill,walls,
+                Math.min(PACKET,target-stored()));
             if(cargo==null)break;
             if(cargo.path().size()<2)available.add(cargo);
             else inbound.add(new Flight(cargo,0));
@@ -190,28 +197,28 @@ final class CoordinatorFillerCache {
         return new RigNetwork.Supply(stack,path,source,face);
     }
     void save(ValueOutput out){
-        out.putInt("FillDepotReady",available.size());
+        out.putInt(key+"FillDepotReady",available.size());
         for(int i=0;i<available.size();i++)
-            saveCargo(out,"DepotReady"+i,available.get(i));
-        out.putInt("FillDepotFlights",inbound.size());
+            saveCargo(out,key+"DepotReady"+i,available.get(i));
+        out.putInt(key+"FillDepotFlights",inbound.size());
         for(int i=0;i<inbound.size();i++){
-            saveCargo(out,"DepotFlight"+i,inbound.get(i).cargo);
-            out.putInt("DepotTicks"+i,inbound.get(i).ticks);
+            saveCargo(out,key+"DepotFlight"+i,inbound.get(i).cargo);
+            out.putInt(key+"DepotTicks"+i,inbound.get(i).ticks);
         }
     }
     void load(ValueInput in){
         for(Flight flight:inbound)flight.discard();
         inbound.clear();available.clear();
-        int ready=Math.max(0,Math.min(192,in.getIntOr("FillDepotReady",0)));
+        int ready=Math.max(0,Math.min(192,in.getIntOr(key+"FillDepotReady",0)));
         for(int i=0;i<ready;i++){
-            RigNetwork.Supply cargo=readCargo(in,"DepotReady"+i);
+            RigNetwork.Supply cargo=readCargo(in,key+"DepotReady"+i);
             if(cargo!=null)available.add(cargo);
         }
-        int flights=Math.max(0,Math.min(MAX_FLIGHTS,in.getIntOr("FillDepotFlights",0)));
+        int flights=Math.max(0,Math.min(MAX_FLIGHTS,in.getIntOr(key+"FillDepotFlights",0)));
         for(int i=0;i<flights;i++){
-            RigNetwork.Supply cargo=readCargo(in,"DepotFlight"+i);
+            RigNetwork.Supply cargo=readCargo(in,key+"DepotFlight"+i);
             if(cargo!=null)inbound.add(new Flight(cargo,
-                Math.max(0,in.getIntOr("DepotTicks"+i,0))));
+                Math.max(0,in.getIntOr(key+"DepotTicks"+i,0))));
         }
     }
 }

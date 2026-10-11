@@ -74,7 +74,8 @@ public final class CoordinatorScreen extends AbstractContainerScreen<Coordinator
     }
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mx,int my,float delta){
         super.extractRenderState(g,mx,my,delta);
-        g.text(font,"FILLER BUFFER "+menu.fillerPending()+"/192",leftPos+7,topPos+78,0xffff726d,false);
+        g.text(font,"F: "+menu.fillerPending()+"/192",leftPos+7,topPos+78,0xffff726d,false);
+        g.text(font,"W: "+menu.wallPending()+"/192",leftPos+92,topPos+78,0xffffd34f,false);
         g.text(font,"STORAGE "+menu.stored()+"/192",leftPos+7,topPos+148,0xff9fe5ff,false);
         g.text(font,"PG "+(menu.page()+1)+"/8",leftPos+89,topPos+148,0xffffffff,false);
         for(int i=0;i<6;i++){
