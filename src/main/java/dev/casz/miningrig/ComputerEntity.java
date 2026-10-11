@@ -385,7 +385,9 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 else if(server.getBlockEntity(pos) instanceof DrillEntity drill
                         && drill.matchesLink(tokens[i])){
                     if(running[i] && statuses[i]!=Status.RECONNECTING){
-                        if(!drill.hasWorkingBits()&&!drill.waitingForHardware())
+                        if(!drill.hasWorkingBits()&&drill.waitingForHardware())
+                            status="Running / Waiting for bits";
+                        else if(!drill.hasWorkingBits())
                             status=Status.OUT_OF_BITS.display;
                         else if(drill.freeStorage()==0)status=Status.FULL.display;
                         else if(!RigTopology.joined(server,this,drill))
