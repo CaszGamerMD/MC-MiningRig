@@ -478,8 +478,12 @@ final class DrillSealing {
         }
         // Air-mode walls draw from the SAME 64-item Filler reservoir used for
         // ocean sealing. No more one-by-one source-to-drill supply waits.
-        filler.tick(world,drill);
-        filler.request(world,drill,64);
+        // Do not reserve 64 blocks on fully solid ring layers: that caused
+        // needless chest withdrawal/refund cycles before any actual work.
+        if(airWallNeeded){
+            filler.tick(world,drill);
+            filler.request(world,drill,64);
+        }
         if(pending!=null&&pendingWall){
             ComputerEntity.Status check=verifyStock(world,drill);
             if(check!=null)return check;
