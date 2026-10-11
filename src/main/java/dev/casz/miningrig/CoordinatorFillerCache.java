@@ -111,6 +111,10 @@ final class CoordinatorFillerCache {
         }
         // The supply cache exists only during active FILLING mode. It is not
         // general coordinator inventory and cannot be routed out by mistake.
+        // Only the nearest CC above this drill is its designated supply depot.
+        // Farther CCs must not all siphon extra filler from the same network.
+        if(drill!=null && RigNetwork.nearestDrillCoordinator(world,drill)!=cc)
+            drill=null;
         if(drill==null || !drill.fluidFilling()){
             if(!isEmpty())flush(world,cc);
             if(changed)cc.setChanged();
