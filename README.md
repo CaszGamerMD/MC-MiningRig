@@ -1,10 +1,31 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.4.5 — correctly oriented CC links and stable tablet warning light**
+**Version 0.4.6 — ocean-sealing recovery and configurable per-coordinate fill tries**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.4.6 — ocean mining: wall-fluid → interior-fluid → excavation
+
+An ocean mine can repeatedly refill its excavated space. The new **fluid recovery order** is:
+
+1. **Detect fluid** in the working layer or the one-block surrounding ring, regardless of Wall setting.
+2. **Seal the outer ring first.** For each fluid/air target, request a Filler block, place it, then **verify that very same coordinate is solid** after falling-block and water updates. Retry that coordinate until solid or its configured safety limit is reached; do **not** advance to a different coordinate prematurely.
+3. **Seal the interior second.** The drill examines every fluid location inside its selected mining footprint and applies the same one-coordinate-at-a-time placement and verification. A fresh scan can return it to the outer wall if water spreads back.
+4. **Resume mining** only after the full ring and mining area have been verified solid. The 64-Filler ready/in-flight stock stays replenished during the entire recovery operation; unused material returns to the network afterward.
+
+The existing normal **Wall → Fluid → Mining** execution order remains: Replace walls can still be mined and reconstructed ahead of fluid management. For fluid management specifically, the outer wall is sealed before the hole interior even if Wall Mode is Off.
+
+### Computer setting: Fill Attempts
+
+In the Mining Computer (or linked tablet's **same computer GUI**), select a drill and use the new **Fill tries / block** controls. Adjust by **±1** or **±25**, with a **default of 24** and supported range **1–4096**. Each of the four drills stores its own independently adjustable limit. It is saved to the computer and takes effect immediately without restarting or resetting the current excavation.
+
+The attempt counter belongs to **one X/Y/Z position**, never the entire wall ring, fluid phase, or drill depth. A 50-block shaft with sand falling through the water can therefore use a higher limit (for example, 100) without raising the limit for the other three drills. Deep gravity shafts receive additional settling time, but the configured number—not an automatic arbitrary threshold—is the cap.
+
+If the drill stops at the limit, the screen identifies **the blocked coordinates**. Increase Fill Attempts beyond the current count to resume automatically, or press Start/Stop to manually retry the exact same cell. If someone repairs the target with a lasting solid block, the drill can detect that and resume. The retry count and target coordinate survive saves/reloads.
+
+**Test on a backed-up ocean world:** start with a high limit, plentiful Filler storage and an output; watch the drill plug ocean-side boundary fluid first, then interior water, staying on each cell until verified solid. A falling sand/gravel shaft deeper than 24 should progress with a suitable higher limit instead of triggering the old stuck error.
 
 ## v0.4.5 — correct coordinator vertical link and handheld indicator animation
 
