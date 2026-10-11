@@ -68,6 +68,6 @@ public final class PagedDrillContainer implements Container {
     @Override public void clearContent(){
         for(int i=0;i<12;i++)setItem(i,ItemStack.EMPTY);
     }
-    @Override public void startOpen(Player player){drill.startOpen(player);}
-    @Override public void stopOpen(Player player){drill.stopOpen(player);}
+    public void startOpen(Player player){drill.startOpen(player);}
+    public void stopOpen(Player player){drill.stopOpen(player);}
 }
