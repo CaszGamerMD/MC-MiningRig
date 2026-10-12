@@ -4,7 +4,7 @@ import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
@@ -26,7 +26,7 @@ import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
 public final class DrillBlock extends BaseEntityBlock {
-    public static final DirectionProperty FACING=BlockStateProperties.FACING;
+    public static final EnumProperty<Direction> FACING=BlockStateProperties.FACING;
     public DrillBlock(Properties properties){
         super(properties);
         registerDefaultState(stateDefinition.any().setValue(FACING,Direction.DOWN));
