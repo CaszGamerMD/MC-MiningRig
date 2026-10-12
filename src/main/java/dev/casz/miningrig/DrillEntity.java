@@ -11,6 +11,9 @@ import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
@@ -32,7 +35,8 @@ import org.jetbrains.annotations.Nullable;
  * Mining output, filler and wall materials are three separate 64-item bundles.
  */
 public final class DrillEntity extends BlockEntity implements Container, MenuProvider {
-    public static final int BIT_SLOTS=3, SLOT_COUNT=67, CAPACITY=64;
+    public static final int BIT_SLOTS=3, OUTPUT_SLOTS=64, UPGRADE_SLOT=BIT_SLOTS+OUTPUT_SLOTS,
+        SLOT_COUNT=UPGRADE_SLOT+1, CAPACITY=64;
     private final NonNullList<ItemStack> items=NonNullList.withSize(SLOT_COUNT,ItemStack.EMPTY);
     private final int[] assigned={-1,-1,-1};
     private final float[] progress=new float[BIT_SLOTS];
@@ -88,6 +92,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     public boolean fluidWarning(){return sealing.warning();}
     /** Only recovery mode requests the 192-item CC filler depot. */
     private long lastControllerTick=Long.MIN_VALUE;
+    private int collectionRadius=6;
     private int lastWallMode;
     public boolean fluidFilling(){return sealing.fluidFilling();}
     private boolean recentlyProcessing(ServerLevel world){
@@ -138,6 +143,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     public void primeSupply(ServerLevel world,ComputerEntity computer){
         lastControllerTick=world.getGameTime();
         lastWallMode=computer.wallMode();
+        collectionRadius=Math.max(4,Math.min(14,computer.radius()+1));
         sealing.maintainSupply(world,this,computer);
         setChanged();
     }
@@ -229,6 +235,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
             }
         }
         drill.hardware.tick(server,drill);
+        if(server.getGameTime()%5==Math.floorMod(pos.hashCode(),5))
+            drill.collectGroundDrops(server);
         if(drill.computerPos==null || drill.linkConfirmed
                 || server.getGameTime()%20!=0)return;
         if(!server.dimension().identifier().toString().equals(drill.computerDimension)
@@ -264,12 +272,41 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         }
         return Math.max(1,(int)Math.ceil(remaining*ticksPerCell/20));
     }
-    public int stored(){return RigStorage.count(items,BIT_SLOTS);}
+    /** Upgrade slot is outside the 64-item mined-output inventory. */
+    public boolean hopperInstalled(){return items.get(UPGRADE_SLOT).is(Items.HOPPER);}
+    private void collectGroundDrops(ServerLevel world){
+        if(!hopperInstalled()||freeStorage()<=0)return;
+        double radius=collectionRadius;
+        AABB area=new AABB(worldPosition).inflate(radius,3.5,radius).move(0,-1.5,0);
+        int inspected=0;
+        for(ItemEntity entity:world.getEntitiesOfClass(ItemEntity.class,area)){
+            if(++inspected>48 || freeStorage()<=0)break;
+            if(!entity.isAlive())continue;
+            ItemStack onGround=entity.getItem();
+            if(onGround.isEmpty())continue;
+            int room=Math.min(onGround.getCount(),freeStorage());
+            if(room<=0)break;
+            ItemStack incoming=onGround.copyWithCount(room);
+            while(room>0&&!canReceive(List.of(incoming))){
+                room--;
+                if(room>0)incoming=onGround.copyWithCount(room);
+            }
+            if(room<=0||!receive(List.of(incoming)))continue;
+            if(room>=onGround.getCount())entity.discard();
+            else {
+                ItemStack remainder=onGround.copy();
+                remainder.shrink(room);
+                entity.setItem(remainder);
+            }
+        }
+    }
+    private List<ItemStack> outputItems(){return items.subList(0,UPGRADE_SLOT);}
+    public int stored(){return RigStorage.count(outputItems(),BIT_SLOTS);}
     public int freeStorage(){return CAPACITY-stored();}
-    public boolean canReceive(List<ItemStack> drops){return RigStorage.canInsert(items,BIT_SLOTS,CAPACITY,drops);}
+    public boolean canReceive(List<ItemStack> drops){return RigStorage.canInsert(outputItems(),BIT_SLOTS,CAPACITY,drops);}
     public boolean receive(List<ItemStack> drops) {
         if(!canReceive(drops))return false;
-        boolean ok=RigStorage.insert(items,BIT_SLOTS,CAPACITY,drops);
+        boolean ok=RigStorage.insert(outputItems(),BIT_SLOTS,CAPACITY,drops);
         if(ok)setChanged();
         return ok;
     }
@@ -535,6 +572,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         }
         for(int i=0;i<SLOT_COUNT;i++)moved.items.set(i,items.get(i).copy());
         moved.initialized=true;moved.startY=startY;
+        moved.collectionRadius=collectionRadius;
         moved.layerBitsRequested=false; // the descending drill starts a new layer
         moved.hardwareIdentity=identity();
         moved.lastConnectedCoordinator=lastConnectedCoordinator;
@@ -596,6 +634,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         setChanged();return item;
     }
     @Override public boolean canPlaceItem(int slot,ItemStack stack) {
+        if(slot<0||slot>=SLOT_COUNT)return false;
+        if(slot==UPGRADE_SLOT)return stack.is(Items.HOPPER);
         return slot<BIT_SLOTS?stack.getItem() instanceof DrillBit:
             !(stack.getItem() instanceof DrillBit) && freeStorage()>0;
     }
@@ -603,7 +643,10 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         return Math.min(stack.getMaxStackSize(),Math.max(1,freeStorage()));
     }
     @Override public void setItem(int slot,ItemStack stack) {
-        if(slot<BIT_SLOTS){
+        if(slot==UPGRADE_SLOT){
+            if(!stack.isEmpty()&&!stack.is(Items.HOPPER))return;
+            items.set(slot,stack.isEmpty()?ItemStack.EMPTY:stack.copyWithCount(1));
+        }else if(slot<BIT_SLOTS){
             if(!stack.isEmpty() && !(stack.getItem() instanceof DrillBit))return;
             items.set(slot,stack.isEmpty()?ItemStack.EMPTY:stack.copyWithCount(1));
         } else {
@@ -627,6 +670,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         out.putInt("Cursor",cursor);out.putBoolean("Initialized",initialized);
         out.putBoolean("LayerBitsRequested",layerBitsRequested);
         out.putLong("WorkTicks",workTicks);
+        out.putInt("CollectRadius",collectionRadius);
         out.putString("DrillIdentity",identity());
         if(lastConnectedCoordinator!=null)out.putLong("LastCC",lastConnectedCoordinator.asLong());
         if(lastConnectedPosition!=null)out.putLong("LastCCDrill",lastConnectedPosition.asLong());
@@ -661,6 +705,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         cursor=in.getIntOr("Cursor",0);initialized=in.getBooleanOr("Initialized",false);
         layerBitsRequested=in.getBooleanOr("LayerBitsRequested",false);
         workTicks=in.getLongOr("WorkTicks",0);
+        collectionRadius=Math.max(4,Math.min(14,in.getIntOr("CollectRadius",6)));
         hardwareIdentity=in.getStringOr("DrillIdentity","");
         lastConnectedCoordinator=in.getLong("LastCC").isPresent()
             ?BlockPos.of(in.getLongOr("LastCC",0)):null;
