@@ -2,6 +2,10 @@ package dev.casz.miningrig;
 
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -19,7 +23,14 @@ import net.minecraft.network.chat.Component;
  * Has no separate item/inventory; every action delegates to the drill below.
  */
 public final class DrillUpperBlock extends Block {
-    public DrillUpperBlock(Properties properties){super(properties);}
+    public static final DirectionProperty FACING=BlockStateProperties.FACING;
+    public DrillUpperBlock(Properties properties){
+        super(properties);
+        registerDefaultState(stateDefinition.any().setValue(FACING,Direction.DOWN));
+    }
+    @Override protected void createBlockStateDefinition(StateDefinition.Builder<Block,BlockState> builder){
+        builder.add(FACING);
+    }
     @Override protected MapCodec<? extends Block> codec(){return simpleCodec(DrillUpperBlock::new);}
     @Override protected RenderShape getRenderShape(BlockState state){return RenderShape.MODEL;}
     @Override protected InteractionResult useItemOn(ItemStack stack,BlockState state,Level level,
