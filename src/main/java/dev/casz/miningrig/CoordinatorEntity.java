@@ -229,7 +229,8 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
     private static List<ItemStack> peek(Container container,int start,int limit){
         int remaining=limit;
         List<ItemStack> cargo=new ArrayList<>();
-        for(int i=start;i<container.getContainerSize()&&remaining>0;i++){
+        for(int i=start,end=container instanceof DrillEntity?DrillEntity.UPGRADE_SLOT:
+            container.getContainerSize();i<end&&remaining>0;i++){
             ItemStack s=container.getItem(i);
             if(s.isEmpty())continue;
             int count=Math.min(s.getCount(),remaining);
