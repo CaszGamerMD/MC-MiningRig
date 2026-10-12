@@ -352,7 +352,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         return -1;
     }
     public ItemStack takeForCollector(int limit){
-        for(int i=BIT_SLOTS;i<SLOT_COUNT;i++) {
+        for(int i=BIT_SLOTS;i<UPGRADE_SLOT;i++) {
             ItemStack stack=items.get(i);
             if(!stack.isEmpty()){
                 ItemStack extracted=stack.split(Math.min(limit,stack.getCount()));
@@ -363,7 +363,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         return ItemStack.EMPTY;
     }
     public ItemStack peekForCollector(){
-        for(int i=BIT_SLOTS;i<SLOT_COUNT;i++)if(!items.get(i).isEmpty())return items.get(i);
+        for(int i=BIT_SLOTS;i<UPGRADE_SLOT;i++)if(!items.get(i).isEmpty())return items.get(i);
         return ItemStack.EMPTY;
     }
     private int enchantmentLevel(ServerLevel world,ItemStack stack,net.minecraft.resources.ResourceKey<Enchantment> key){
