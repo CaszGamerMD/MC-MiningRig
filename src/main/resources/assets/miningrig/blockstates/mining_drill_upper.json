@@ -1,44 +1,29 @@
 {
-  "multipart": [
-    {
-      "apply": {
-        "model": "miningrig:block/mining_drill_upper"
-      }
+  "variants": {
+    "facing=down": {
+      "model": "miningrig:block/mining_drill_upper"
     },
-    {
-      "when": {
-        "facing": "north"
-      },
-      "apply": {
-        "model": "miningrig:block/drill_direction_marker"
-      }
+    "facing=north": {
+      "model": "miningrig:block/mining_drill_upper",
+      "x": 90
     },
-    {
-      "when": {
-        "facing": "east"
-      },
-      "apply": {
-        "model": "miningrig:block/drill_direction_marker",
-        "y": 90
-      }
+    "facing=east": {
+      "model": "miningrig:block/mining_drill_upper",
+      "x": 90,
+      "y": 90
     },
-    {
-      "when": {
-        "facing": "south"
-      },
-      "apply": {
-        "model": "miningrig:block/drill_direction_marker",
-        "y": 180
-      }
+    "facing=south": {
+      "model": "miningrig:block/mining_drill_upper",
+      "x": 90,
+      "y": 180
     },
-    {
-      "when": {
-        "facing": "west"
-      },
-      "apply": {
-        "model": "miningrig:block/drill_direction_marker",
-        "y": 270
-      }
+    "facing=west": {
+      "model": "miningrig:block/mining_drill_upper",
+      "x": 90,
+      "y": 270
+    },
+    "facing=up": {
+      "model": "miningrig:block/mining_drill_upper"
     }
-  ]
+  }
 }
