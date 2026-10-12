@@ -509,14 +509,18 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         if(now%20==0){
             computer.activeSlot=computer.selected;
             BlockPos selectedPos=computer.positions[computer.selected];
-            if(selectedPos!=null&&server.hasChunkAt(selectedPos)){
+            if(selectedPos!=null&&server.hasChunkAt(selectedPos)
+                    &&server.getBlockEntity(selectedPos) instanceof DrillEntity displayed){
                 int rad=computer.radius();
                 for(int dx=-rad;dx<=rad;dx++)for(int dz=-rad;dz<=rad;dz++){
                     boolean boundary=computer.contains(dx,dz)
                         &&(!computer.contains(dx+1,dz)||!computer.contains(dx-1,dz)
                             ||!computer.contains(dx,dz+1)||!computer.contains(dx,dz-1));
-                    if(boundary)server.sendParticles(ParticleTypes.END_ROD,
-                        selectedPos.getX()+dx+.5,selectedPos.getY()+.2,selectedPos.getZ()+dz+.5,1,0,0,0,0);
+                    if(!boundary)continue;
+                    BlockPos rim=displayed.slicePosition(dx,dz);
+                    if(server.hasChunkAt(rim))
+                        server.sendParticles(ParticleTypes.END_ROD,
+                            rim.getX()+.5,rim.getY()+.5,rim.getZ()+.5,1,0,0,0,0);
                 }
             }
         }
