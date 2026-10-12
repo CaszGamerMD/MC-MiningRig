@@ -20,7 +20,7 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Visible yellow housing and top output hatch of the mining drill.
- * Has no separate item/inventory; every action delegates to the drill below.
+ * Has no separate item/inventory; every action delegates to the drill head.
  */
 public final class DrillUpperBlock extends Block {
     public static final EnumProperty<Direction> FACING=BlockStateProperties.FACING;
@@ -52,12 +52,15 @@ public final class DrillUpperBlock extends Block {
             }
             return InteractionResult.SUCCESS;
         }
-        if(!level.isClientSide() && owner(level,pos,state) instanceof DrillEntity drill){
-            int slot=drill.insertBit(stack);
-            if(slot<0)player.sendSystemMessage(Component.literal("All three drill-bit slots are occupied."));
-            else{
-                if(!player.getAbilities().instabuild)stack.shrink(1);
-                player.sendSystemMessage(Component.literal("Installed bit into slot "+(slot+1)));
+        if(!level.isClientSide()){
+            DrillEntity drill=owner(level,pos,state);
+            if(drill!=null){
+                int slot=drill.insertBit(stack);
+                if(slot<0)player.sendSystemMessage(Component.literal("All three drill-bit slots are occupied."));
+                else{
+                    if(!player.getAbilities().instabuild)stack.shrink(1);
+                    player.sendSystemMessage(Component.literal("Installed bit into slot "+(slot+1)));
+                }
             }
         }
         return InteractionResult.SUCCESS;
@@ -73,8 +76,8 @@ public final class DrillUpperBlock extends Block {
     @Override public BlockState playerWillDestroy(Level level,BlockPos pos,BlockState state,Player player){
         if(level instanceof ServerLevel server){
             BlockPos head=headPosition(pos,state);
-            if(server.getBlockState(head).is(MiningRig.DRILL)
-                    &&owner(server,pos,state) instanceof DrillEntity drill){
+            DrillEntity drill=owner(server,pos,state);
+            if(server.getBlockState(head).is(MiningRig.DRILL)&&drill!=null){
                 drill.dropInventory();
                 server.destroyBlock(head,!player.getAbilities().instabuild);
             }
