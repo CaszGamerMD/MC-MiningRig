@@ -1,7 +1,9 @@
 {
-  "variants": {
-    "": {
-      "model": "miningrig:block/mining_drill"
+  "multipart": [
+    {
+      "apply": {
+        "model": "miningrig:block/mining_drill"
+      }
     }
-  }
+  ]
 }
