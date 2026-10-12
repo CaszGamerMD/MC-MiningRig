@@ -1,9 +1,29 @@
 {
-  "multipart": [
-    {
-      "apply": {
-        "model": "miningrig:block/mining_drill"
-      }
+  "variants": {
+    "facing=down": {
+      "model": "miningrig:block/mining_drill"
+    },
+    "facing=north": {
+      "model": "miningrig:block/mining_drill",
+      "x": 90
+    },
+    "facing=east": {
+      "model": "miningrig:block/mining_drill",
+      "x": 90,
+      "y": 90
+    },
+    "facing=south": {
+      "model": "miningrig:block/mining_drill",
+      "x": 90,
+      "y": 180
+    },
+    "facing=west": {
+      "model": "miningrig:block/mining_drill",
+      "x": 90,
+      "y": 270
+    },
+    "facing=up": {
+      "model": "miningrig:block/mining_drill"
     }
-  ]
+  }
 }
