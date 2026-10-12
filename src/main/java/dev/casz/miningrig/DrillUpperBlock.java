@@ -33,14 +33,26 @@ public final class DrillUpperBlock extends Block {
     }
     @Override protected MapCodec<? extends Block> codec(){return simpleCodec(DrillUpperBlock::new);}
     @Override protected RenderShape getRenderShape(BlockState state){return RenderShape.MODEL;}
+    /** The drill head sits forward from this body on its FACING axis. */
+    private static BlockPos headPosition(BlockPos body,BlockState state){
+        return body.relative(state.getValue(FACING));
+    }
+    private static DrillEntity owner(Level level,BlockPos body,BlockState state){
+        BlockPos head=headPosition(body,state);
+        if(level.getBlockEntity(head) instanceof DrillEntity drill
+                &&drill.drillingDirection()==state.getValue(FACING))return drill;
+        return null;
+    }
     @Override protected InteractionResult useItemOn(ItemStack stack,BlockState state,Level level,
             BlockPos pos,Player player,InteractionHand hand,BlockHitResult hit){
         if(!(stack.getItem() instanceof DrillBit)){
-            if(!level.isClientSide() && level.getBlockEntity(pos.below()) instanceof DrillEntity drill)
-                player.openMenu(drill);
+            if(!level.isClientSide()){
+                DrillEntity drill=owner(level,pos,state);
+                if(drill!=null)player.openMenu(drill);
+            }
             return InteractionResult.SUCCESS;
         }
-        if(!level.isClientSide() && level.getBlockEntity(pos.below()) instanceof DrillEntity drill){
+        if(!level.isClientSide() && owner(level,pos,state) instanceof DrillEntity drill){
             int slot=drill.insertBit(stack);
             if(slot<0)player.sendSystemMessage(Component.literal("All three drill-bit slots are occupied."));
             else{
@@ -52,14 +64,20 @@ public final class DrillUpperBlock extends Block {
     }
     @Override protected InteractionResult useWithoutItem(BlockState state,Level level,BlockPos pos,
             Player player,BlockHitResult hit){
-        if(!level.isClientSide() && level.getBlockEntity(pos.below()) instanceof DrillEntity drill)
-            player.openMenu(drill);
+        if(!level.isClientSide()){
+            DrillEntity drill=owner(level,pos,state);
+            if(drill!=null)player.openMenu(drill);
+        }
         return InteractionResult.SUCCESS;
     }
     @Override public BlockState playerWillDestroy(Level level,BlockPos pos,BlockState state,Player player){
-        if(level instanceof ServerLevel server && server.getBlockState(pos.below()).is(MiningRig.DRILL)){
-            if(server.getBlockEntity(pos.below()) instanceof DrillEntity drill)drill.dropInventory();
-            server.destroyBlock(pos.below(),!player.getAbilities().instabuild);
+        if(level instanceof ServerLevel server){
+            BlockPos head=headPosition(pos,state);
+            if(server.getBlockState(head).is(MiningRig.DRILL)
+                    &&owner(server,pos,state) instanceof DrillEntity drill){
+                drill.dropInventory();
+                server.destroyBlock(head,!player.getAbilities().instabuild);
+            }
         }
         return super.playerWillDestroy(level,pos,state,player);
     }
