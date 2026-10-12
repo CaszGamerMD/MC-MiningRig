@@ -390,6 +390,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 if(!server.hasChunkAt(pos))status=Status.UNLOADED.display;
                 else if(server.getBlockEntity(pos) instanceof DrillEntity drill
                         && drill.matchesLink(tokens[i])){
+                    location+=" >"+drill.drillingDirection().getName().toUpperCase(java.util.Locale.ROOT);
                     if(running[i] && statuses[i]!=Status.RECONNECTING){
                         if(!drill.hasWorkingBits()&&drill.waitingForHardware())
                             status="Running / Waiting for bits";
