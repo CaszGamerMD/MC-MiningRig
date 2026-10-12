@@ -56,6 +56,36 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private int placementBit=-1;
     private BlockPos wallWorkTarget;
     public int completedLayers(){return completedLayers;}
+    /** Travel direction is saved in the block state, including during motion. */
+    public Direction drillingDirection(){
+        BlockState state=getBlockState();
+        Direction dir=state.hasProperty(DrillBlock.FACING)
+            ?state.getValue(DrillBlock.FACING):Direction.DOWN;
+        return dir==Direction.UP?Direction.DOWN:dir;
+    }
+    /**
+     * Map the computer's two-dimensional x/z footprint onto the NEXT
+     * excavation slice: horizontal x/z when mining down, vertical/upright
+     * when traveling horizontally. The direction property never changes.
+     */
+    public BlockPos slicePosition(int u,int v){
+        Direction forward=drillingDirection();
+        BlockPos face=worldPosition.relative(forward);
+        if(forward==Direction.DOWN)return face.offset(u,0,v);
+        return face.relative(forward.getClockWise(),u).above(v);
+    }
+    public boolean inSlice(BlockPos block,ComputerEntity computer,boolean expanded){
+        Direction forward=drillingDirection();
+        BlockPos face=worldPosition.relative(forward);
+        int dx=block.getX()-face.getX(),dy=block.getY()-face.getY(),
+            dz=block.getZ()-face.getZ();
+        if(forward==Direction.DOWN)return dy==0
+            && DrillSealing.contains(computer,dx,dz,expanded);
+        int u=dx*forward.getClockWise().getStepX()
+            +dz*forward.getClockWise().getStepZ();
+        int plane=dx*forward.getStepX()+dz*forward.getStepZ();
+        return plane==0&&DrillSealing.contains(computer,u,dy,expanded);
+    }
     public String identity(){
         if(hardwareIdentity.isBlank()){hardwareIdentity=java.util.UUID.randomUUID().toString();setChanged();}
         return hardwareIdentity;
@@ -456,7 +486,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     public ComputerEntity.Status mineTick(ServerLevel world,ComputerEntity computer) {
         lastControllerTick=world.getGameTime();
         lastWallMode=computer.wallMode();
-        if(completedLayers>=computer.depth() || worldPosition.getY()-1<world.getMinY())
+        if(completedLayers>=computer.depth() ||
+                (drillingDirection()==Direction.DOWN&&worldPosition.getY()-1<world.getMinY()))
             return ComputerEntity.Status.DONE;
         if(!layerBitsRequested){
             // Exactly one missing-slot scan at the start of each layer. Supply
@@ -509,8 +540,9 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
                 while(cursor<total){
                     int index=cursor++,dx=index%edge-r,dz=index/edge-r;
                     if(!computer.contains(dx,dz))continue;
-                    BlockPos p=worldPosition.offset(dx,-1,dz);
-                    if(p.getY()<world.getMinY())return ComputerEntity.Status.DONE;
+                    BlockPos p=slicePosition(dx,dz);
+                    if(p.getY()<world.getMinY()||p.getY()>=world.getMaxY())
+                        return ComputerEntity.Status.BLOCKED;
                     if(!world.hasChunkAt(p)){cursor--;return ComputerEntity.Status.BLOCKED;}
                     if(world.getBlockState(p).isAir()||DrillSealing.immune(world.getBlockState(p)))continue;
                     assigned[lane]=index;break;
@@ -518,7 +550,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
             }
             if(assigned[lane]<0)continue;
             int index=assigned[lane],dx=index%edge-r,dz=index/edge-r;
-            BlockPos p=worldPosition.offset(dx,-1,dz);
+            BlockPos p=slicePosition(dx,dz);
             if(!world.hasChunkAt(p))return ComputerEntity.Status.BLOCKED;
             BlockState state=world.getBlockState(p);
             if(state.isAir()||DrillSealing.immune(state)){
@@ -560,28 +592,44 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
             completedLayers=nextLayer;setChanged();return ComputerEntity.Status.DONE;
         }
         BlockPos previous=worldPosition;
-        BlockPos next=previous.below();
+        Direction travel=drillingDirection();
+        BlockPos next=previous.relative(travel);
         if(next.getY()<world.getMinY())return ComputerEntity.Status.DONE;
-        if(!world.hasChunkAt(next))return ComputerEntity.Status.BLOCKED;
-        if(!world.getBlockState(next).isAir()){
-            // Gravel/sand can drop into the already-cleared center between
-            // clearing the layer and moving. Mine that obstruction rather
-            // than silently ending a 12-layer job after only 3-4 layers.
-            ComputerEntity.Status cleanup=mineWall(world,next);
+        if(next.above().getY()>=world.getMaxY())return ComputerEntity.Status.BLOCKED;
+        // Moving horizontally carries BOTH parts of the machine. The
+        // incoming slice must be clear at the drill's lower and upper cells;
+        // handle last-second gravel and stone with normal bit wear/drops.
+        for(BlockPos occupied:new BlockPos[]{next,next.above()}){
+            if(!world.hasChunkAt(occupied))return ComputerEntity.Status.BLOCKED;
+            BlockState obstruction=world.getBlockState(occupied);
+            if(obstruction.isAir()||!obstruction.getFluidState().isEmpty())continue;
+            if(DrillSealing.immune(obstruction))return ComputerEntity.Status.BLOCKED;
+            ComputerEntity.Status cleanup=mineWall(world,occupied);
             if(cleanup!=null)return cleanup;
-            if(!world.getBlockState(next).isAir())return ComputerEntity.Status.BLOCKED;
+            if(!world.getBlockState(occupied).isAir())
+                return ComputerEntity.Status.RUNNING;
         }
         // Mark BEFORE any neighbor changes. Once the destination is populated,
         // clear every source stack before replacing the old block, so neither
         // Minecraft's replacement callbacks nor the drill's own drop path can
         // duplicate tools or mined items during the downward move.
         relocating=true;
-        if(!world.setBlock(next,MiningRig.DRILL.defaultBlockState(),Block.UPDATE_CLIENTS)){
+        if(!world.setBlock(next,MiningRig.DRILL.defaultBlockState()
+                .setValue(DrillBlock.FACING,travel),Block.UPDATE_CLIENTS)){
             relocating=false;return ComputerEntity.Status.BLOCKED;
         }
         if(!(world.getBlockEntity(next) instanceof DrillEntity moved)) {
             relocating=false;
             world.removeBlock(next,false);return ComputerEntity.Status.BLOCKED;
+        }
+        // New upper housing stays vertical as the assembly travels forward.
+        // For DOWN travel this location is the old lower housing; for
+        // horizontal travel it is an entirely new block.
+        if(!world.setBlock(next.above(),MiningRig.DRILL_UPPER.defaultBlockState()
+                .setValue(DrillUpperBlock.FACING,travel),Block.UPDATE_CLIENTS)){
+            relocating=false;
+            world.removeBlock(next,false);
+            return ComputerEntity.Status.BLOCKED;
         }
         for(int i=0;i<SLOT_COUNT;i++)moved.items.set(i,items.get(i).copy());
         moved.initialized=true;moved.startY=startY;
@@ -614,11 +662,17 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         // callbacks run for the block at the previous position.
         for(int i=0;i<SLOT_COUNT;i++)items.set(i,ItemStack.EMPTY);
         contentsDropped=true;
-        // Move the two-block structure down together. The old lower block
-        // becomes the new upper block; no inventory is dropped during motion.
+        // DOWN: old lower becomes new upper. HORIZONTAL: erase both
+        // previous cells after transferring the complete machine inventory.
+        // The old block entity has been marked contentsDropped so breaking
+        // source blocks never duplicates cargo, hardware, or the hopper.
         if(world.getBlockState(previous.above()).is(MiningRig.DRILL_UPPER))
             world.setBlock(previous.above(),Blocks.AIR.defaultBlockState(),Block.UPDATE_ALL);
-        world.setBlock(previous,MiningRig.DRILL_UPPER.defaultBlockState(),Block.UPDATE_ALL);
+        if(travel!=Direction.DOWN)
+            world.setBlock(previous,Blocks.AIR.defaultBlockState(),Block.UPDATE_ALL);
+        else
+            world.setBlock(previous,MiningRig.DRILL_UPPER.defaultBlockState()
+                .setValue(DrillUpperBlock.FACING,travel),Block.UPDATE_ALL);
         computer.moved(linkedToken,previous,next);
         return ComputerEntity.Status.RUNNING;
     }
