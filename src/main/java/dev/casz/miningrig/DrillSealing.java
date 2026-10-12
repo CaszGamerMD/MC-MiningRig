@@ -286,15 +286,13 @@ final class DrillSealing {
         wallPositionsRemaining=0;airWallNeeded=false;
     }
     private boolean outsideHole(BlockPos pos,DrillEntity drill,ComputerEntity computer){
-        return !contains(computer,pos.getX()-drill.getBlockPos().getX(),
-            pos.getZ()-drill.getBlockPos().getZ(),false);
+        return !drill.inSlice(pos,computer,false);
     }
     private void scanFluids(ServerLevel world,DrillEntity drill,ComputerEntity computer){
         int r=computer.radius()+1;
-        BlockPos base=drill.getBlockPos();
         for(int dx=-r;dx<=r;dx++)for(int dz=-r;dz<=r;dz++){
             if(!contains(computer,dx,dz,true))continue;
-            BlockPos p=base.offset(dx,-1,dz);
+            BlockPos p=drill.slicePosition(dx,dz);
             if(world.hasChunkAt(p)&&!world.getFluidState(p).isEmpty()){
                 fluidSpots.add(p);
                 cautionTicks=200;
@@ -494,10 +492,9 @@ final class DrillSealing {
     private List<BlockPos> ring(DrillEntity drill,ComputerEntity computer){
         List<BlockPos> positions=new ArrayList<>();
         int r=computer.radius()+1;
-        BlockPos origin=drill.getBlockPos();
         for(int dx=-r;dx<=r;dx++)for(int dz=-r;dz<=r;dz++)
             if(contains(computer,dx,dz,true)&&!contains(computer,dx,dz,false))
-                positions.add(origin.offset(dx,-1,dz));
+                positions.add(drill.slicePosition(dx,dz));
         return positions;
     }
     /**
