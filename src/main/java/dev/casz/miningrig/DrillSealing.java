@@ -133,9 +133,12 @@ final class DrillSealing {
             :VERIFY_TICKS;
     }
     private static boolean sturdyFloor(ServerLevel world,BlockPos below){
-        return below.getY()>=world.getMinY()&&world.hasChunkAt(below)
-            &&solid(world,below)&&world.getBlockState(below)
-                .isFaceSturdy(world,below,net.minecraft.core.Direction.UP);
+        if(below.getY()<world.getMinY()||!world.hasChunkAt(below))return false;
+        BlockState state=world.getBlockState(below);
+        // A top slab can hold sand even when waterlogged. Test its actual
+        // support face; only loose liquids and replaceable blocks fail.
+        return !state.isAir()&&!state.canBeReplaced()
+            &&state.isFaceSturdy(world,below,net.minecraft.core.Direction.UP);
     }
     /**
      * Classify a genuinely non-full block occupying a target or support shaft.
