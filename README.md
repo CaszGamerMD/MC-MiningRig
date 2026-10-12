@@ -1,10 +1,20 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.5.2 — hopper collection and stable gravity filler**
+**Version 0.5.3 — clear unsupported partial blocks before filling**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.5.3 — obstacle-aware bottom-up gravity fill
+
+**Support detection.** Sand and gravel continue to scan downward up to 32 loaded blocks to find a genuinely sturdy floor, then work upward. The support check uses the actual sturdy top face of the block: a top slab that supports falling sand (including a waterlogged top slab) is a valid foundation and will not be unnecessarily destroyed.
+
+**Partial-block cleanup.** Where the requested fill position or the shaft beneath it contains a non-full obstruction such as a torch, rail, bottom slab, or trapdoor, the drill checks that a reachable safe foundation exists, then breaks the lowest obstructing partial block before filling. It uses an installed drill bit with hardness progress, enchantment-based speed and normal bit durability. The drops are inserted into the drill's standard 64-item Output buffer for CC transport. If Output is full, excavation pauses rather than losing drops. Waterlogged partial blocks leave their fluid behind for the fill pass.
+
+**Safety.** Machine blocks, unbreakable/protected blocks, block entities, unloaded chunks, and shafts without a safe support floor are not automatically excavated. When safe filling is impossible the drill reports Fill blocked instead of discarding sand/gravel.
+
+**Validation.** Compiled for Fabric 26.2; runtime tests are still needed for modded partial blocks and underwater fill.
 
 ## v0.5.2 — Drill hopper upgrade and stable falling-block placement
 
