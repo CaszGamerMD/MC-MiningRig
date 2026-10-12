@@ -2,6 +2,10 @@ package dev.casz.miningrig;
 
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
@@ -22,12 +26,22 @@ import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
 public final class DrillBlock extends BaseEntityBlock {
-    public DrillBlock(Properties properties){super(properties);}
+    public static final DirectionProperty FACING=BlockStateProperties.FACING;
+    public DrillBlock(Properties properties){
+        super(properties);
+        registerDefaultState(stateDefinition.any().setValue(FACING,Direction.DOWN));
+    }
+    @Override protected void createBlockStateDefinition(StateDefinition.Builder<Block,BlockState> builder){
+        builder.add(FACING);
+    }
     @Override protected MapCodec<? extends BaseEntityBlock> codec(){return simpleCodec(DrillBlock::new);}
     @Override protected RenderShape getRenderShape(BlockState state){return RenderShape.MODEL;}
     @Nullable @Override public BlockState getStateForPlacement(BlockPlaceContext ctx){
         if(!ctx.getLevel().getBlockState(ctx.getClickedPos().above()).canBeReplaced(ctx))return null;
-        return super.getStateForPlacement(ctx);
+        // Floor placement drills DOWN; a wall placement drills INTO the wall.
+        // The underside would point UP, which is not supported yet.
+        Direction digging=ctx.getClickedFace().getOpposite();
+        return digging==Direction.UP?null:defaultBlockState().setValue(FACING,digging);
     }
     @Nullable @Override public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level,BlockState state,BlockEntityType<T> type){
         return level.isClientSide()?null:createTickerHelper(type,MiningRig.DRILL_ENTITY,DrillEntity::tick);
@@ -35,7 +49,8 @@ public final class DrillBlock extends BaseEntityBlock {
     @Override public void setPlacedBy(Level level,BlockPos pos,BlockState state,@Nullable LivingEntity placer,ItemStack stack){
         super.setPlacedBy(level,pos,state,placer,stack);
         if(level.getBlockState(pos.above()).canBeReplaced())
-            level.setBlock(pos.above(),MiningRig.DRILL_UPPER.defaultBlockState(),Block.UPDATE_ALL);
+            level.setBlock(pos.above(),MiningRig.DRILL_UPPER.defaultBlockState()
+                .setValue(DrillUpperBlock.FACING,state.getValue(FACING)),Block.UPDATE_ALL);
         if(!(level instanceof ServerLevel server))return;
         DrillBinding.Link link=DrillBinding.read(stack);
         if(level.getBlockEntity(pos) instanceof DrillEntity drill){
