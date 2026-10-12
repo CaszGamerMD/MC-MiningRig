@@ -321,17 +321,23 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         }
         return best;
     }
-    /** Placement throughput follows the installed bits, including Efficiency,
-     * but is quicker than actually mining stone. Material travel is separately
-     * prefetched and does not add a slow per-block source trip. */
+    /**
+     * Placement is bit-speed dependent but not identical for every material.
+     * Ordinary walls can go in promptly; filler must leave time for liquids
+     * to update, and sand/gravel must not overtake their falling physics.
+     */
     public boolean placementReady(ServerLevel world){
+        return placementReady(world,false,false);
+    }
+    public boolean placementReady(ServerLevel world,boolean gravity,boolean filler){
         int slot=bestBit(world,Blocks.STONE.defaultBlockState());
         if(slot<0)return false;
         placementBit=slot;
         if(placementCharge>=1)return true;
         ItemStack tool=items.get(slot);
+        float multiplier=gravity?0.85f:(filler?1.55f:2.5f);
         placementCharge+=Math.min(1.0f,
-            speed(world,tool,Blocks.STONE.defaultBlockState())*3.0f);
+            speed(world,tool,Blocks.STONE.defaultBlockState())*multiplier);
         return placementCharge>=1;
     }
     private void playCuttingAudio(ServerLevel world){
