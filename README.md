@@ -1,10 +1,18 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.5.1 — adaptive output routing, faster placement and clean CC visuals**
+**Version 0.5.2 — hopper collection and stable gravity filler**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.5.2 — Drill hopper upgrade and stable falling-block placement
+
+**Hopper upgrade:** The Mining Drill now has a **dedicated hopper slot** beside its three drill bits. Install one ordinary vanilla hopper to activate nearby dropped-item collection. Every five server ticks, it scans a bounded region around the drill (at least four blocks horizontally and up to the configured radius plus one, capped at fourteen), and pulls compatible item drops into the drill's existing **64-item Output** buffer. It accepts partial stacks without deleting the rest of an entity; an incompatible/full buffer leaves the items safely on the ground. When CCs empty Output, the upgrade can resume collecting. The hopper is not output cargo, never counts against the 64-item buffer, persists on save/reload and travels with the drill during descent. Remove the hopper to turn the collector off; it is returned as an item when the drill is broken.
+
+**Safer wall and fluid filler:** Bit speed and Efficiency still influence placement, but normal filler is slower and gravity-affected sand/gravel has a substantially slower rate and a longer verification pause. When a falling block has no sturdy support, the drill first uses a stocked non-falling filler block if one is available. Otherwise, it builds a supported column bottom-up (up to 32 loaded blocks deep), verifying each foundation block before approaching the original target. If no safe foundation is available, the drill reports **Fill blocked** at the target rather than throwing sand or gravel down a bottomless shaft. Verification now waits five ticks for ordinary blocks and at least eighteen for falling blocks; fluid sealing and the original per-coordinate retry ceiling remain in effect.
+
+**Verification:** GitHub Actions compiles and packages the Fabric 26.2 mod. Test hopper suction, sand/gravel settlement under water, sided CC extraction, and drill descent in a backed-up world before depending on the changes.
 
 ## v0.5.1 — output failover, supply priming, JEI bounds and visuals
 
