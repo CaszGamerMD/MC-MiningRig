@@ -407,20 +407,29 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         setChanged();
     }
     /**
-     * Replacement mode excavates one outer-wall block with a legitimate tool.
-     * Returns null once the space is clear; keeps hardness progress per target.
+     * Replacement walls and filler obstructions share bit wear, normal block
+     * hardness and drop ownership. Waterlogged slabs must be mined and leave
+     * the water in place; original wall clearing still skips fluid spaces.
      */
     public ComputerEntity.Status mineWall(ServerLevel world,BlockPos target){
+        return mineBoundaryBlock(world,target,false);
+    }
+    public ComputerEntity.Status mineFillObstruction(ServerLevel world,BlockPos target){
+        if(!DrillSealing.partialObstruction(world,target))return null;
+        return mineBoundaryBlock(world,target,true);
+    }
+    private ComputerEntity.Status mineBoundaryBlock(ServerLevel world,BlockPos target,
+            boolean partial){
+        if(!world.hasChunkAt(target))return ComputerEntity.Status.BLOCKED;
         BlockState state=world.getBlockState(target);
-        if(state.isAir()||!state.getFluidState().isEmpty())return null;
-        if(DrillSealing.immune(state)||state.getDestroySpeed(world,target)<0||state.hasBlockEntity())
-            return ComputerEntity.Status.BLOCKED;
+        if(state.isAir()||(!partial&&!state.getFluidState().isEmpty()))return null;
+        if(DrillSealing.immune(state)||state.getDestroySpeed(world,target)<0
+                ||state.hasBlockEntity())return ComputerEntity.Status.BLOCKED;
         int slot=bestBit(world,state);
         if(slot<0)return ComputerEntity.Status.BLOCKED;
         if(!target.equals(wallWorkTarget)){
             wallWorkTarget=target.immutable();wallWorkCharge=0;
         }
-        // Actual target hardness, not the drill's housing position.
         DrillBit bit=(DrillBit)items.get(slot).getItem();
         float power=bit.miningSpeed();
         int efficiency=enchantmentLevel(world,items.get(slot),Enchantments.EFFICIENCY);
@@ -431,7 +440,11 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         if(wallWorkCharge<1)return ComputerEntity.Status.RUNNING;
         List<ItemStack> drops=Block.getDrops(state,world,target,null,null,items.get(slot));
         if(!canReceive(drops))return ComputerEntity.Status.FULL;
-        if(!world.setBlock(target,Blocks.AIR.defaultBlockState(),Block.UPDATE_ALL))
+        // A waterlogged partial may contain a water source: clearing the
+        // obstacle must preserve that fluid for the upcoming sealing pass.
+        BlockState cleared=partial?state.getFluidState().createLegacyBlock()
+            :Blocks.AIR.defaultBlockState();
+        if(!world.setBlock(target,cleared,Block.UPDATE_ALL))
             return ComputerEntity.Status.BLOCKED;
         if(!receive(drops))return ComputerEntity.Status.FULL;
         damageBit(world,slot,1);
