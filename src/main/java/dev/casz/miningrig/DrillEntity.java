@@ -509,6 +509,13 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     public ComputerEntity.Status mineTick(ServerLevel world,ComputerEntity computer) {
         lastControllerTick=world.getGameTime();
         lastWallMode=computer.wallMode();
+        // Never advance a head whose housing is missing or is still at the
+        // old v0.6.0 vertical location. The ticker migrates old structures
+        // only when the correct rear cell can safely accept the body.
+        BlockPos body=housingPosition();
+        if(!world.hasChunkAt(body) || !world.getBlockState(body).is(MiningRig.DRILL_UPPER)
+                || world.getBlockState(body).getValue(DrillUpperBlock.FACING)
+                    !=drillingDirection())return ComputerEntity.Status.BLOCKED;
         if(completedLayers>=computer.depth() ||
                 (drillingDirection()==Direction.DOWN&&worldPosition.getY()-1<world.getMinY()))
             return ComputerEntity.Status.DONE;
