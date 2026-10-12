@@ -59,7 +59,7 @@ final class RigNetworkRepair {
             BlockPos target=origin.relative(dir,d);
             if(!world.hasChunkAt(target)||target.distSqr(drill.getBlockPos())>24*24)continue;
             if(!world.getBlockState(target).isAir())continue;
-            if(target.equals(drill.getBlockPos())||target.equals(drill.getBlockPos().above()))continue;
+            if(target.equals(drill.getBlockPos())||target.equals(drill.housingPosition()))continue;
             double rating=target.distSqr(desired)+d*.05;
             if(rating<score){score=rating;best=target.immutable();}
         }
