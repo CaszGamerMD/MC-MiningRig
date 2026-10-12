@@ -36,21 +36,29 @@ public final class DrillBlock extends BaseEntityBlock {
     }
     @Override protected MapCodec<? extends BaseEntityBlock> codec(){return simpleCodec(DrillBlock::new);}
     @Override protected RenderShape getRenderShape(BlockState state){return RenderShape.MODEL;}
+    /**
+     * The drill's first (bit) block is the clicked position; the yellow body
+     * always sits immediately BEHIND the bit, along the reverse travel axis.
+     * Thus floor placement remains vertical and a wall-mounted drill has
+     * both blocks aligned horizontally rather than a detached body above.
+     */
     @Nullable @Override public BlockState getStateForPlacement(BlockPlaceContext ctx){
-        if(!ctx.getLevel().getBlockState(ctx.getClickedPos().above()).canBeReplaced(ctx))return null;
-        // Floor placement drills DOWN; a wall placement drills INTO the wall.
-        // The underside would point UP, which is not supported yet.
         Direction digging=ctx.getClickedFace().getOpposite();
-        return digging==Direction.UP?null:defaultBlockState().setValue(FACING,digging);
+        if(digging==Direction.UP)return null; // no upwards drilling
+        BlockPos body=ctx.getClickedPos().relative(digging.getOpposite());
+        if(!ctx.getLevel().getBlockState(body).canBeReplaced(ctx))return null;
+        return defaultBlockState().setValue(FACING,digging);
     }
     @Nullable @Override public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level,BlockState state,BlockEntityType<T> type){
         return level.isClientSide()?null:createTickerHelper(type,MiningRig.DRILL_ENTITY,DrillEntity::tick);
     }
     @Override public void setPlacedBy(Level level,BlockPos pos,BlockState state,@Nullable LivingEntity placer,ItemStack stack){
         super.setPlacedBy(level,pos,state,placer,stack);
-        if(level.getBlockState(pos.above()).canBeReplaced())
-            level.setBlock(pos.above(),MiningRig.DRILL_UPPER.defaultBlockState()
-                .setValue(DrillUpperBlock.FACING,state.getValue(FACING)),Block.UPDATE_ALL);
+        Direction digging=state.getValue(FACING);
+        BlockPos body=pos.relative(digging.getOpposite());
+        if(level.getBlockState(body).canBeReplaced())
+            level.setBlock(body,MiningRig.DRILL_UPPER.defaultBlockState()
+                .setValue(DrillUpperBlock.FACING,digging),Block.UPDATE_ALL);
         if(!(level instanceof ServerLevel server))return;
         DrillBinding.Link link=DrillBinding.read(stack);
         if(level.getBlockEntity(pos) instanceof DrillEntity drill){
@@ -92,15 +100,21 @@ public final class DrillBlock extends BaseEntityBlock {
     @Override public BlockState playerWillDestroy(Level level,BlockPos pos,BlockState state,Player player) {
         if(!level.isClientSide()){
             if(level.getBlockEntity(pos) instanceof DrillEntity entity)entity.dropInventory();
-            if(level.getBlockState(pos.above()).is(MiningRig.DRILL_UPPER))
-                level.removeBlock(pos.above(),false);
+            BlockPos body=pos.relative(state.getValue(FACING).getOpposite());
+            if(level.getBlockState(body).is(MiningRig.DRILL_UPPER)
+                    &&level.getBlockState(body).getValue(DrillUpperBlock.FACING)
+                        ==state.getValue(FACING))
+                level.removeBlock(body,false);
         }
         return super.playerWillDestroy(level,pos,state,player);
     }
     @Override protected void affectNeighborsAfterRemoval(BlockState state,ServerLevel level,BlockPos pos,boolean moved){
         if(level.getBlockEntity(pos) instanceof DrillEntity drill)drill.dropInventory();
-        if(level.getBlockState(pos.above()).is(MiningRig.DRILL_UPPER))
-            level.removeBlock(pos.above(),false);
+        BlockPos body=pos.relative(state.getValue(FACING).getOpposite());
+        if(level.getBlockState(body).is(MiningRig.DRILL_UPPER)
+                &&level.getBlockState(body).getValue(DrillUpperBlock.FACING)
+                    ==state.getValue(FACING))
+            level.removeBlock(body,false);
         super.affectNeighborsAfterRemoval(state,level,pos,moved);
     }
 }
