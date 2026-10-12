@@ -10,7 +10,7 @@ Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable too
 
 - **Rotate the entire two-block drill.** The mining head leads, and the yellow housing sits one block **behind** the head along the drill's travel axis, with its model rotated identically. A sideways head no longer dangles beneath an upright yellow housing. The down-facing 2-block assembly stays unchanged.
 - Directional **bit/housing GUI access**, installing bits, destroying either half, and dropping stored inventory now use the actual orientation. When the drill moves, the old head becomes the new housing, preserving data and eliminating detached blocks.
-- Existing v0.6.0 horizontal machines whose housing is still above the head auto-migrate the housing to the rear if that location is unloaded? No: migration requires a **loaded, empty/replaceable** rear cell and matching old housing. Otherwise mining safely pauses rather than overwriting an occupied block; clear the space or re-place the drill.
+- Existing v0.6.0 horizontal machines whose housing is still above the head auto-migrate the housing to the rear only when the rear cell is **loaded and replaceable** and matching old housing. Otherwise mining safely pauses rather than overwriting an occupied block; clear the space or re-place the drill.
 - Wireless CC network repair avoids both occupied machine cells; horizontal tunnel diameter/shape, filler, wall, hopper upgrade, bits, and distance-in-blocks Depth controls remain unchanged.
 - Built with Fabric 26.2; run-time testing in a backed-up world is recommended.
 
