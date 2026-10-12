@@ -3,14 +3,16 @@
   "category": "redstone",
   "pattern": [
     "IGI",
-    "RCR",
-    "III"
+    "ACA",
+    "BRB"
   ],
   "key": {
     "I": "minecraft:iron_ingot",
-    "G": "minecraft:glass_pane",
-    "R": "minecraft:redstone",
-    "C": "minecraft:comparator"
+    "G": "minecraft:glass",
+    "A": "minecraft:amethyst_shard",
+    "C": "minecraft:comparator",
+    "B": "minecraft:iron_block",
+    "R": "minecraft:redstone"
   },
   "result": {
     "id": "miningrig:mining_computer",
