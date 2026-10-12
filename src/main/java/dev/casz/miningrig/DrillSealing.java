@@ -138,24 +138,49 @@ final class DrillSealing {
                 .isFaceSturdy(world,below,net.minecraft.core.Direction.UP);
     }
     /**
-     * Sand/gravel goes on a supported floor, progressing bottom-up through
-     * a loaded shaft rather than creating falling-item entities. Refuse
-     * bottomless/blocked paths instead of silently wasting filler supplies.
+     * Classify a genuinely non-full block occupying a target or support shaft.
+     * Face sturdiness alone is insufficient: a top slab can support sand, and
+     * must be preserved; a bottom slab, torch, rail or trapdoor cannot.
+     * Never treat water (which also has an empty collision shape) as debris.
      */
-    @Nullable private static BlockPos safeGravityPosition(ServerLevel world,BlockPos goal){
-        if(sturdyFloor(world,goal.below()))return goal;
+    static boolean partialObstruction(ServerLevel world,BlockPos pos){
+        if(!world.hasChunkAt(pos))return false;
+        BlockState state=world.getBlockState(pos);
+        return !state.isAir()&&!immune(state)
+            && !(state.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock)
+            && !state.canBeReplaced()
+            && !Block.isShapeFullBlock(state.getCollisionShape(world,pos));
+    }
+    /**
+     * Either the lowest safe location to place a falling block or the lowest
+     * unsupported partial obstruction to mine first. Neither result means
+     * the hole is too deep, blocked by a full block, or unloaded.
+     */
+    private record GravitySite(@Nullable BlockPos place,@Nullable BlockPos clear){}
+    @Nullable private static GravitySite safeGravityPosition(ServerLevel world,BlockPos goal){
+        if(sturdyFloor(world,goal.below()))return new GravitySite(goal,null);
+        BlockPos lowestObstruction=null;
         for(int depth=1;depth<=MAX_GRAVITY_SUPPORT_DEPTH;depth++){
             BlockPos below=goal.below(depth);
             if(below.getY()<world.getMinY()||!world.hasChunkAt(below))return null;
             if(sturdyFloor(world,below)){
-                BlockPos placing=below.above();
-                BlockState state=world.getBlockState(placing);
+                // Do not clear decorations unless a reachable supporting floor
+                // exists. Then clear the lowest one before placing material.
+                if(lowestObstruction!=null)return new GravitySite(null,lowestObstruction);
+                BlockPos place=below.above();
+                BlockState state=world.getBlockState(place);
                 return !immune(state)&&(state.isAir()||state.canBeReplaced()
-                    ||!state.getFluidState().isEmpty())?placing:null;
+                    ||state.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock)
+                    ?new GravitySite(place,null):null;
+            }
+            if(partialObstruction(world,below)){
+                lowestObstruction=below;
+                continue;
             }
             BlockState state=world.getBlockState(below);
             if(!state.isAir()&&!state.canBeReplaced()
-                &&state.getFluidState().isEmpty())return null;
+                    &&!(state.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock))
+                return null;
         }
         return null;
     }
@@ -394,6 +419,13 @@ final class DrillSealing {
         if(failed())return ComputerEntity.Status.FILL_FAILED;
         BlockState state=world.getBlockState(goal);
         if(immune(state))return ComputerEntity.Status.BLOCKED;
+        // A torch, lower slab, rail or other non-full obstacle isn't a
+        // successfully sealed target. Mine it with a bit and route its drop
+        // through the normal CC output before spending filler.
+        if(partialObstruction(world,goal)){
+            ComputerEntity.Status clear=drill.mineFillObstruction(world,goal);
+            return clear==null?ComputerEntity.Status.RUNNING:clear;
+        }
         if(solid(world,goal)){
             markDone(goal,wall);
             drill.setChanged();
@@ -406,13 +438,19 @@ final class DrillSealing {
             ItemStack stable=stock.peekStable(world,random);
             if(!stable.isEmpty())available=stable;
             else {
-                placement=safeGravityPosition(world,goal);
-                if(placement==null){
+                GravitySite site=safeGravityPosition(world,goal);
+                if(site==null){
                     attempts=allowedAttempts;
                     pending=goal;pendingGoal=goal;pendingWall=wall;wait=0;
                     drill.setChanged();
                     return ComputerEntity.Status.FILL_FAILED;
                 }
+                if(site.clear()!=null){
+                    ComputerEntity.Status clear=drill.mineFillObstruction(world,site.clear());
+                    return clear==null?ComputerEntity.Status.RUNNING:clear;
+                }
+                placement=site.place();
+                if(placement==null)return ComputerEntity.Status.BLOCKED;
             }
         }
         if(!drill.placementReady(world,falling(available),stock==filler))
