@@ -36,6 +36,7 @@ public final class DrillScreen extends AbstractContainerScreen<DrillMenu> {
         g.fill(leftPos+4,topPos+143,leftPos+172,topPos+232,0xff273640);
         for(int i=0;i<3;i++)
             g.fill(leftPos+61+i*18,topPos+18,leftPos+79+i*18,topPos+36,0xff657986);
+        g.fill(leftPos+141,topPos+18,leftPos+159,topPos+36,0xff638b6c);
         for(int i=0;i<9;i++)
             g.fill(leftPos+7+i*18,topPos+79,leftPos+25+i*18,topPos+97,0xff657986);
     }
@@ -44,6 +45,7 @@ public final class DrillScreen extends AbstractContainerScreen<DrillMenu> {
             menu.randomWalls()?"Wall: Random":"Wall: Order"));
         super.extractRenderState(g,mouseX,mouseY,delta);
         g.text(font,"3 DRILL BITS",leftPos+7,topPos+27,0xffffffff,false);
+        g.text(font,"HOPPER",leftPos+126,topPos+39,0xffa4e3b1,false);
         g.text(font,menu.bankName()+" "+menu.stored()+"/64",leftPos+7,topPos+116,0xff9fe5ff,false);
         g.text(font,(menu.page()+1)+"/8",leftPos+99,topPos+116,0xffffffff,false);
     }
