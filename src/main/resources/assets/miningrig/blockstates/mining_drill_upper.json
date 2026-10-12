@@ -1,7 +1,44 @@
 {
-  "variants": {
-    "": {
-      "model": "miningrig:block/mining_drill_upper"
+  "multipart": [
+    {
+      "apply": {
+        "model": "miningrig:block/mining_drill_upper"
+      }
+    },
+    {
+      "when": {
+        "facing": "north"
+      },
+      "apply": {
+        "model": "miningrig:block/drill_direction_marker"
+      }
+    },
+    {
+      "when": {
+        "facing": "east"
+      },
+      "apply": {
+        "model": "miningrig:block/drill_direction_marker",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "facing": "south"
+      },
+      "apply": {
+        "model": "miningrig:block/drill_direction_marker",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "facing": "west"
+      },
+      "apply": {
+        "model": "miningrig:block/drill_direction_marker",
+        "y": 270
+      }
     }
-  }
+  ]
 }
