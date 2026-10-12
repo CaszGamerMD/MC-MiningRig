@@ -14,10 +14,10 @@ import net.minecraft.world.item.ItemStack;
 public final class DrillMenu extends AbstractContainerMenu {
     private final Container drill;
     private final ContainerData data;
-    public DrillMenu(int id, Inventory player) { this(id,player,new SimpleContainer(12),new SimpleContainerData(6)); }
+    public DrillMenu(int id, Inventory player) { this(id,player,new SimpleContainer(13),new SimpleContainerData(6)); }
     public DrillMenu(int id, Inventory player, Container container,ContainerData data) {
         super(RigMenus.DRILL,id);
-        checkContainerSize(container,12);
+        checkContainerSize(container,13);
         this.drill=container;
         this.data=data;
         addDataSlots(data);
@@ -36,6 +36,12 @@ public final class DrillMenu extends AbstractContainerMenu {
                         ?view.roomForSlot(getContainerSlot())
                         :drill.getMaxStackSize(stack));
             }
+        });
+        addSlot(new Slot(container,12,142,19){
+            @Override public boolean mayPlace(ItemStack stack) {
+                return stack.is(net.minecraft.world.item.Items.HOPPER);
+            }
+            @Override public int getMaxStackSize(ItemStack stack){return 1;}
         });
         addStandardInventorySlots(player,8,149);
     }
@@ -60,8 +66,11 @@ public final class DrillMenu extends AbstractContainerMenu {
         Slot slot=slots.get(slotIndex);
         if(!slot.hasItem())return ItemStack.EMPTY;
         ItemStack stack=slot.getItem(),original=stack.copy();
-        if(slotIndex<12) {
-            if(!moveItemStackTo(stack,12,slots.size(),true))return ItemStack.EMPTY;
+        if(slotIndex<13) {
+            if(!moveItemStackTo(stack,13,slots.size(),true))return ItemStack.EMPTY;
+        } else if(stack.is(net.minecraft.world.item.Items.HOPPER)
+                && !slots.get(12).hasItem()){
+            if(!moveItemStackTo(stack,12,13,false))return ItemStack.EMPTY;
         } else if(stack.getItem() instanceof DrillBit) {
             if(!moveItemStackTo(stack,0,3,false))return ItemStack.EMPTY;
         } else {
