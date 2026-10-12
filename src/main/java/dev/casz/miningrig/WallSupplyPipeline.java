@@ -196,6 +196,28 @@ final class WallSupplyPipeline {
         }
         return ready.get(selectedIndex).stack();
     }
+    /**
+     * Prefer a non-gravity block at unsupported fill positions, avoiding
+     * unnecessary sand/gravel towers when a solid filler is already staged.
+     * Keeps the queue item's original source for correct refunds.
+     */
+    ItemStack peekStable(ServerLevel world,boolean random){
+        List<Integer> candidates=new ArrayList<>();
+        for(int i=0;i<ready.size();i++){
+            ItemStack stack=ready.get(i).stack();
+            if(stack.getItem() instanceof net.minecraft.world.item.BlockItem block
+                && !(block.getBlock() instanceof net.minecraft.world.level.block.FallingBlock))
+                candidates.add(i);
+        }
+        if(candidates.isEmpty())return ItemStack.EMPTY;
+        if(random&&candidates.size()>1){
+            List<Integer> different=new ArrayList<>();
+            for(int index:candidates)if(ready.get(index)!=lastUsed)different.add(index);
+            if(!different.isEmpty())candidates=different;
+            selectedIndex=candidates.get(world.getRandom().nextInt(candidates.size()));
+        }else selectedIndex=candidates.get(0);
+        return ready.get(selectedIndex).stack();
+    }
     void consume(){
         if(ready.isEmpty())return;
         int index=selectedIndex>=0&&selectedIndex<ready.size()?selectedIndex:0;
