@@ -1,10 +1,19 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.5.3 — clear unsupported partial blocks before filling**
+**Version 0.6.0 — directional horizontal drilling**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.0 — Horizontal drilling
+
+- When placing the **Mining Drill** against the side of a block, it drills **into the clicked wall**. Placing on the top of a block keeps the original **downward** mode. Placing underneath a block (which would drill upward) is disabled.
+- The drill's **Depth** field on the Mining Computer now means **distance traveled in blocks** for both modes. Radius and Square/Circle shape still define the excavation cross-section. A horizontal drill cuts a **vertical** circular/square tunnel with the same width logic.
+- Each horizontal step executes the same **boundary walls → fluid sealing → core mining → advance** stages, reusing the existing filler, gravity checks, mining bits, automatic CC routing and hardware replenishment, output, alarms, chunk tickets and hopper upgrade.
+- The two-block-tall rig travels intact one block into the wall after the next tunnel slice is cleared. It preserves linked computer token, drill settings, bit wear, output contents, wall/filler inventory, supply flights, hopper upgrade and progress. Obstructions in either upcoming housing cell are removed with a bit before advancing, with normal drops and capacity checks.
+- Drill-bit cone models rotate to indicate the selected horizontal direction; the top housing displays a directional marker. The Mining Computer preview outlines the **vertical slice** ahead of the drill, and its location column includes the direction.
+- No upward drilling. Existing placed drills default to downward-facing via their block state migration. Tests in a backed-up world are recommended before running in large caves or under oceans.
 
 ## v0.5.3 — obstacle-aware bottom-up gravity fill
 
