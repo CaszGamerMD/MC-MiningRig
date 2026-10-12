@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "redstone",
+  "ingredients": [
+    "miningrig:mining_computer"
+  ],
+  "result": {
+    "id": "miningrig:mining_tablet",
+    "count": 1
+  }
+}
