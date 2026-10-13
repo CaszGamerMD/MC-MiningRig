@@ -1,7 +1,7 @@
 {
   "textures": {
-    "steel": "minecraft:block/iron_block",
-    "dark": "minecraft:block/polished_deepslate",
+    "steel": "miningrig:block/suite/steel",
+    "dark": "miningrig:block/suite/slate",
     "cone": "minecraft:block/raw_iron_block",
     "paint": "minecraft:block/yellow_concrete",
     "rust": "minecraft:block/exposed_copper",

@@ -1,12 +1,12 @@
 {
   "textures": {
-    "body": "minecraft:block/polished_deepslate",
-    "frame": "minecraft:block/iron_block",
+    "body": "miningrig:block/suite/slate",
+    "frame": "miningrig:block/suite/steel",
     "screen": "minecraft:block/black_concrete",
     "keys": "minecraft:block/blackstone",
     "cap": "minecraft:block/smooth_stone",
-    "lamp": "minecraft:block/polished_blackstone",
-    "particle": "minecraft:block/polished_deepslate"
+    "lamp": "miningrig:block/suite/rubber",
+    "particle": "miningrig:block/suite/slate"
   },
   "elements": [
     {

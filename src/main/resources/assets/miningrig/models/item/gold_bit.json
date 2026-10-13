@@ -1,6 +1,6 @@
 {
   "textures": {
-    "shaft": "minecraft:block/polished_deepslate",
+    "shaft": "miningrig:block/suite/slate",
     "head": "minecraft:block/gold_block",
     "highlight": "minecraft:block/raw_gold_block",
     "particle": "minecraft:block/gold_block"

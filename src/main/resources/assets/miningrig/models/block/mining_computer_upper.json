@@ -1,6 +1,6 @@
 {
   "textures": {
-    "particle": "minecraft:block/iron_block"
+    "particle": "miningrig:block/suite/steel"
   },
   "elements": []
 }

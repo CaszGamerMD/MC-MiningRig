@@ -1,9 +1,9 @@
 {
   "textures": {
-    "shaft": "minecraft:block/polished_deepslate",
-    "head": "minecraft:block/iron_block",
+    "shaft": "miningrig:block/suite/slate",
+    "head": "miningrig:block/suite/steel",
     "highlight": "minecraft:block/smooth_stone",
-    "particle": "minecraft:block/iron_block"
+    "particle": "miningrig:block/suite/steel"
   },
   "elements": [
     {

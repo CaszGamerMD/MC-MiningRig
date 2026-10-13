@@ -1,6 +1,6 @@
 {
   "textures": {
-    "shaft": "minecraft:block/polished_deepslate",
+    "shaft": "miningrig:block/suite/slate",
     "head": "minecraft:block/stone",
     "highlight": "minecraft:block/andesite",
     "particle": "minecraft:block/stone"

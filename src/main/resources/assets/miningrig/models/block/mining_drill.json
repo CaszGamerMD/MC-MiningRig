@@ -1,14 +1,15 @@
 {
   "textures": {
-    "steel": "minecraft:block/iron_block",
-    "dark": "minecraft:block/polished_deepslate",
+    "steel": "miningrig:block/suite/steel",
+    "dark": "miningrig:block/suite/slate",
     "cone": "minecraft:block/raw_iron_block",
     "paint": "minecraft:block/yellow_concrete",
     "rust": "minecraft:block/exposed_copper",
     "grime": "minecraft:block/coarse_dirt",
     "hatch": "minecraft:block/black_concrete",
     "lid": "minecraft:block/smooth_stone",
-    "particle": "minecraft:block/raw_iron_block"
+    "particle": "minecraft:block/raw_iron_block",
+    "vent": "miningrig:block/suite/vent"
   },
   "elements": [
     {
@@ -240,6 +241,64 @@
         },
         "west": {
           "texture": "#rust"
+        }
+      }
+    },
+    {
+      "from": [
+        4,
+        14.1,
+        0.82
+      ],
+      "to": [
+        12,
+        15.1,
+        0.95
+      ],
+      "faces": {
+        "north": {
+          "texture": "#vent"
+        },
+        "east": {
+          "texture": "#vent"
+        },
+        "west": {
+          "texture": "#vent"
+        },
+        "up": {
+          "texture": "#vent"
+        },
+        "down": {
+          "texture": "#vent"
+        }
+      }
+    },
+    {
+      "from": [
+        4,
+        14.1,
+        15.05
+      ],
+      "to": [
+        12,
+        15.1,
+        15.18
+      ],
+      "faces": {
+        "south": {
+          "texture": "#vent"
+        },
+        "east": {
+          "texture": "#vent"
+        },
+        "west": {
+          "texture": "#vent"
+        },
+        "up": {
+          "texture": "#vent"
+        },
+        "down": {
+          "texture": "#vent"
         }
       }
     }

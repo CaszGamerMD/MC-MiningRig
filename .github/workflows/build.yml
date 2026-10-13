@@ -1,7 +1,7 @@
 name: Fabric 26.2 Build
 on:
   push:
-    branches: [main, 'feature/**']
+    branches: [ 'art/caszual-suite-redesign',main, 'feature/**']
   pull_request:
   workflow_dispatch:
 jobs:

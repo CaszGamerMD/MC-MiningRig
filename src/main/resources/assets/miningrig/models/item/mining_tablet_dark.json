@@ -1,6 +1,6 @@
 {
   "textures": {
-    "frame": "minecraft:block/polished_deepslate",
+    "frame": "miningrig:block/suite/slate",
     "paper": "minecraft:block/light_gray_concrete",
     "screen": "minecraft:block/white_concrete",
     "line": "minecraft:block/gray_concrete",

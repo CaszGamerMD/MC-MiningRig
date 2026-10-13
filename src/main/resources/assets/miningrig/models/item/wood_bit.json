@@ -1,9 +1,9 @@
 {
   "textures": {
-    "shaft": "minecraft:block/polished_deepslate",
-    "head": "minecraft:block/oak_planks",
+    "shaft": "miningrig:block/suite/slate",
+    "head": "miningrig:block/suite/oak",
     "highlight": "minecraft:block/stripped_oak_log",
-    "particle": "minecraft:block/oak_planks"
+    "particle": "miningrig:block/suite/oak"
   },
   "elements": [
     {

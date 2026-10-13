@@ -1,11 +1,11 @@
 {
   "textures": {
-    "steel": "minecraft:block/polished_deepslate",
-    "frame": "minecraft:block/iron_block",
+    "steel": "miningrig:block/suite/slate",
+    "frame": "miningrig:block/suite/steel",
     "glass": "minecraft:block/cyan_stained_glass",
     "signal": "minecraft:block/sea_lantern",
     "grip": "minecraft:block/blackstone",
-    "particle": "minecraft:block/polished_deepslate"
+    "particle": "miningrig:block/suite/slate"
   },
   "elements": [
     {

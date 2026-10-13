@@ -1,14 +1,14 @@
 {
   "textures": {
-    "steel": "minecraft:block/iron_block",
-    "dark": "minecraft:block/polished_deepslate",
-    "trim": "minecraft:block/polished_blackstone_bricks",
+    "steel": "miningrig:block/suite/steel",
+    "dark": "miningrig:block/suite/slate",
+    "trim": "miningrig:block/suite/slate",
     "black": "minecraft:block/black_concrete",
-    "edge": "minecraft:block/polished_blackstone",
+    "edge": "miningrig:block/suite/rubber",
     "bolt": "minecraft:block/smooth_stone",
     "cyan": "minecraft:block/cyan_concrete",
     "glow": "minecraft:block/light_blue_concrete",
-    "particle": "minecraft:block/polished_deepslate"
+    "particle": "miningrig:block/suite/slate"
   },
   "elements": [
     {

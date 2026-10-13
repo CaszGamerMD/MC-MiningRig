@@ -1,8 +1,8 @@
 {
   "textures": {
-    "shaft": "minecraft:block/polished_deepslate",
+    "shaft": "miningrig:block/suite/slate",
     "head": "minecraft:block/netherite_block",
-    "highlight": "minecraft:block/polished_blackstone",
+    "highlight": "miningrig:block/suite/rubber",
     "particle": "minecraft:block/netherite_block"
   },
   "elements": [
