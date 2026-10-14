@@ -5,21 +5,21 @@
     },
     "facing=north": {
       "model": "miningrig:block/mining_drill",
-      "x": 90
+      "x": 270
     },
     "facing=east": {
       "model": "miningrig:block/mining_drill",
-      "x": 90,
+      "x": 270,
       "y": 90
     },
     "facing=south": {
       "model": "miningrig:block/mining_drill",
-      "x": 90,
+      "x": 270,
       "y": 180
     },
     "facing=west": {
       "model": "miningrig:block/mining_drill",
-      "x": 90,
+      "x": 270,
       "y": 270
     },
     "facing=up": {
