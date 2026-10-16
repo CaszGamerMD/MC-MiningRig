@@ -1,10 +1,18 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.1 — connected sideways drill assembly**
+**Version 0.6.5 — CC discovery for horizontal drilling**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.5 — Horizontal drill CC network recognition
+
+- CC proximity and computer auto-discovery now check the full two-block drill assembly (head and yellow housing) rather than only the leading bit, including CCs near the rear of a horizontal drill.
+- CC faces render the link in the true direction of the nearest connected drill instead of always displaying the downward link. The CC screen labels the linked direction.
+- Paired drills choose their serving CC from the **same connected coordinator network as their Mining Computer**, avoiding unrelated nearby CC networks intercepting output, wall, filler and hardware traffic. Unpaired drills remain discoverable from loaded CCs.
+- Server-side discovery and transport remain loaded-chunk-only, with no force-loaded world scan.
+- Existing horizontal and vertical machines keep their block IDs, orientation, inventory and saved data.
 
 ## v0.6.1 — Correct horizontal drill model and structure
 
