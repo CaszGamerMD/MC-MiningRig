@@ -123,7 +123,12 @@ public final class CoordinatorScreen extends AbstractContainerScreen<Coordinator
             if(selected==side)g.fill(x,topPos+48,x+26,topPos+49,0xffffffff);
         }
         g.text(font,"Selected: "+selected.getName().toUpperCase(),leftPos+7,topPos+49,0xffc1d4dd,false);
-        if(menu.drillSide(Direction.DOWN))
-            g.text(font,"DRILL LINK",leftPos+113,topPos+8,0xff39e8dd,false);
+        for(Direction side:SIDES){
+            if(menu.drillSide(side)){
+                g.text(font,"DRILL "+side.getName().toUpperCase(java.util.Locale.ROOT),
+                    leftPos+101,topPos+8,0xff39e8dd,false);
+                break;
+            }
+        }
     }
 }
