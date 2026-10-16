@@ -53,6 +53,57 @@ public final class RigTopology {
     private static boolean nearby(BlockPos a,BlockPos b){
         return a.distSqr(b)<=RANGE*RANGE;
     }
+    /** Either half of the placed 2-block machine may be in CC range. */
+    private static double drillDistanceSq(BlockPos cc,DrillEntity drill){
+        return Math.min(cc.distSqr(drill.getBlockPos()),
+            cc.distSqr(drill.housingPosition()));
+    }
+    public static boolean nearDrill(BlockPos cc,DrillEntity drill){
+        return drillDistanceSq(cc,drill)<=RANGE*RANGE;
+    }
+    /** Search both head and body, without checking/chunk-loading air along the way. */
+    public static List<CoordinatorEntity> coordinators(ServerLevel world,DrillEntity drill){
+        Map<BlockPos,CoordinatorEntity> found=new HashMap<>();
+        for(BlockPos point:new BlockPos[]{drill.getBlockPos(),drill.housingPosition()})
+            for(CoordinatorEntity cc:coordinators(world,point))
+                if(nearDrill(cc.getBlockPos(),drill))
+                    found.put(cc.getBlockPos(),cc);
+        List<CoordinatorEntity> result=new ArrayList<>(found.values());
+        result.sort(Comparator.comparingDouble(cc->drillDistanceSq(cc.getBlockPos(),drill)));
+        return result;
+    }
+    /**
+     * A paired drill must use a CC on its computer's component, rather than
+     * silently choosing a closer but unrelated warehouse/rig CC network.
+     * An unpaired drill can still be auto-discovered from nearby CCs.
+     */
+    public static CoordinatorEntity nearestDrillCoordinator(ServerLevel world,DrillEntity drill){
+        List<CoordinatorEntity> nearby=coordinators(world,drill);
+        if(nearby.isEmpty())return null;
+        BlockPos computerPos=drill.pairedComputerPosition(world);
+        if(computerPos!=null&&world.hasChunkAt(computerPos)
+                &&world.getBlockEntity(computerPos) instanceof ComputerEntity computer){
+            Set<BlockPos> owned=new HashSet<>();
+            for(CoordinatorEntity cc:network(world,computer))owned.add(cc.getBlockPos());
+            for(CoordinatorEntity cc:nearby)
+                if(owned.contains(cc.getBlockPos()))return cc;
+            return null;
+        }
+        return nearby.get(0);
+    }
+    /** Select the visual face pointing towards the nearer machine half. */
+    public static net.minecraft.core.Direction drillLinkFace(BlockPos cc,DrillEntity drill){
+        BlockPos head=drill.getBlockPos(),body=drill.housingPosition();
+        BlockPos target=cc.distSqr(body)<=cc.distSqr(head)?body:head;
+        int x=target.getX()-cc.getX(),y=target.getY()-cc.getY(),
+            z=target.getZ()-cc.getZ();
+        int ax=Math.abs(x),ay=Math.abs(y),az=Math.abs(z);
+        if(ay>=ax&&ay>=az)return y<0
+            ?net.minecraft.core.Direction.DOWN:net.minecraft.core.Direction.UP;
+        if(ax>=az)return x<0
+            ?net.minecraft.core.Direction.WEST:net.minecraft.core.Direction.EAST;
+        return z<0?net.minecraft.core.Direction.NORTH:net.minecraft.core.Direction.SOUTH;
+    }
     public static List<CoordinatorEntity> coordinators(ServerLevel world,BlockPos origin){
         List<CoordinatorEntity> result=new ArrayList<>();
         Set<BlockPos> positions=coordinators.get(world);
@@ -74,11 +125,15 @@ public final class RigTopology {
         Set<BlockPos> positions=drills.get(world);
         if(positions==null)return result;
         for(BlockPos pos:new ArrayList<>(positions)){
-            if(!nearby(origin,pos)||!world.hasChunkAt(pos))continue;
-            if(world.getBlockEntity(pos) instanceof DrillEntity drill)result.add(drill);
-            else positions.remove(pos);
+            // Horizontal machines have a housing block behind their head.
+            // A CC within 24 blocks of that housing can service the drill
+            // even if the leading bit is one more block away.
+            if(!world.hasChunkAt(pos))continue;
+            if(world.getBlockEntity(pos) instanceof DrillEntity drill){
+                if(nearDrill(origin,drill))result.add(drill);
+            }else positions.remove(pos);
         }
-        result.sort(Comparator.comparingDouble(d->d.getBlockPos().distSqr(origin)));
+        result.sort(Comparator.comparingDouble(d->drillDistanceSq(origin,d)));
         return result;
     }
     public static List<DrillEntity> networkDrills(ServerLevel world,ComputerEntity computer){
@@ -91,7 +146,7 @@ public final class RigTopology {
     }
     public static boolean joined(ServerLevel world,ComputerEntity computer,DrillEntity drill){
         for(CoordinatorEntity cc:network(world,computer))
-            if(nearby(cc.getBlockPos(),drill.getBlockPos()))return true;
+            if(nearDrill(cc.getBlockPos(),drill))return true;
         return false;
     }
 }
