@@ -194,7 +194,9 @@ public final class RigNetwork {
     }
     @org.jetbrains.annotations.Nullable
     public static CoordinatorEntity nearestDrillCoordinator(ServerLevel world,DrillEntity drill){
-        return RigTopology.nearest(world,drill.getBlockPos());
+        // Head and housing make up ONE drill, and already-linked drills must
+        // dispatch/receive cargo through the same CC graph as their computer.
+        return RigTopology.nearestDrillCoordinator(world,drill);
     }
     /**
      * Insert unused material back into the original Filler/Wall input (only
