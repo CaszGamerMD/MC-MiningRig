@@ -119,6 +119,16 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     }
     @Nullable public BlockPos lastConnectedCoordinator(){return lastConnectedCoordinator;}
     @Nullable public BlockPos lastConnectedPosition(){return lastConnectedPosition;}
+    /**
+     * Saved pairing is authoritative for choosing the CC component. Never
+     * force-load the computer solely to resolve a wireless connection.
+     */
+    @Nullable public BlockPos pairedComputerPosition(ServerLevel world){
+        if(linkedToken.isBlank()||computerPos==null
+                ||!world.dimension().identifier().toString().equals(computerDimension))
+            return null;
+        return computerPos;
+    }
     public void adoptController(ServerLevel world,ComputerEntity computer,String token){
         linkedToken=token;
         computerPos=computer.getBlockPos().immutable();
