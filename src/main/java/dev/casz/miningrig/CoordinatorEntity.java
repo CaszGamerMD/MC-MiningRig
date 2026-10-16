@@ -151,9 +151,13 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
             if(RigNetwork.nearestDrillCoordinator(world,drill)==this)result.add(drill);
         return result;
     }
-    DrillEntity drillBelow(ServerLevel world){
-        java.util.List<DrillEntity> connected=serviceDrills(world);
-        return connected.isEmpty()?null:connected.get(0);
+    private int connectedDrillFaces(ServerLevel world){
+        int mask=0;
+        for(DrillEntity drill:serviceDrills(world)){
+            Direction direction=RigTopology.drillLinkFace(worldPosition,drill);
+            mask|=1<<direction.get3DDataValue();
+        }
+        return mask;
     }
     DrillEntity supplying(ServerLevel world,boolean wall){
         for(DrillEntity drill:serviceDrills(world))
@@ -169,7 +173,7 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
             if(world.hasChunkAt(adjacent)&&world.getBlockEntity(adjacent) instanceof Container container
                     && !(container instanceof CoordinatorEntity))a|=bit;
         }
-        int d=drillBelow(world)==null?0:1<<Direction.DOWN.get3DDataValue();
+        int d=connectedDrillFaces(world);
         if(w!=wirelessMask||a!=adjacentMask||d!=drillMask){
             wirelessMask=w;adjacentMask=a;drillMask=d;setChanged();
         }
