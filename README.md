@@ -1,10 +1,17 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.5 — CC discovery for horizontal drilling**
+**Version 0.6.6 — forward-facing horizontal fluid wall**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.6 — Horizontal forward fluid barrier
+
+- A horizontal Mining Drill seals the **forward face** of the tunnel before mining the nearer slice. It checks one full footprint (including the one-block perimeter) **two blocks ahead of the head**, plugs detected fluid with staged **Filler** blocks, waits for stability, then builds any side walls and mines the near slice. This avoids instantly drilling away the only fluid seal.
+- Each step scans the next forward face, so the temporary bulkhead advances with the machine, leaving a protective fluid-tight cap ahead. Dry rock and ores ahead are left intact until their normal mining step; liquids on the leading face get first priority regardless of Wall mode.
+- Existing **outer-ring wall**, filler, tool-speed, fluid verification, gravity support, CC supply, chunk safety, and retry limits are reused. Waiting forward cells and pending verification are persisted across saves, reboots and drill movement. Vertical drilling is unchanged.
+- Build-verified for Fabric 26.2. Water-filled caves, source blocks, sand/gravel and transitions between dry/wet rock still need real-world runtime QA.
 
 ## v0.6.5 — Horizontal drill CC network recognition
 
