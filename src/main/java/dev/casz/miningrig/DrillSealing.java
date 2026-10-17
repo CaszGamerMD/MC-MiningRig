@@ -26,10 +26,15 @@ final class DrillSealing {
     private static final int VERIFY_TICKS=5, FALLING_VERIFY_TICKS=18, MAX_GRAVITY_SUPPORT_DEPTH=32;
     private static final int DEFAULT_FILL_ATTEMPTS=24;
     private final LinkedHashSet<BlockPos> fluidSpots=new LinkedHashSet<>();
+    // A horizontal bore is flooded from the direction it advances. Before
+    // cutting the next tunnel slice, seal fluids on the NEXT forward plane.
+    // These temporary bulkhead blocks are excavated when the drill reaches
+    // them on a subsequent step; the barrier advances with the bit.
+    private final LinkedHashSet<BlockPos> forwardSpots=new LinkedHashSet<>();
     private final LinkedHashSet<BlockPos> finishedWalls=new LinkedHashSet<>();
     @Nullable private BlockPos pending;
     @Nullable private BlockPos pendingGoal;
-    private boolean pendingWall;
+    private boolean pendingWall,pendingForward;
     private int wait,attempts;
     // Attempts MUST belong to one physical target, never the layer as a
     // whole. A sand/gravel column may be much deeper than 24 blocks.
@@ -50,7 +55,8 @@ final class DrillSealing {
     private int flightTicks;
     @Nullable private Display.ItemDisplay visual;
 
-    boolean warning(){return !fluidSpots.isEmpty()||pending!=null||cautionTicks>0;}
+    boolean warning(){return !fluidSpots.isEmpty()||!forwardSpots.isEmpty()
+        ||pending!=null||cautionTicks>0;}
     boolean fluidFilling(){return fluidMode;}
     boolean needsWallSupply(){return !wallFinished;}
     boolean needsAirFiller(){return !wallFinished && airWallNeeded;}
@@ -246,8 +252,10 @@ final class DrillSealing {
     }
     void copyTo(DrillSealing next){
         next.fluidSpots.clear();next.fluidSpots.addAll(fluidSpots);
+        next.forwardSpots.clear();next.forwardSpots.addAll(forwardSpots);
         next.finishedWalls.clear();next.finishedWalls.addAll(finishedWalls);
-        next.pending=pending;next.pendingGoal=pendingGoal;next.pendingWall=pendingWall;
+        next.pending=pending;next.pendingGoal=pendingGoal;
+        next.pendingWall=pendingWall;next.pendingForward=pendingForward;
         next.wait=wait;next.attempts=attempts;
         next.attemptTarget=attemptTarget;
         next.allowedAttempts=allowedAttempts;
@@ -271,7 +279,8 @@ final class DrillSealing {
         dropCargo(world,at);
         nextLayer();
         wallFallback=false;wallSourceChecked=false;wallFinished=false;
-        cautionTicks=0;pending=null;pendingGoal=null;pendingWall=false;
+        cautionTicks=0;pending=null;pendingGoal=null;
+        pendingWall=false;pendingForward=false;forwardSpots.clear();
         replaceCleared=false;fluidMode=false;legacyWallPhase=false;
         wallPositionsRemaining=0;airWallNeeded=false;
         deliveryWall=false;pendingSourceWalls=false;flightTicks=0;attempts=0;wait=0;
@@ -279,7 +288,8 @@ final class DrillSealing {
         discardVisual();
     }
     void nextLayer(){
-        fluidSpots.clear();finishedWalls.clear();pending=null;pendingGoal=null;pendingWall=false;
+        fluidSpots.clear();forwardSpots.clear();finishedWalls.clear();
+        pending=null;pendingGoal=null;pendingWall=false;pendingForward=false;
         wait=0;attempts=0;wallFinished=false;wallSourceChecked=false;
         attemptTarget=null;allowedAttempts=configuredLimit;gravityDropDepth=0;
         replaceCleared=false;fluidMode=false;
@@ -394,10 +404,11 @@ final class DrillSealing {
         // the requested upper fluid/wall coordinate.
         boolean goalFinished=pendingGoal==null||p.equals(pendingGoal);
         if(goalFinished){
-            if(walls)finishedWalls.add(p);
+            if(pendingForward)forwardSpots.remove(p);
+            else if(walls)finishedWalls.add(p);
             else fluidSpots.remove(p);
         }
-        attempts=0;pending=null;pendingGoal=null;wait=0;
+        attempts=0;pending=null;pendingGoal=null;pendingForward=false;wait=0;
         attemptTarget=null;allowedAttempts=configuredLimit;gravityDropDepth=0;
     }
     private ComputerEntity.Status verify(ServerLevel world,DrillEntity drill){
@@ -488,6 +499,68 @@ final class DrillSealing {
                 ComputerEntity.Status.OUT_OF_FILLER;
         }
         return applyFromStock(world,drill,stock,pendingGoal==null?pending:pendingGoal,pendingWall);
+    }
+    /**
+     * Horizontal rigs need to resist fluid pressure in the direction of
+     * travel. Merely filling water in the slice about to be mined results in
+     * that seal immediately being drilled away. Instead we seal the NEXT
+     * forward face first (+2 blocks relative to the current drill head).
+     * We then mine the nearer (+1) slice behind this temporary bulkhead.
+     *
+     * Only fluid cells are filled; dry ore/stone is not replaced, and the
+     * perimeter wall pass and downward rigs keep their existing behavior.
+     * Scan outside-in, just like the established fluid recovery logic.
+     */
+    ComputerEntity.Status forwardSealStep(ServerLevel world,DrillEntity drill,
+            ComputerEntity computer){
+        net.minecraft.core.Direction forward=drill.drillingDirection();
+        if(forward==net.minecraft.core.Direction.DOWN)return null;
+        // Another phase has a pending verification or a cargo packet.
+        // Never overwrite it, but allow that phase to finish normally.
+        if((pending!=null&&!pendingForward)||delivery!=null)return null;
+        if(pendingForward){
+            ComputerEntity.Status verified=verifyStock(world,drill);
+            if(verified!=null)return verified==ComputerEntity.Status.RUNNING
+                ?ComputerEntity.Status.FILLING:verified;
+        }
+        int radius=computer.radius()+1;
+        for(int u=-radius;u<=radius;u++)
+            for(int v=-radius;v<=radius;v++){
+                if(!contains(computer,u,v,true))continue;
+                BlockPos at=drill.slicePosition(u,v).relative(forward);
+                if(!world.hasChunkAt(at))return ComputerEntity.Status.BLOCKED;
+                if(!world.getFluidState(at).isEmpty()){
+                    forwardSpots.add(at.immutable());
+                    cautionTicks=200;
+                }
+            }
+        if(forwardSpots.isEmpty())return null;
+        filler.tick(world,drill);
+        filler.request(world,drill,64);
+        for(int stage=0;stage<2;stage++){
+            boolean outside=stage==0;
+            for(Iterator<BlockPos> it=forwardSpots.iterator();it.hasNext();){
+                BlockPos at=it.next();
+                if(!world.hasChunkAt(at))return ComputerEntity.Status.BLOCKED;
+                if(outsideHole(at.relative(forward.getOpposite()),drill,computer)!=outside)
+                    continue;
+                if(immune(world.getBlockState(at))||solid(world,at)){
+                    it.remove();continue;
+                }
+                target(world,at,null);
+                if(failed())return ComputerEntity.Status.FILL_FAILED;
+                if(!filler.hasSupply()){
+                    if(filler.hasFlights()||RigNetwork.fillerDepotPending(world,drill))
+                        return ComputerEntity.Status.FILLING;
+                    return ComputerEntity.Status.OUT_OF_FILLER;
+                }
+                ComputerEntity.Status result=applyFromStock(world,drill,filler,at,false);
+                if(pending!=null&&at.equals(pendingGoal))pendingForward=true;
+                return result==ComputerEntity.Status.RUNNING
+                    ?ComputerEntity.Status.FILLING:result;
+            }
+        }
+        return null;
     }
     private List<BlockPos> ring(DrillEntity drill,ComputerEntity computer){
         List<BlockPos> positions=new ArrayList<>();
@@ -686,6 +759,11 @@ final class DrillSealing {
     }
     void save(ValueOutput out){
         out.putInt("FluidSpots",fluidSpots.size());
+        out.putInt("ForwardSpots",forwardSpots.size());
+        int forwardIndex=0;
+        for(BlockPos spot:forwardSpots)
+            out.putLong("ForwardSpot"+forwardIndex++,spot.asLong());
+        out.putBoolean("FillPendingForward",pendingForward);
         int i=0;for(BlockPos p:fluidSpots)out.putLong("FluidSpot"+i++,p.asLong());
         out.putInt("FinishedWalls",finishedWalls.size());
         i=0;for(BlockPos p:finishedWalls)out.putLong("WallPos"+i++,p.asLong());
@@ -722,6 +800,10 @@ final class DrillSealing {
     void load(ValueInput in){
         discardVisual();
         fluidSpots.clear();
+        forwardSpots.clear();
+        for(int i=0;i<Math.min(1024,in.getIntOr("ForwardSpots",0));i++)
+            forwardSpots.add(BlockPos.of(in.getLongOr("ForwardSpot"+i,0)));
+        pendingForward=in.getBooleanOr("FillPendingForward",false);
         for(int i=0;i<Math.min(1024,in.getIntOr("FluidSpots",0));i++)
             fluidSpots.add(BlockPos.of(in.getLongOr("FluidSpot"+i,0)));
         finishedWalls.clear();
