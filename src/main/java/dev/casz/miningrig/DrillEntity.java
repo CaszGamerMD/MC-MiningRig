@@ -553,10 +553,14 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         if(!hasWorkingBits())return hardware.awaitingReplacement()&&!hardware.waitExpired()
             ?ComputerEntity.Status.RUNNING:ComputerEntity.Status.OUT_OF_BITS;
         if(freeStorage()==0)return ComputerEntity.Status.FULL;
-        // Operational order is explicitly WALL -> FLUID -> MINING.
-        // The controller owns the setting; the sealing state owns the
-        // per-coordinate count. Update live for every tick and after reload.
+        // Horizontal tunnels need a temporary forward pressure bulkhead
+        // BEFORE touching their perimeter or mining the near slice. The
+        // fluid on the forward face is sealed one plane beyond the cutter,
+        // so the bit does not immediately break the block preventing influx.
+        // Vertical drills still follow the original WALL -> FLUID -> MINING.
         sealing.setTryLimit(computer.fillAttemptLimit());
+        ComputerEntity.Status forward=sealing.forwardSealStep(world,this,computer);
+        if(forward!=null)return forward;
         ComputerEntity.Status walls=sealing.wallStep(world,this,computer);
         if(walls!=null)return walls==ComputerEntity.Status.RUNNING
             ?ComputerEntity.Status.WALLING:walls;
