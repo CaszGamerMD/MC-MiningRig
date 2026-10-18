@@ -1,6 +1,6 @@
 {
   "type": "minecraft:crafting_shapeless",
-  "category": "tools",
+  "category": "misc",
   "ingredients": [
     "minecraft:clay_ball",
     "minecraft:white_dye",
