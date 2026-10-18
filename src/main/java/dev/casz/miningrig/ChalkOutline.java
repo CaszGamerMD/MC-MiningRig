@@ -64,11 +64,26 @@ public final class ChalkOutline {
         } catch (IllegalArgumentException ex) { return null; }
     }
 
-    /** A chalk drawing is a polygon through the centres of its marked blocks. */
+    /** The chalk has independent replace, additive, and subtractive contour modes. */
+    public enum Operation { REPLACE, ADD, CUT }
+
+    /** Existing single-polygon behavior, retained for existing callers. */
     public static ChalkOutline create(List<BlockPos> marks, DrillEntity drill, Direction face) {
+        return apply(marks, drill, face, null, Operation.REPLACE);
+    }
+
+    /**
+     * Rasterize a player-drawn polygon in the drill's local slice plane and
+     * combine it with the previously saved bit mask. Multiple contours can
+     * therefore form concave arches, donuts, letters, notches, and islands.
+     * The resulting mask must still include the drill head.
+     */
+    public static ChalkOutline apply(List<BlockPos> marks, DrillEntity drill,
+            Direction face, ChalkOutline previous, Operation operation) {
         Direction forward = drill.drillingDirection();
         if (marks.size() < 3 || marks.size() > 128
                 || forward != face.getOpposite()) return null;
+        if (operation != Operation.REPLACE && previous == null) return null;
         BlockPos origin = drill.getBlockPos();
         List<int[]> vertices = new ArrayList<>();
         for (BlockPos p : marks) {
@@ -87,13 +102,37 @@ public final class ChalkOutline {
                 vertices.add(new int[]{u,v});
         }
         if (vertices.size() < 3) return null;
-        BitSet bits = new BitSet(CELLS);
+
+        BitSet region = new BitSet(CELLS);
         for (int u=-LIMIT;u<=LIMIT;u++)
             for (int v=-LIMIT;v<=LIMIT;v++)
-                if (inside(vertices,u,v))bits.set(index(u,v));
-        if (!bits.get(index(0,0))) return null; // the drill must stand inside
-        ChalkOutline outline = new ChalkOutline(bits);
-        return outline.count > 0 ? outline : null;
+                if (inside(vertices,u,v))region.set(index(u,v));
+        if (region.isEmpty()) return null;
+        if (operation == Operation.REPLACE) {
+            if (!region.get(index(0,0))) return null;
+            return new ChalkOutline(region);
+        }
+
+        // A new contour must touch the current outline. This avoids applying
+        // an edit to unrelated drills merely because they are within 20 blocks.
+        BitSet overlap = (BitSet)region.clone();
+        overlap.and(previous.mask);
+        if (overlap.isEmpty()) {
+            if (operation == Operation.CUT) return null;
+            boolean adjoining = false;
+            for (int u=-LIMIT;u<=LIMIT && !adjoining;u++)
+                for (int v=-LIMIT;v<=LIMIT;v++)
+                    if (region.get(index(u,v)) && previous.contains(u,v,true)){
+                        adjoining=true;break;
+                    }
+            if (!adjoining) return null;
+        }
+        BitSet composite = (BitSet) previous.mask.clone();
+        if (operation == Operation.ADD) composite.or(region);
+        else composite.andNot(region);
+        if (composite.isEmpty() || !composite.get(index(0,0))
+                || composite.equals(previous.mask)) return null;
+        return new ChalkOutline(composite);
     }
 
     private static boolean inside(List<int[]> poly,int u,int v) {
