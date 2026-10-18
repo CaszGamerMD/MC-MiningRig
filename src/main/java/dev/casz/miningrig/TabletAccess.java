@@ -21,7 +21,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 
 /**
  * Linked tablets are remote terminals only. The original computer remains
- * the sole authority for drill positions, settings and all four inventories.
+ * the sole authority for drill positions, settings and all sixteen drill inventories.
  */
 public final class TabletAccess {
     private TabletAccess(){}
