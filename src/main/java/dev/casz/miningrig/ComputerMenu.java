@@ -65,6 +65,10 @@ public final class ComputerMenu extends AbstractContainerMenu {
         else if(id==42)computer.startAll();
         else if(id==43)computer.stopAll();
         else if(id==44)computer.allowRescan();
+        else if(id==45)player.sendSystemMessage(
+            net.minecraft.network.chat.Component.literal(computer.copySelectedSettings()));
+        else if(id==46)player.sendSystemMessage(
+            net.minecraft.network.chat.Component.literal(computer.pasteSelectedSettings()));
         else if(id>=50&&id<=53)computer.resetTask(id-50);
         else return false;
         broadcastChanges();return true;
