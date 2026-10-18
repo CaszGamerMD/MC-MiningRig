@@ -1,10 +1,19 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.13 — sixteen-drill computer and paginated console**
+**Version 0.6.14 — copy/paste 16-drill settings**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to sixteen drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.14 — Copy and paste drill settings
+
+- The Mining Computer and linked tablet now have **COPY** and **PASTE** buttons in the selected-drill settings toolbar. Select a source drill, click COPY, select any destination drill across all four pages, and click PASTE. The same clipboard can be reused for multiple target drills.
+- A copied snapshot includes **radius, depth, circle/square selection, wall mode, filler attempt limit, and complete Target Chalk mask**, including compound outlines with cut-outs and additions.
+- The clipboard is **saved in the Mining Computer's block entity**, surviving world reloads and usable through its linked tablet. It records the source drill number and doesn't change when the source drill is later edited. The UI indicates which drill was copied and disables PASTE when empty.
+- Paste **never copies** the drill's nickname, registered pairing token, location, installed bits, storage, running status or excavation progress. Empty slots can be pre-configured, but are not automatically linked or started.
+- Changing a destination's mining geometry safely pauses it, returns staged filler/wall supplies, and resets its excavation and sealing cursor before applying the new shape. A disconnected or unloaded registered drill refuses a geometry-changing paste until its chunk can be loaded safely; unchanged geometry/fill retry-only edits do not require resetting its progress.
+- Both actions validate against the actual server menu and display clear result messages. A paste of identical settings is a no-op. Existing worlds and saved settings remain backward-compatible.
 
 ## v0.6.13 — Control up to 16 mining drills
 
