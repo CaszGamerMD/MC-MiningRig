@@ -3,7 +3,7 @@
   "id": "miningrig",
   "version": "${version}",
   "name": "Caszual Mining Rig",
-  "description": "Caszual Mining Rig: command up to four named, remotely operated drills with independent progress, ETA, and wireless collection.",
+  "description": "Caszual Mining Rig: command up to sixteen named, remotely operated drills with independent progress, ETA, and wireless collection.",
   "authors": [
     "CaszGamerMD"
   ],
