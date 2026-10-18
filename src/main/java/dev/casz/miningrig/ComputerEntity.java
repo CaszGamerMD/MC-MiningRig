@@ -29,9 +29,9 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import org.jetbrains.annotations.Nullable;
 
-/** Independent supervisor of up to four item-linked drills. */
+/** Independent supervisor of up to sixteen item-linked drills. */
 public final class ComputerEntity extends BlockEntity implements MenuProvider {
-    public static final int MAX_DRILLS=4;
+    public static final int MAX_DRILLS=16;
     /** Inclusive maximum excavation radius, shared by controls and persisted settings. */
     public static final int MAX_RADIUS=20;
     public enum Status {
@@ -49,22 +49,22 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         public final String display;
         Status(String value){display=value;}
     }
-    private final String[] tokens={"","","",""};
-    private final String[] nicknames={"Drill 1","Drill 2","Drill 3","Drill 4"};
+    private final String[] tokens=new String[MAX_DRILLS];
+    private final String[] nicknames=new String[MAX_DRILLS];
     private final BlockPos[] positions=new BlockPos[MAX_DRILLS];
-    private final Status[] statuses={Status.READY,Status.READY,Status.READY,Status.READY};
+    private final Status[] statuses=new Status[MAX_DRILLS];
     private final boolean[] running=new boolean[MAX_DRILLS];
-    private final int[] radii={2,2,2,2};
+    private final int[] radii=new int[MAX_DRILLS];
     private final ChalkOutline[] outlines=new ChalkOutline[MAX_DRILLS];
     private final int[] missingChecks=new int[MAX_DRILLS];
-    private final int[] depths={12,12,12,12};
-    private final boolean[] circles={true,true,true,true};
+    private final int[] depths=new int[MAX_DRILLS];
+    private final boolean[] circles=new boolean[MAX_DRILLS];
     // 0 OFF, 1 AIR boundary sealing, 2 ALWAYS (extended mining and wall blocks)
-    private final int[] wallModes={0,0,0,0};
+    private final int[] wallModes=new int[MAX_DRILLS];
     // A per-coordinate safety ceiling, configured independently for each
     // linked drill. Higher limits permit tall sand/gravel shafts in oceans.
     public static final int MIN_FILL_TRIES=1,MAX_FILL_TRIES=4096,DEFAULT_FILL_TRIES=24;
-    private final int[] fillTries={24,24,24,24};
+    private final int[] fillTries=new int[MAX_DRILLS];
     private int selected, activeSlot;
     private long lastBroadcast;
     private String tabletId;
@@ -103,7 +103,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         if(change)settingsChanged();
     }
     /** Preserve unloaded machines, but release stale slots once the chunk proves
-     * the drill is gone. This allows unlimited consecutive drills on four slots. */
+     * the drill is gone. This allows unlimited consecutive drills on sixteen slots. */
     private boolean stale(ServerLevel server,int index){
         BlockPos pos=positions[index];
         if(tokens[index].isEmpty()||pos==null||!server.hasChunkAt(pos))return false;
@@ -194,7 +194,16 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         if(level instanceof ServerLevel server)syncActiveChunks(server);
     }
 
-    public ComputerEntity(BlockPos pos,BlockState state){super(MiningRig.COMPUTER_ENTITY,pos,state);}
+    public ComputerEntity(BlockPos pos,BlockState state){
+        super(MiningRig.COMPUTER_ENTITY,pos,state);
+        Arrays.fill(tokens,"");
+        Arrays.fill(statuses,Status.READY);
+        Arrays.fill(radii,2);
+        Arrays.fill(depths,12);
+        Arrays.fill(circles,true);
+        Arrays.fill(fillTries,DEFAULT_FILL_TRIES);
+        for(int i=0;i<MAX_DRILLS;i++)nicknames[i]="Drill "+(i+1);
+    }
     public boolean belongsTo(ComputerMenu menu){return menu.computer()==this;}
     public int selected(){return selected;}
     public int selectedRadius(){return radii[selected];}
