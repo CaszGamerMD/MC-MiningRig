@@ -58,6 +58,9 @@ public final class ComputerBlock extends BaseEntityBlock {
     }
     public static InteractionResult handleItem(ItemStack stack,Level level,BlockPos pos,Player player) {
         if (!(level.getBlockEntity(pos) instanceof ComputerEntity computer)) return InteractionResult.PASS;
+        if(stack.is(MiningRig.TARGET_CHALK))
+            return TargetChalkItem.interact(level,player,stack,pos,
+                net.minecraft.core.Direction.UP);
         if(stack.is(MiningRig.TABLET)){
             if(level instanceof ServerLevel server){
                 TabletLink.write(stack,TabletLink.of(server,computer));
