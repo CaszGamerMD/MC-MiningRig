@@ -310,17 +310,18 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         }
     }
     public boolean canConnectAbove(ServerLevel world){return RigNetwork.nearestDrillCoordinator(world,this)!=null;}
-    public int estimatedSeconds(int radius,int depth,boolean circle,boolean mining){
+    public int estimatedSeconds(int radius,int depth,boolean circle,boolean mining,
+            ChalkOutline outline){
         if(completedLayers>=depth)return 0;
         if(!hasWorkingBits())return -1;
         int perLayer=0;
         for(int x=-radius;x<=radius;x++)for(int z=-radius;z<=radius;z++)
-            if(!circle||x*x+z*z<=radius*radius)perLayer++;
+            if(outline!=null?outline.has(x,z):(!circle||x*x+z*z<=radius*radius))perLayer++;
         int edge=2*radius+1;
         int visited=completedLayers*perLayer;
         for(int i=0;i<Math.min(cursor,edge*edge);i++){
             int x=i%edge-radius,z=i/edge-radius;
-            if(!circle||x*x+z*z<=radius*radius)visited++;
+            if(outline!=null?outline.has(x,z):(!circle||x*x+z*z<=radius*radius))visited++;
         }
         for(int idx:assigned)if(idx>=0)visited=Math.max(0,visited-1);
         int remaining=Math.max(0,depth*perLayer-visited);
