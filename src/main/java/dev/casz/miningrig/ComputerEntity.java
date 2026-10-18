@@ -234,6 +234,14 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public int radius(){return footprintRadius(activeSlot);}
     public ChalkOutline outline(){return outlines[activeSlot];}
     public ChalkOutline outline(int slot){return slot>=0&&slot<MAX_DRILLS?outlines[slot]:null;}
+    /** Return the saved footprint for this specific physical drill. */
+    public ChalkOutline outline(DrillEntity drill){
+        for(int i=0;i<MAX_DRILLS;i++)
+            if(positions[i]!=null && positions[i].equals(drill.getBlockPos())
+                    && drill.matchesLink(tokens[i]))
+                return outlines[i];
+        return null;
+    }
     /**
      * Attach only to an actual registered drill, never an unplaced reservation.
      * Resets the task to avoid applying a different geometry to an in-flight cursor.
