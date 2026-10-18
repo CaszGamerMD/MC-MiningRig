@@ -35,7 +35,10 @@ final class RigNetworkRepair {
             display=null;cargo=null;destination=null;ticks=0;elapsed=0;
         }
     }
-    private final Job[] jobs={new Job(),new Job(),new Job(),new Job()};
+    private final Job[] jobs=new Job[ComputerEntity.MAX_DRILLS];
+    RigNetworkRepair(){
+        for(int i=0;i<jobs.length;i++)jobs[i]=new Job();
+    }
     private static int distance(BlockPos a,BlockPos b){
         return Math.abs(a.getX()-b.getX())
             +Math.abs(a.getY()-b.getY())+Math.abs(a.getZ()-b.getZ());
