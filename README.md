@@ -1,10 +1,19 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.8 — extended mining radius to 20**
+**Version 0.6.9 — Target Chalk outlines and automatic slot recycling**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.9 — Custom Target Chalk footprints and drill discovery cleanup
+
+- The Mining Computer automatically frees a slot after three consecutive 20-tick checks find its former drill missing in a **loaded** chunk. Unloaded drills are preserved; available slots are reused without a permanent four-drill history limit. A newly discovered real drill can also replace an unplaced item reservation when all slots are full. Manual Unlink and Rescan still work.
+- **Target Chalk** is crafted using clay ball, white dye and red dye. Right-click corners on the top of a flat ground layer for downward drilling, or a vertical wall face for a horizontal drill. Click the first corner again or sneak-right-click air to close the polygon. Up to 128 points. Point-to-point drawing has white particle feedback.
+- Closed chalk outlines select **every already registered, loaded drill inside them**, provided all marked corners are within 20 blocks of that drill along the excavation slice. The outline must contain the drill head. All marker clicks must be on the same plane and face. Matching drills pause and reset their excavation task when the new shape is assigned.
+- Chalk masks are computed as exact block-cell polygons, including boundary cells, and serialized in each computer slot. The drill retains the cutout through each vertical/horizontal movement and through world save/reload. Walls, filler, perimeter previews, chunk tickets, ETA and excavation share the mask. A one-cell outer seal ring prevents fluids from bypassing irregular edges.
+- Sneak-right-click a Mining Computer with clear Target Chalk to remove the selected drill's mask, or sneak-right-click the corresponding drill. The original circle/square settings remain saved and become active again.
+- An outline needs a recognized drill attached to a loaded Mining Computer; incomplete drawings stay on the chalk item. The visual stroke uses particles instead of permanently replacing terrain with decals.
 
 ## v0.6.8 — Mining radius up to 20
 
