@@ -32,6 +32,8 @@ import org.jetbrains.annotations.Nullable;
 /** Independent supervisor of up to four item-linked drills. */
 public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public static final int MAX_DRILLS=4;
+    /** Inclusive maximum excavation radius, shared by controls and persisted settings. */
+    public static final int MAX_RADIUS=20;
     public enum Status {
         READY("Ready"), RUNNING("Mining"), STOPPED("Manually stopped"), DONE("Job done"),
         OUT_OF_BITS("Out of bits"), NO_COLLECTOR("No collector in range"),
@@ -91,7 +93,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         }
     }
     public void applySettings(int radius,int depth,int tries){
-        if(radius<1||radius>12||depth<1||depth>256
+        if(radius<1||radius>MAX_RADIUS||depth<1||depth>256
             ||tries<MIN_FILL_TRIES||tries>MAX_FILL_TRIES)return;
         boolean change=radius!=radii[selected]||depth!=depths[selected];
         radii[selected]=radius;depths[selected]=depth;
@@ -199,7 +201,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public void select(int slot){
         if(slot>=0&&slot<MAX_DRILLS){selected=slot;activeSlot=slot;setChanged();}
     }
-    public void setRadius(int value){radii[selected]=Math.max(1,Math.min(12,value));settingsChanged();}
+    public void setRadius(int value){radii[selected]=Math.max(1,Math.min(MAX_RADIUS,value));settingsChanged();}
     public void setDepth(int value){depths[selected]=Math.max(1,Math.min(256,value));settingsChanged();}
     public void setCircle(boolean value){circles[selected]=value;settingsChanged();}
     private void settingsChanged(){
@@ -583,7 +585,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             running[i]=in.getBooleanOr("Running"+i,false);
             try{statuses[i]=Status.valueOf(in.getStringOr("Status"+i,"READY"));}
             catch(IllegalArgumentException e){statuses[i]=Status.READY;}
-            radii[i]=Math.max(1,Math.min(12,in.getIntOr("Radius"+i,2)));
+            radii[i]=Math.max(1,Math.min(MAX_RADIUS,in.getIntOr("Radius"+i,2)));
             depths[i]=Math.max(1,Math.min(256,in.getIntOr("Depth"+i,12)));
             circles[i]=in.getBooleanOr("Circle"+i,true);
             wallModes[i]=Math.max(0,Math.min(2,in.getIntOr("WallMode"+i,0)));
@@ -595,7 +597,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             tokens[0]=UUID.randomUUID().toString();
             positions[0]=BlockPos.of(in.getLongOr("Drill",0));
             running[0]=in.getBooleanOr("Running",false);
-            radii[0]=Math.max(1,Math.min(12,in.getIntOr("Radius",2)));
+            radii[0]=Math.max(1,Math.min(MAX_RADIUS,in.getIntOr("Radius",2)));
             depths[0]=Math.max(1,Math.min(256,in.getIntOr("Depth",12)));
             circles[0]=in.getBooleanOr("Circle",true);
         }
