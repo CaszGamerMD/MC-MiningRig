@@ -5,7 +5,7 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
-/** One selected slot plus four tab-delimited drill summaries, updated server-side. */
+/** One selected slot plus sixteen tab-delimited drill summaries, updated server-side. */
 public record ComputerStatePayload(String state) implements CustomPacketPayload {
     public static final Type<ComputerStatePayload> TYPE=new Type<>(MiningRig.id("computer_state"));
     public static final StreamCodec<RegistryFriendlyByteBuf,ComputerStatePayload> CODEC=
