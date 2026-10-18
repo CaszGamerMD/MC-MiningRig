@@ -24,15 +24,46 @@ import net.minecraft.sounds.SoundSource;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Opt-in placement assist. Never changes the existing CC networking rules.
+ * CC Organizer: placement and retrieval in the same saved item.
  *
- * Click a CC face to lock an axis, sneak-use in air to choose 1..20 blocks,
- * use in air to place, or click a nearby surface to snap to that distance.
- * Placement uses one CC from inventory and checks both ends of the link.
+ * Sneak-use air to switch modes. Placement uses a CC face to pick an axis,
+ * shift-clicking that origin to adjust distance (1..20). Retrieval right-
+ * clicking any CC sends it to Hardware storage, falling back to Output.
+ * The original registry ID and saved placement plans remain compatible.
  */
 public final class CoordinatorGuideItem extends Item {
     private static final int MAX_DISTANCE=20;
     public CoordinatorGuideItem(Properties properties){super(properties);}
+
+    /** Old guide items default to Placement; no item ID or NBT migration. */
+    public static boolean isRetrieval(ItemStack tool){
+        CustomData data=tool.get(DataComponents.CUSTOM_DATA);
+        return data!=null&&data.copyTag().getBooleanOr("OrganizerRetrieval",false);
+    }
+    private static void toggleMode(ItemStack tool,Player player){
+        CustomData data=tool.get(DataComponents.CUSTOM_DATA);
+        CompoundTag tag=data==null?new CompoundTag():data.copyTag();
+        boolean retrieving=!tag.getBooleanOr("OrganizerRetrieval",false);
+        tag.putBoolean("OrganizerRetrieval",retrieving);
+        tool.set(DataComponents.CUSTOM_DATA,CustomData.of(tag));
+        say(player,retrieving
+            ?"CC Organizer: RETRIEVAL. Right-click any CC to store it in Hardware, "
+                +"or Output if no Hardware space exists. Sneak-use air to switch."
+            :"CC Organizer: PLACEMENT. Right-click a CC face to select it, "
+                +"sneak-click the same CC to change spacing. Sneak-use air to switch.");
+    }
+
+    /** Discard a placement plan if its origin was recalled. */
+    public static void onRecalled(ItemStack tool,BlockPos pos){
+        Plan current=read(tool);
+        if(current==null || !current.origin().equals(pos))return;
+        CustomData data=tool.get(DataComponents.CUSTOM_DATA);
+        if(data==null)return;
+        CompoundTag tag=data.copyTag();
+        for(String key:new String[]{"GuideActive","GuideDimension","GuideOrigin",
+                "GuideDirection","GuideDistance"})tag.remove(key);
+        tool.set(DataComponents.CUSTOM_DATA,CustomData.of(tag));
+    }
 
     private record Plan(String dimension,BlockPos origin,Direction direction,int distance){}
     @Nullable private static Plan read(ItemStack stack){
@@ -67,11 +98,24 @@ public final class CoordinatorGuideItem extends Item {
     public static InteractionResult select(Level world,BlockPos ccPos,
             Direction outward,Player player,ItemStack tool){
         if(!(world instanceof ServerLevel server))return InteractionResult.SUCCESS;
+        if(isRetrieval(tool)){
+            CoordinatorRetrieval.recall(server,ccPos,player,tool,outward);
+            return InteractionResult.SUCCESS;
+        }
         Plan previous=read(tool);
+        if(player.isShiftKeyDown() && previous!=null && previous.origin().equals(ccPos)
+                && dimension(server).equals(previous.dimension())){
+            int next=previous.distance()%MAX_DISTANCE+1;
+            save(tool,new Plan(previous.dimension(),previous.origin(),outward,next));
+            say(player,"CC Organizer: placement spacing "+next+"/20 blocks. "
+                +"Use air to place, or click another block to snap spacing.");
+            return InteractionResult.SUCCESS;
+        }
         int length=previous==null?1:previous.distance();
         save(tool,new Plan(dimension(server),ccPos.immutable(),outward,length));
-        say(player,"CC guide: "+outward.getName()+" from "+ccPos.toShortString()
-            +" | "+length+"/20 blocks. Sneak-use air to change distance; use air to place.");
+        say(player,"CC Organizer: PLACEMENT from "+ccPos.toShortString()
+            +" "+outward.getName()+" | "+length+"/20 blocks. "
+            +"Sneak-click this CC to change spacing; use air to place.");
         return InteractionResult.SUCCESS;
     }
 
@@ -85,6 +129,10 @@ public final class CoordinatorGuideItem extends Item {
         Player player=context.getPlayer();
         if(player==null)return InteractionResult.PASS;
         ItemStack tool=context.getItemInHand();
+        if(isRetrieval(tool)){
+            say(player,"CC Organizer: in RETRIEVAL mode, right-click a CC unit to recall it.");
+            return InteractionResult.SUCCESS;
+        }
         Plan plan=read(tool);
         if(plan==null){
             say(player,"Right-click a Collection Coordinator face first.");
@@ -118,15 +166,17 @@ public final class CoordinatorGuideItem extends Item {
     @Override public InteractionResult use(Level world,Player player,InteractionHand hand){
         if(!(world instanceof ServerLevel server))return InteractionResult.SUCCESS;
         ItemStack tool=player.getItemInHand(hand);
-        Plan plan=read(tool);
-        if(plan==null){
-            say(player,"Right-click a Collection Coordinator face to start a placement guide.");
+        if(player.isShiftKeyDown()){
+            toggleMode(tool,player);
             return InteractionResult.SUCCESS;
         }
-        if(player.isShiftKeyDown()){
-            int next=plan.distance()%MAX_DISTANCE+1;
-            save(tool,new Plan(plan.dimension(),plan.origin(),plan.direction(),next));
-            say(player,"CC spacing: "+next+"/20 blocks. Release sneak and use to place.");
+        if(isRetrieval(tool)){
+            say(player,"CC Organizer: point at a Collection Coordinator and right-click to retrieve.");
+            return InteractionResult.SUCCESS;
+        }
+        Plan plan=read(tool);
+        if(plan==null){
+            say(player,"CC Organizer: right-click a Collection Coordinator face to select a placement axis.");
             return InteractionResult.SUCCESS;
         }
         place(server,player,tool,plan);
@@ -207,7 +257,7 @@ public final class CoordinatorGuideItem extends Item {
             if(world.getGameTime()%15!=0)continue;
             ItemStack item=player.getMainHandItem().is(MiningRig.CC_GUIDE)
                 ?player.getMainHandItem():player.getOffhandItem();
-            if(!item.is(MiningRig.CC_GUIDE))continue;
+            if(!item.is(MiningRig.CC_GUIDE)||isRetrieval(item))continue;
             Plan plan=read(item);
             if(plan==null||!dimension(world).equals(plan.dimension())
                     ||!world.hasChunkAt(plan.origin()))continue;
