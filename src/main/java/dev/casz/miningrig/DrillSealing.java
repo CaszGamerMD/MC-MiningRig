@@ -325,7 +325,8 @@ final class DrillSealing {
         for(int dx=-r;dx<=r;dx++)for(int dz=-r;dz<=r;dz++){
             if(!contains(computer,dx,dz,true))continue;
             BlockPos p=drill.slicePosition(dx,dz);
-            if(world.hasChunkAt(p)&&!world.getFluidState(p).isEmpty()){
+            if(world.hasChunkAt(p) && (!world.getFluidState(p).isEmpty()
+                    || waterloggedObstruction(world,p))){
                 fluidSpots.add(p);
                 cautionTicks=200;
             }
@@ -572,7 +573,8 @@ final class DrillSealing {
                 if(!contains(computer,u,v,true))continue;
                 BlockPos at=drill.slicePosition(u,v).relative(forward);
                 if(!world.hasChunkAt(at))return ComputerEntity.Status.BLOCKED;
-                if(!world.getFluidState(at).isEmpty()){
+                if(!world.getFluidState(at).isEmpty()
+                        || waterloggedObstruction(world,at)){
                     forwardSpots.add(at.immutable());
                     cautionTicks=200;
                 }
