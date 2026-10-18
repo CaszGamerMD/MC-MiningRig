@@ -25,7 +25,7 @@ public final class CoordinatorRetrieval {
     private CoordinatorRetrieval(){}
 
     private record Destination(BlockPos pos,Container inventory,int slot,
-            boolean hardware){}
+            Direction incoming,boolean hardware){}
 
     private static void say(Player player,String message){
         player.sendSystemMessage(Component.literal(message));
@@ -66,7 +66,7 @@ public final class CoordinatorRetrieval {
                         boolean occupied=!dest.getItem(slot).isEmpty();
                         if(occupied!=(pass==0))continue;
                         if(accepts(dest,slot,incoming,stack))
-                            return new Destination(at,dest,slot,
+                            return new Destination(at,dest,slot,incoming,
                                 portMode==RigNetwork.HARDWARE);
                     }
                 }
@@ -107,14 +107,9 @@ public final class CoordinatorRetrieval {
         // Check that the destination still has room and exists before committing.
         if(!world.hasChunkAt(store.pos())
                 || world.getBlockEntity(store.pos())!=store.inventory()
-                || !accepts(store.inventory(),store.slot(),Direction.UP,recovered)
-                    && !canInsertWithoutFace(store,recovered)){
-            // The properly sided-checked slot was found a moment ago; only a
-            // changed or removed destination should prevent retrieval.
-            if(!canInsertWithoutFace(store,recovered)){
-                say(player,"CC Organizer: destination inventory changed; try again.");
-                return;
-            }
+                || !accepts(store.inventory(),store.slot(),store.incoming(),recovered)){
+            say(player,"CC Organizer: destination inventory changed; try again.");
+            return;
         }
         if(!world.removeBlock(pos,false)){
             say(player,"CC Organizer: could not remove coordinator.");
@@ -124,7 +119,7 @@ public final class CoordinatorRetrieval {
         Container inventory=world.getBlockEntity(store.pos()) instanceof Container present
             ?present:null;
         if(inventory!=store.inventory()
-                || !canInsertWithoutFace(store,recovered)){
+                || !accepts(inventory,store.slot(),store.incoming(),recovered)){
             // Never void the retrieved CC if a neighboring inventory vanished.
             Block.popResource(world,pos,recovered);
             say(player,"CC Organizer: storage became unavailable; retrieved CC dropped at its location.");
@@ -139,19 +134,4 @@ public final class CoordinatorRetrieval {
             +(store.hardware()?"Hardware":"Output")+" storage.");
     }
 
-    /**
-     * Already vetted by the selected port's insertion face, this checks the
-     * available capacity again without trusting stale inventory contents.
-     */
-    private static boolean canInsertWithoutFace(Destination dest,ItemStack stack){
-        Container inventory=dest.inventory();
-        int slot=dest.slot();
-        if(slot<0||slot>=inventory.getContainerSize()
-                || !inventory.canPlaceItem(slot,stack))return false;
-        ItemStack existing=inventory.getItem(slot);
-        if(!existing.isEmpty()&&!ItemStack.isSameItemSameComponents(existing,stack))
-            return false;
-        return existing.getCount()<Math.min(stack.getMaxStackSize(),
-            inventory.getMaxStackSize(stack));
-    }
 }
