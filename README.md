@@ -1,10 +1,17 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.7 — directional Mining Computer and compact inventory model**
+**Version 0.6.8 — extended mining radius to 20**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.8 — Mining radius up to 20
+
+- The Mining Computer now accepts radii from **1 through 20**, including the GUI field and its server-side settings validation, sneak-stick adjustment, and settings loaded from saved worlds.
+- Excavation, wall and fluid-sealing footprints, horizontal tunnels, particle outlines, work estimates and chunk coverage all use the selected radius. A radius of 20 allows a 41-block-wide square tunnel or diameter-41 circular footprint.
+- The optional hopper collector range grows with the larger mining footprint rather than stopping at the former 14-block cap; the collector continues respecting output capacity and scan limits.
+- All other machine settings and previously placed machines retain their saved data. Large excavations may require more time, CC supplies and server resources.
 
 ## v0.6.7 — Mining Computer visual and facing update
 
@@ -81,7 +88,7 @@ Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable too
 
 **Automatic discovery.** Place a Mining Computer within 24 blocks of a loaded Collection Coordinator, and it will discover and assign up to four drills near **any loaded CC in the same connected CC network**. Drills no longer need item pairing or manual linking. Each drill has a persistent identity even as it moves down. Discovery is limited to loaded chunks; old assignments survive save/load and drill relocation. Use **Rescan** if you previously removed a drill assignment; removing one assignment does not reset the drill's own excavation. A separate **Reset Task** clears that drill's layers and cursor without breaking it or removing its bits.
 
-**New computer console.** The interface expands to the screen size in a black/green theme, with Start/Stop per drill, Start All, Stop All, a current-alert mute, selective task resets, Shape/Wall buttons, and editable Radius (1-12), Depth (1-256), and Fill Tries (1-4096). Press **Apply** to submit all three numbers to the server with range validation. Focused text boxes swallow inventory and other gameplay shortcut keys; drill nicknames have a separate Save Name button.
+**New computer console.** The interface expands to the screen size in a black/green theme, with Start/Stop per drill, Start All, Stop All, a current-alert mute, selective task resets, Shape/Wall buttons, and editable Radius (1-20), Depth (1-256), and Fill Tries (1-4096). Press **Apply** to submit all three numbers to the server with range validation. Focused text boxes swallow inventory and other gameplay shortcut keys; drill nicknames have a separate Save Name button.
 
 **Network Storage page.** Each connected CC face can assign a **container nickname**, up to 32 characters, which is saved per CC face and shown in its GUI. The computer and linked tablet display connected container names, source coordinates, assigned type (Filler, Walls, Output, or Hardware), and live item count/estimated stack capacity. The CC graph and its loaded adjacent inventories are the source of truth; no forced loads for offline containers. Storage pages support more than ten containers.
 
