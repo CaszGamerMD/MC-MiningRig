@@ -152,8 +152,27 @@ final class DrillSealing {
      * must be preserved; a bottom slab, torch, rail or trapdoor cannot.
      * Never treat water (which also has an empty collision shape) as debris.
      */
+    /**
+     * Waterlogged blocks must be harvested BEFORE they are filled over.
+     * Their fluid state alone is not a replaceable water block: some stairs,
+     * slabs and modded fluid-containing blocks have solid collision shapes.
+     * Detect the WATERLOGGED property and fluid-bearing non-liquid blocks.
+     */
+    static boolean waterloggedObstruction(ServerLevel world,BlockPos pos){
+        if(!world.hasChunkAt(pos))return false;
+        BlockState state=world.getBlockState(pos);
+        if(state.isAir() || immune(state)
+                || state.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock)
+            return false;
+        return (state.hasProperty(
+                net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED)
+                && state.getValue(
+                net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED))
+            || !state.getFluidState().isEmpty();
+    }
     static boolean partialObstruction(ServerLevel world,BlockPos pos){
         if(!world.hasChunkAt(pos))return false;
+        if(waterloggedObstruction(world,pos))return true;
         BlockState state=world.getBlockState(pos);
         return !state.isAir()&&!immune(state)
             && !(state.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock)
@@ -238,7 +257,8 @@ final class DrillSealing {
     }
     private static boolean solid(ServerLevel world,BlockPos p){
         BlockState state=world.getBlockState(p);
-        return !state.isAir()&&state.getFluidState().isEmpty()&&!state.canBeReplaced();
+        return !state.isAir()&&state.getFluidState().isEmpty()
+            && !waterloggedObstruction(world,p) && !state.canBeReplaced();
     }
     private void discardVisual(){
         if(visual!=null)visual.discard();
@@ -361,6 +381,15 @@ final class DrillSealing {
             return ComputerEntity.Status.RUNNING;
         }
         BlockPos target=deliveryTarget;
+        // Cargo that arrives at a waterlogged slab/stair/fence must wait:
+        // mine the obstacle with a real bit, recover its drops, keep the water,
+        // and only then spend the reserved filler block. Do not discard cargo.
+        if(target!=null && !world.hasChunkAt(target))
+            return ComputerEntity.Status.BLOCKED;
+        if(target!=null && waterloggedObstruction(world,target)){
+            ComputerEntity.Status cleared=drill.mineFillObstruction(world,target);
+            return cleared==null?ComputerEntity.Status.RUNNING:cleared;
+        }
         ItemStack material=delivery.stack();
         pendingSourceWalls=deliveryWall;
         discardVisual();
@@ -425,6 +454,13 @@ final class DrillSealing {
     }
     private ComputerEntity.Status applyFromStock(ServerLevel world,DrillEntity drill,
             WallSupplyPipeline stock,BlockPos goal,boolean wall){
+        // Waterlogged obstructions get priority over filler availability.
+        // Otherwise an empty buffer could halt the drill before it ever
+        // removed the waterlogged block and exposed its water source.
+        if(waterloggedObstruction(world,goal)){
+            ComputerEntity.Status cleared=drill.mineFillObstruction(world,goal);
+            return cleared==null?ComputerEntity.Status.RUNNING:cleared;
+        }
         boolean random=stock==walls&&drill.randomWalls();
         ItemStack available=stock.peek(world,random);
         if(available.isEmpty())return ComputerEntity.Status.RUNNING;
@@ -486,6 +522,11 @@ final class DrillSealing {
             markDone(pending,pendingWall);drill.setChanged();return null;
         }
         if(failed())return ComputerEntity.Status.FILL_FAILED;
+        BlockPos goal=pendingGoal==null?pending:pendingGoal;
+        if(waterloggedObstruction(world,goal)){
+            ComputerEntity.Status cleared=drill.mineFillObstruction(world,goal);
+            return cleared==null?ComputerEntity.Status.RUNNING:cleared;
+        }
         // Retry EXACTLY this position, rather than selecting another fluid
         // cell from a newly reordered LinkedHashSet and carrying its 24 tries.
         WallSupplyPipeline stock=pendingSourceWalls?walls:filler;
@@ -551,6 +592,12 @@ final class DrillSealing {
                 }
                 target(world,at,null);
                 if(failed())return ComputerEntity.Status.FILL_FAILED;
+                // Forward face first: harvest the waterlogged block and
+                // preserve its source water before checking filler inventory.
+                if(waterloggedObstruction(world,at)){
+                    ComputerEntity.Status cleared=drill.mineFillObstruction(world,at);
+                    return cleared==null?ComputerEntity.Status.FILLING:cleared;
+                }
                 if(!filler.hasSupply()){
                     if(filler.hasFlights()||RigNetwork.fillerDepotPending(world,drill))
                         return ComputerEntity.Status.FILLING;
@@ -593,8 +640,10 @@ final class DrillSealing {
                 if(finishedWalls.contains(at))continue;
                 BlockState state=world.getBlockState(at);
                 if(immune(state)){finishedWalls.add(at);continue;}
-                if(!state.isAir()&&state.getFluidState().isEmpty()){
-                    ComputerEntity.Status mined=drill.mineWall(world,at);
+                if(!state.isAir() && (state.getFluidState().isEmpty()
+                        || waterloggedObstruction(world,at))){
+                    ComputerEntity.Status mined=waterloggedObstruction(world,at)
+                        ?drill.mineFillObstruction(world,at):drill.mineWall(world,at);
                     if(mined!=null)return mined;
                     return ComputerEntity.Status.RUNNING;
                 }
@@ -683,6 +732,10 @@ final class DrillSealing {
             if(!world.hasChunkAt(at))return ComputerEntity.Status.BLOCKED;
             BlockState state=world.getBlockState(at);
             if(immune(state)||solid(world,at)){finishedWalls.add(at);continue;}
+            if(waterloggedObstruction(world,at)){
+                ComputerEntity.Status cleared=drill.mineFillObstruction(world,at);
+                return cleared==null?ComputerEntity.Status.RUNNING:cleared;
+            }
             if(!filler.hasSupply()){
                 if(filler.hasFlights() || RigNetwork.supplyDepotPending(world,drill,false))
                     return ComputerEntity.Status.RUNNING;
@@ -736,6 +789,10 @@ final class DrillSealing {
                 // permanent solid block exists here.
                 target(world,at,null);
                 if(failed())return ComputerEntity.Status.FILL_FAILED;
+                if(waterloggedObstruction(world,at)){
+                    ComputerEntity.Status cleared=drill.mineFillObstruction(world,at);
+                    return cleared==null?ComputerEntity.Status.RUNNING:cleared;
+                }
                 if(!filler.hasSupply()){
                     if(filler.hasFlights() || RigNetwork.fillerDepotPending(world,drill))
                         return ComputerEntity.Status.RUNNING;
