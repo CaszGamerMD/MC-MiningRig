@@ -205,7 +205,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     public void primeSupply(ServerLevel world,ComputerEntity computer){
         lastControllerTick=world.getGameTime();
         lastWallMode=computer.wallMode();
-        collectionRadius=Math.max(4,Math.min(14,computer.radius()+1));
+        collectionRadius=Math.max(4,Math.min(ComputerEntity.MAX_RADIUS+1,computer.radius()+1));
         sealing.maintainSupply(world,this,computer);
         setChanged();
     }
@@ -808,7 +808,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         cursor=in.getIntOr("Cursor",0);initialized=in.getBooleanOr("Initialized",false);
         layerBitsRequested=in.getBooleanOr("LayerBitsRequested",false);
         workTicks=in.getLongOr("WorkTicks",0);
-        collectionRadius=Math.max(4,Math.min(14,in.getIntOr("CollectRadius",6)));
+        collectionRadius=Math.max(4,Math.min(ComputerEntity.MAX_RADIUS+1,in.getIntOr("CollectRadius",6)));
         hardwareIdentity=in.getStringOr("DrillIdentity","");
         lastConnectedCoordinator=in.getLong("LastCC").isPresent()
             ?BlockPos.of(in.getLongOr("LastCC",0)):null;
