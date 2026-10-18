@@ -130,7 +130,11 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             if(ignoredDrills.contains(id))continue;
             int slot=-1;
             for(int i=0;i<MAX_DRILLS;i++)
-                if(id.equals(tokens[i])){slot=i;break;}
+                // A paired item has a UUID link token distinct from the
+                // drill's persistent physical identity; never count it twice.
+                if(id.equals(tokens[i]) || (positions[i]!=null
+                        && positions[i].equals(drill.getBlockPos())
+                        && drill.matchesLink(tokens[i]))){slot=i;break;}
             if(slot<0){
                 for(int i=0;i<MAX_DRILLS;i++)
                     if(tokens[i].isEmpty()){slot=i;break;}
@@ -148,7 +152,9 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             }else if(positions[slot]==null||!positions[slot].equals(drill.getBlockPos())){
                 positions[slot]=drill.getBlockPos().immutable();changed=true;
             }
-            if(!drill.matchesLink(id)){drill.adoptController(server,this,id);changed=true;}
+            if(!drill.matchesLink(tokens[slot])){
+                drill.adoptController(server,this,tokens[slot]);changed=true;
+            }
             if(changed)setChanged();
         }
     }
@@ -355,7 +361,10 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         if(level instanceof ServerLevel server && positions[index]!=null &&
                 server.hasChunkAt(positions[index])
                 && server.getBlockEntity(positions[index]) instanceof DrillEntity drill
-                && drill.matchesLink(tokens[index]))drill.detachController();
+                && drill.matchesLink(tokens[index])){
+            ignoredDrills.add(drill.identity());
+            drill.detachController();
+        }
         if(!tokens[index].isEmpty())ignoredDrills.add(tokens[index]);
         tokens[index]="";positions[index]=null;running[index]=false;
         statuses[index]=Status.READY;nicknames[index]="Drill "+(index+1);
