@@ -1,10 +1,17 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.6 — forward-facing horizontal fluid wall**
+**Version 0.6.7 — directional Mining Computer and compact inventory model**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.7 — Mining Computer visual and facing update
+
+- Placing a Mining Computer now orients the full workstation screen and keyboard toward its placing player, for all green, amber and red indicator states.
+- The inventory item has a dedicated compact 3D workstation icon with terminal display, status light, individual keys and a better-defined housing, independent of the full-sized placed model.
+- Reduced first- and third-person hand display scales so held computers no longer cover the player's view; tuned inventory, ground and item-frame transforms independently.
+- Existing placed computers preserve their north-facing default, stored data and mod namespace. Functional drilling and CC networking are unchanged.
 
 ## v0.6.6 — Horizontal forward fluid barrier
 
