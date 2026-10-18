@@ -1,16 +1,68 @@
 {
   "variants": {
-    "alarm=false,warn=false": {
-      "model": "miningrig:block/mining_computer"
+    "alarm=false,facing=north,warn=false": {
+      "model": "miningrig:block/mining_computer",
+      "y": 0
     },
-    "alarm=true,warn=false": {
-      "model": "miningrig:block/mining_computer_alarm"
+    "alarm=false,facing=north,warn=true": {
+      "model": "miningrig:block/mining_computer_warning",
+      "y": 0
     },
-    "alarm=false,warn=true": {
-      "model": "miningrig:block/mining_computer_warning"
+    "alarm=true,facing=north,warn=false": {
+      "model": "miningrig:block/mining_computer_alarm",
+      "y": 0
     },
-    "alarm=true,warn=true": {
-      "model": "miningrig:block/mining_computer_alarm"
+    "alarm=true,facing=north,warn=true": {
+      "model": "miningrig:block/mining_computer_alarm",
+      "y": 0
+    },
+    "alarm=false,facing=east,warn=false": {
+      "model": "miningrig:block/mining_computer",
+      "y": 90
+    },
+    "alarm=false,facing=east,warn=true": {
+      "model": "miningrig:block/mining_computer_warning",
+      "y": 90
+    },
+    "alarm=true,facing=east,warn=false": {
+      "model": "miningrig:block/mining_computer_alarm",
+      "y": 90
+    },
+    "alarm=true,facing=east,warn=true": {
+      "model": "miningrig:block/mining_computer_alarm",
+      "y": 90
+    },
+    "alarm=false,facing=south,warn=false": {
+      "model": "miningrig:block/mining_computer",
+      "y": 180
+    },
+    "alarm=false,facing=south,warn=true": {
+      "model": "miningrig:block/mining_computer_warning",
+      "y": 180
+    },
+    "alarm=true,facing=south,warn=false": {
+      "model": "miningrig:block/mining_computer_alarm",
+      "y": 180
+    },
+    "alarm=true,facing=south,warn=true": {
+      "model": "miningrig:block/mining_computer_alarm",
+      "y": 180
+    },
+    "alarm=false,facing=west,warn=false": {
+      "model": "miningrig:block/mining_computer",
+      "y": 270
+    },
+    "alarm=false,facing=west,warn=true": {
+      "model": "miningrig:block/mining_computer_warning",
+      "y": 270
+    },
+    "alarm=true,facing=west,warn=false": {
+      "model": "miningrig:block/mining_computer_alarm",
+      "y": 270
+    },
+    "alarm=true,facing=west,warn=true": {
+      "model": "miningrig:block/mining_computer_alarm",
+      "y": 270
     }
   }
 }
