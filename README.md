@@ -1,10 +1,20 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.9 — Target Chalk outlines and automatic slot recycling**
+**Version 0.6.10 — Irregular, hollow and compound Target Chalk excavations**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.10 — Draw concave rainbows and hollow shapes with Target Chalk
+
+- The polygon tool now has three editable modes, saved directly on each Target Chalk item. With **no unfinished drawing**, **sneak-right-click in air** to cycle **REPLACE → ADD → CUT → REPLACE**.
+- **REPLACE:** Draw and close an outer outline that includes a registered drill. It can be concave (U-shapes, rainbow arches, stair-steps, letters) with as many as 128 corner marks.
+- **ADD:** Draw another area adjoining/overlapping the old footprint to enlarge the cut. The mask is combined with the previous selection rather than replacing it.
+- **CUT:** Draw and close an area overlapping the footprint to exclude it from excavation, including a hole inside a rainbow or ring. The remaining area must still include the drill head; a cut cannot remove the drill's cell.
+- To create a rainbow: draw an outer arch in REPLACE, close it, switch to CUT and outline the inner hollow area. To create a ring: outline a disc in REPLACE, then subtract its center in CUT. Minecraft's block grid renders curves as stepped shapes, not smooth geometric curves.
+- The custom outline remains saved per drill and carries across vertical/horizontal excavation and world reload. Mining, ETA, fluid barriers, wall placement, outlines and chunk coverage all operate on the exact resulting mask, including inward edges of hollow regions.
+- New contours must stay within 20 blocks of the owning drill. Existing shapes, machines, and other mods' worlds are unchanged until you explicitly edit them. As before, applying an outline pauses and resets that drill's excavation task.
 
 ## v0.6.9 — Custom Target Chalk footprints and drill discovery cleanup
 
