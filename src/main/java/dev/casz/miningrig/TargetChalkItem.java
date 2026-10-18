@@ -28,6 +28,28 @@ public final class TargetChalkItem extends Item {
     private static final int MAX_POINTS=128;
     public TargetChalkItem(Properties properties){super(properties);}
 
+    private static ChalkOutline.Operation operation(ItemStack chalk){
+        CustomData custom=chalk.get(DataComponents.CUSTOM_DATA);
+        String stored=custom==null?"REPLACE":custom.copyTag().getStringOr("ChalkMode","REPLACE");
+        try{return ChalkOutline.Operation.valueOf(stored);}
+        catch(IllegalArgumentException ignored){return ChalkOutline.Operation.REPLACE;}
+    }
+    private static void cycleOperation(ItemStack chalk,Player player){
+        ChalkOutline.Operation previous=operation(chalk);
+        ChalkOutline.Operation[] modes=ChalkOutline.Operation.values();
+        ChalkOutline.Operation next=modes[(previous.ordinal()+1)%modes.length];
+        CustomData custom=chalk.get(DataComponents.CUSTOM_DATA);
+        CompoundTag data=custom==null?new CompoundTag():custom.copyTag();
+        data.putString("ChalkMode",next.name());
+        chalk.set(DataComponents.CUSTOM_DATA,CustomData.of(data));
+        say(player,"Target Chalk mode: "+next.name()+" — "+
+            switch(next){
+                case REPLACE->"draw a new enclosing outline for a drill.";
+                case ADD->"draw a second area touching the existing excavation to extend it.";
+                case CUT->"draw an interior area to leave unmined, such as the inside of a rainbow.";
+            });
+    }
+
     private record Drawing(String dimension,Direction face,int plane,List<BlockPos> points){}
     private static String dimension(ServerLevel world) {
         return world.dimension().identifier().toString();
@@ -99,7 +121,7 @@ public final class TargetChalkItem extends Item {
             if(draft!=null&&draft.points().size()>=3)return finish(world,player,chalk,draft);
             if(draft!=null){save(chalk,null);say(player,"Target Chalk: incomplete outline erased.");return InteractionResult.SUCCESS;}
             if(clearAt(world,player,clicked))return InteractionResult.SUCCESS;
-            say(player,"Target Chalk: no outline to clear. Click points to draw an excavation boundary.");
+            say(player,"Target Chalk: no drill mask to clear. Sneak-use in AIR to switch between REPLACE, ADD and CUT modes.");
             return InteractionResult.SUCCESS;
         }
         if(face!=Direction.UP && face.getAxis()==Direction.Axis.Y){
@@ -125,7 +147,8 @@ public final class TargetChalkItem extends Item {
         else stroke(world,clicked,clicked,face);
         points.add(clicked.immutable());
         save(chalk,draft);
-        say(player,"Target Chalk: "+points.size()+" points. Click the first point again or sneak-right-click air to finish.");
+        say(player,"Target Chalk ["+operation(chalk)+"]: "+points.size()
+            +" points. Click the first point again or sneak-right-click air to finish.");
         return InteractionResult.SUCCESS;
     }
     @Override public InteractionResult useOn(UseOnContext context){
@@ -139,7 +162,10 @@ public final class TargetChalkItem extends Item {
         ItemStack chalk=player.getItemInHand(hand);
         Drawing draft=read(chalk);
         if(draft==null){
-            say(player,"Target Chalk: right-click outline corners on the ground or a wall. Close by clicking the first mark.");
+            if(player.isShiftKeyDown())cycleOperation(chalk,player);
+            else say(player,"Target Chalk ["+operation(chalk)
+                +"]: right-click corners on the ground or wall. Close at the first mark. "
+                +"Sneak-use AIR to change REPLACE / ADD / CUT.");
         }else if(player.isShiftKeyDown()){
             if(draft.points().size()>=3)finish(world,player,chalk,draft);
             else{save(chalk,null);say(player,"Target Chalk: incomplete draft erased.");}
@@ -151,27 +177,34 @@ public final class TargetChalkItem extends Item {
 
     private static InteractionResult finish(ServerLevel world,Player player,ItemStack chalk,Drawing drawing){
         if(drawing.points().size()<3){say(player,"Target Chalk: at least three corners required.");return InteractionResult.SUCCESS;}
-        // Resolve all registered, loaded drills; this never force-loads distant chunks.
+        // Resolve registered, loaded drills only; no forced world-chunk scans.
+        ChalkOutline.Operation mode=operation(chalk);
         int assigned=0,lastCells=0;
         for(DrillEntity drill:RigTopology.loadedDrills(world)){
             if(drill.drillingDirection()!=drawing.face().getOpposite())continue;
-            ChalkOutline outline=ChalkOutline.create(drawing.points(),drill,drawing.face());
-            if(outline==null)continue;
             BlockPos computerPos=drill.pairedComputerPosition(world);
             if(computerPos==null || !world.hasChunkAt(computerPos))continue;
             if(!(world.getBlockEntity(computerPos) instanceof ComputerEntity computer))continue;
+            ChalkOutline before=computer.outline(drill);
+            ChalkOutline outline=ChalkOutline.apply(drawing.points(),drill,
+                drawing.face(),before,mode);
+            if(outline==null)continue;
             if(computer.installOutline(world,drill,outline)){
                 assigned++;lastCells=outline.count();
             }
         }
         if(assigned==0){
-            say(player,"Target Chalk: no registered drill inside the outline, or shape exceeds 20 blocks from its drill. The draft is kept for editing.");
+            say(player,"Target Chalk ["+mode+"]: no matching drill footprint changed. "
+                +"REPLACE must surround a registered drill. ADD/CUT need an existing "
+                +"overlapping shape, must stay within 20 blocks, and cannot remove the drill itself. Draft kept.");
             return InteractionResult.SUCCESS;
         }
         List<BlockPos> points=drawing.points();
         stroke(world,points.get(points.size()-1),points.get(0),drawing.face());
         save(chalk,null);
-        say(player,"Target Chalk: applied custom excavation to "+assigned+" drill(s); "+lastCells+" cells on the last footprint. Mining paused and tasks reset.");
+        say(player,"Target Chalk ["+mode+"]: updated "+assigned+" drill(s); "
+            +lastCells+" excavation cells in the last footprint. "
+            +"Sneak-use air to switch modes; mining paused and tasks reset.");
         return InteractionResult.SUCCESS;
     }
     /** Redraw unfinished marks for players holding the chalk so the sketch
