@@ -129,6 +129,7 @@ public final class CoordinatorRetrieval {
         if(existing.isEmpty())inventory.setItem(store.slot(),recovered);
         else {existing.grow(1);inventory.setChanged();}
         inventory.setChanged();
+        CoordinatorGuideItem.onRecalled(organizer,pos);
         world.playSound(null,pos,SoundEvents.ANVIL_LAND,SoundSource.BLOCKS,.35f,1.75f);
         say(player,"CC Organizer: retrieved CC at "+pos.toShortString()+" into "
             +(store.hardware()?"Hardware":"Output")+" storage.");
