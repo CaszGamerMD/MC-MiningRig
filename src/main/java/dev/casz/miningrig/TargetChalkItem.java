@@ -174,6 +174,31 @@ public final class TargetChalkItem extends Item {
         say(player,"Target Chalk: applied custom excavation to "+assigned+" drill(s); "+lastCells+" cells on the last footprint. Mining paused and tasks reset.");
         return InteractionResult.SUCCESS;
     }
+    /** Redraw unfinished marks for players holding the chalk so the sketch
+     * remains legible while walking from corner to corner. */
+    public static void tickServer(net.minecraft.server.MinecraftServer minecraft){
+        if(minecraft.overworld()==null || minecraft.overworld().getGameTime()%20!=0)return;
+        for(net.minecraft.server.level.ServerPlayer player:minecraft.getPlayerList().getPlayers()){
+            ItemStack chalk=player.getMainHandItem().is(MiningRig.TARGET_CHALK)
+                ?player.getMainHandItem():player.getOffhandItem();
+            if(!chalk.is(MiningRig.TARGET_CHALK))continue;
+            Drawing drawing=read(chalk);
+            if(drawing==null || !(player.level() instanceof ServerLevel world)
+                    || !drawing.dimension().equals(dimension(world)))continue;
+            // Avoid a global particle storm from remote unfinished sketches.
+            List<BlockPos> points=drawing.points();
+            if(points.isEmpty() || player.blockPosition().distSqr(points.get(points.size()-1))>80*80)
+                continue;
+            for(int i=0;i<points.size();i++){
+                BlockPos p=points.get(i);
+                if(player.blockPosition().distSqr(p)>80*80)continue;
+                if(i==0)stroke(world,p,p,drawing.face());
+                else if(player.blockPosition().distSqr(points.get(i-1))<=80*80)
+                    stroke(world,points.get(i-1),p,drawing.face());
+            }
+        }
+    }
+
     private static boolean clearAt(ServerLevel world,Player player,BlockPos clicked){
         BlockPos at=clicked;
         if(world.getBlockState(at).is(MiningRig.COMPUTER_UPPER))at=at.below();
