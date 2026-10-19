@@ -30,9 +30,10 @@ import org.jetbrains.annotations.Nullable;
 /**
  * CC Organizer: placement and retrieval in the same saved item.
  *
- * Sneak-use air to switch modes. Placement uses a CC face to pick an axis,
- * shift-clicking that origin to adjust distance (1..20). Retrieval right-
- * clicking any CC sends it to Hardware storage, falling back to Output.
+ * Sneak-right-click anywhere to switch modes (never also select or recall).
+ * Placement right-clicks select a CC face / set spacing / confirm in air.
+ * Retrieval right-clicks a CC (or visible CC up to 100 blocks) to recall.
+ * Every action performs ONE operation; clicks never unexpectedly place.
  * The original registry ID and saved placement plans remain compatible.
  */
 public final class CoordinatorGuideItem extends Item {
@@ -53,9 +54,10 @@ public final class CoordinatorGuideItem extends Item {
         tool.set(DataComponents.CUSTOM_DATA,CustomData.of(tag));
         say(player,retrieving
             ?"CC Organizer: RETRIEVAL (100 blocks). Aim at a visible CC and right-click. "
-                +"Hardware storage first, Output if full. Sneak-use air to switch."
-            :"CC Organizer: PLACEMENT. Right-click a CC face to select it, "
-                +"sneak-click the same CC to change spacing. Sneak-use air to switch.");
+                +"Hardware storage first, Output if full. Sneak-right-click to switch."
+            :"CC Organizer: PLACEMENT. Right-click a CC face to select an axis; "
+                +"right-click a surface to set distance, air to place. "
+                +"Sneak-right-click to switch.");
     }
 
     /** Discard a placement plan if its origin was recalled. */
@@ -103,39 +105,51 @@ public final class CoordinatorGuideItem extends Item {
     public static InteractionResult select(Level world,BlockPos ccPos,
             Direction outward,Player player,ItemStack tool){
         if(!(world instanceof ServerLevel server))return InteractionResult.SUCCESS;
+        // Sneak is ONLY a mode switch, even while pointing directly at a CC.
+        // Before this change it also changed spacing or recalled a CC,
+        // depending on which block/item interaction handler won the click.
+        if(player.isShiftKeyDown()){
+            toggleMode(tool,player);
+            return InteractionResult.SUCCESS;
+        }
         if(isRetrieval(tool)){
             CoordinatorRetrieval.recall(server,ccPos,player,tool,outward);
             return InteractionResult.SUCCESS;
         }
         Plan previous=read(tool);
-        if(player.isShiftKeyDown() && previous!=null && previous.origin().equals(ccPos)
-                && dimension(server).equals(previous.dimension())){
-            int next=previous.distance()%MAX_DISTANCE+1;
-            save(tool,new Plan(previous.dimension(),previous.origin(),outward,next));
-            say(player,"CC Organizer: placement spacing "+next+"/20 blocks. "
-                +"Use air to place, or click another block to snap spacing.");
-            return InteractionResult.SUCCESS;
-        }
+        boolean same=previous!=null&&previous.origin().equals(ccPos)
+                && dimension(server).equals(previous.dimension())
+                && previous.direction()==outward;
         int length=previous==null?1:previous.distance();
+        // Repeatedly clicking the selected CC face cycles the spacing.
+        // This is never a placement or retrieval side effect.
+        if(same)length=length%MAX_DISTANCE+1;
         save(tool,new Plan(dimension(server),ccPos.immutable(),outward,length));
-        say(player,"CC Organizer: PLACEMENT from "+ccPos.toShortString()
-            +" "+outward.getName()+" | "+length+"/20 blocks. "
-            +"Sneak-click this CC to change spacing; use air to place.");
+        say(player,"CC Organizer: PLACEMENT "+ccPos.toShortString()
+            +" "+outward.getName()+" | spacing "+length+"/20. "
+            +(same?"Click this face again to cycle; ":"")
+            +"click another surface to set spacing, then right-click air to place.");
         return InteractionResult.SUCCESS;
     }
 
     @Override public InteractionResult useOn(UseOnContext context){
         Level world=context.getLevel();
         BlockPos clicked=context.getClickedPos();
-        if(world.getBlockState(clicked).is(MiningRig.COORDINATOR))
-            return select(world,clicked,context.getClickedFace(),
-                context.getPlayer(),context.getItemInHand());
         if(!(world instanceof ServerLevel server))return InteractionResult.SUCCESS;
         Player player=context.getPlayer();
         if(player==null)return InteractionResult.PASS;
         ItemStack tool=context.getItemInHand();
+        // Same modifier and outcome on CCs, terrain and air. Avoid consuming
+        // a placement click or recall in the same interaction as a mode switch.
+        if(player.isShiftKeyDown()){
+            toggleMode(tool,player);
+            return InteractionResult.SUCCESS;
+        }
+        if(world.getBlockState(clicked).is(MiningRig.COORDINATOR))
+            return select(world,clicked,context.getClickedFace(),player,tool);
         if(isRetrieval(tool)){
-            say(player,"CC Organizer: in RETRIEVAL mode, right-click a CC unit to recall it.");
+            say(player,"CC Organizer: RETRIEVAL. Aim at a visible CC and right-click "
+                +"(up to 100 blocks); sneak-right-click to change modes.");
             return InteractionResult.SUCCESS;
         }
         Plan plan=read(tool);
@@ -163,8 +177,14 @@ public final class CoordinatorGuideItem extends Item {
             return InteractionResult.SUCCESS;
         }
         Plan chosen=new Plan(plan.dimension(),origin,dir,distance);
+        if(!dimension(server).equals(plan.dimension())){
+            say(player,"CC Organizer: selected CC is in another dimension. Select a CC here.");
+            return InteractionResult.SUCCESS;
+        }
         save(tool,chosen);
-        place(server,player,tool,chosen);
+        say(player,"CC Organizer: spacing set to "+distance+"/20 blocks ("
+                +dir.getName()+"). Right-click air to PLACE one CC at "
+                +origin.relative(dir,distance).toShortString()+".");
         return InteractionResult.SUCCESS;
     }
 
@@ -199,22 +219,27 @@ public final class CoordinatorGuideItem extends Item {
     private static void retrieveInSight(ServerLevel world,Player player,ItemStack tool){
         Vec3 eye=player.getEyePosition();
         Vec3 look=player.getViewVector(1.0F).normalize();
-        // Don't raycast through unloaded chunks: that would synchronously
-        // load distant terrain or let the organizer act on an unseen CC.
-        for(int step=0;step<=RETRIEVAL_REACH;step++){
+        // Stop the ray at the FIRST unloaded chunk, not at any unloaded
+        // chunk farther away than an otherwise valid CC target. The old
+        // 100-block precheck rejected a visible close CC if distant terrain
+        // was not loaded. Sample every half block without force-loading.
+        double safe=0;
+        for(double step=.5;step<=RETRIEVAL_REACH;step+=.5){
             BlockPos along=BlockPos.containing(eye.add(look.scale(step)));
-            if(!world.hasChunkAt(along)){
-                say(player,"CC Organizer: target path enters an unloaded chunk. Move closer.");
-                return;
-            }
+            if(!world.hasChunkAt(along))break;
+            safe=step;
         }
-        Vec3 reach=eye.add(look.scale(RETRIEVAL_REACH));
+        if(safe==0){
+            say(player,"CC Organizer: no loaded line of sight; move closer.");
+            return;
+        }
+        Vec3 reach=eye.add(look.scale(safe));
         BlockHitResult hit=world.clip(new ClipContext(eye,reach,
             ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,player));
         if(hit.getType()!=HitResult.Type.BLOCK
                 || !world.getBlockState(hit.getBlockPos()).is(MiningRig.COORDINATOR)){
             say(player,"CC Organizer: no visible CC within "+RETRIEVAL_REACH
-                +" blocks. A clear line of sight is required.");
+                +" blocks of loaded line of sight (walls block retrieval).");
             return;
         }
         CoordinatorRetrieval.recall(world,hit.getBlockPos(),player,tool,hit.getDirection());
