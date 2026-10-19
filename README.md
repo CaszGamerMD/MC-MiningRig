@@ -1,10 +1,16 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.15 — CC Organizer retrieval reaches 100 blocks**
+**Version 0.6.16 — CC Organizer unified controls and safer 100-block retrieval**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to sixteen drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.16 — CC Organizer controls (no mixed actions)
+- **Sneak-right-click anywhere:** switch **PLACEMENT ↔ RETRIEVAL**. No simultaneous spacing adjustment, placement or recall.
+- **Placement:** right-click a CC face to select your starting CC and direction; right-click the **same CC face again** to cycle spacing 1–20; right-click a nearby surface to **set spacing only** (snaps to the selected line without placing); **right-click air** to place the next CC. The guide continues along the selected axis after placement. The 3D preview marks the planned spot.
+- **Retrieval:** right-click a CC to retrieve it or aim at a visible CC up to 100 blocks away and right-click. The ray stops at solid blocks and never force-loads terrain; unloaded chunks **after** a nearer target no longer block its retrieval. Storage remains Hardware-first, Output-second, with all existing in-flight safeguards.
+- The existing CC Organizer item ID and NBT placement plans survive this change. Toggle only changes mode, not the stored starting CC or distance.
 
 ## v0.6.15 — CC Organizer retrieval range: 100 blocks
 
