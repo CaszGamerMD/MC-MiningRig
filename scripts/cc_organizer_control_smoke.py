@@ -20,7 +20,7 @@ on=code[code.index("@Override public InteractionResult useOn("):code.index("@Ove
 assert on.index("if(player.isShiftKeyDown())") < on.index("if(world.getBlockState(clicked).is(MiningRig.COORDINATOR))")
 assert "save(tool,chosen);" in on
 assert "place(server,player,tool,chosen)" not in on
-assert "right-click air to PLACE" in on
+assert "right-click air to place" in on.lower()
 use=code[code.index("@Override public InteractionResult use(Level"):code.index("private static void retrieveInSight")]
 assert use.index("if(player.isShiftKeyDown())") < use.index("if(isRetrieval(tool))")
 assert "place(server,player,tool,plan);" in use
