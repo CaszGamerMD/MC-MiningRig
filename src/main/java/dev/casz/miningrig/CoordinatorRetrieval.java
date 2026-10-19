@@ -76,6 +76,18 @@ public final class CoordinatorRetrieval {
     /** Called on a right-clicked coordinator while the organizer is in retrieval mode. */
     public static void recall(ServerLevel world,BlockPos pos,Player player,
             ItemStack organizer,Direction face) {
+        // The target must be physically within the 100-block reach even when
+        // invoked through a nearby block interaction rather than the air ray.
+        net.minecraft.world.phys.Vec3 eye=player.getEyePosition();
+        double nearX=Math.max(pos.getX(),Math.min(eye.x,pos.getX()+1.0));
+        double nearY=Math.max(pos.getY(),Math.min(eye.y,pos.getY()+1.0));
+        double nearZ=Math.max(pos.getZ(),Math.min(eye.z,pos.getZ()+1.0));
+        double dx=eye.x-nearX,dy=eye.y-nearY,dz=eye.z-nearZ;
+        if(dx*dx+dy*dy+dz*dz>
+                CoordinatorGuideItem.RETRIEVAL_REACH*CoordinatorGuideItem.RETRIEVAL_REACH){
+            say(player,"CC Organizer: retrieval target exceeds 100 blocks.");
+            return;
+        }
         if(!world.hasChunkAt(pos)
                 || !(world.getBlockEntity(pos) instanceof CoordinatorEntity target)) {
             say(player,"CC Organizer: the targeted coordinator is no longer loaded.");
