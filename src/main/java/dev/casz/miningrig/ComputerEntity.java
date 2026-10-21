@@ -29,9 +29,9 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import org.jetbrains.annotations.Nullable;
 
-/** Independent supervisor of up to four item-linked drills. */
+/** Independent supervisor of up to sixteen item-linked drills. */
 public final class ComputerEntity extends BlockEntity implements MenuProvider {
-    public static final int MAX_DRILLS=4;
+    public static final int MAX_DRILLS=16;
     /** Inclusive maximum excavation radius, shared by controls and persisted settings. */
     public static final int MAX_RADIUS=20;
     public enum Status {
@@ -49,22 +49,30 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         public final String display;
         Status(String value){display=value;}
     }
-    private final String[] tokens={"","","",""};
-    private final String[] nicknames={"Drill 1","Drill 2","Drill 3","Drill 4"};
+    private final String[] tokens=new String[MAX_DRILLS];
+    private final String[] nicknames=new String[MAX_DRILLS];
     private final BlockPos[] positions=new BlockPos[MAX_DRILLS];
-    private final Status[] statuses={Status.READY,Status.READY,Status.READY,Status.READY};
+    private final Status[] statuses=new Status[MAX_DRILLS];
     private final boolean[] running=new boolean[MAX_DRILLS];
-    private final int[] radii={2,2,2,2};
+    private final int[] radii=new int[MAX_DRILLS];
     private final ChalkOutline[] outlines=new ChalkOutline[MAX_DRILLS];
     private final int[] missingChecks=new int[MAX_DRILLS];
-    private final int[] depths={12,12,12,12};
-    private final boolean[] circles={true,true,true,true};
+    private final int[] depths=new int[MAX_DRILLS];
+    private final boolean[] circles=new boolean[MAX_DRILLS];
     // 0 OFF, 1 AIR boundary sealing, 2 ALWAYS (extended mining and wall blocks)
-    private final int[] wallModes={0,0,0,0};
+    private final int[] wallModes=new int[MAX_DRILLS];
     // A per-coordinate safety ceiling, configured independently for each
     // linked drill. Higher limits permit tall sand/gravel shafts in oceans.
     public static final int MIN_FILL_TRIES=1,MAX_FILL_TRIES=4096,DEFAULT_FILL_TRIES=24;
-    private final int[] fillTries={24,24,24,24};
+    private final int[] fillTries=new int[MAX_DRILLS];
+    /**
+     * Persisted snapshot, not a reference to the source drill. Preserves the
+     * exact copied settings even if the operator later changes the source.
+     * This computer's clipboard is shared by its placed UI and linked tablets.
+     */
+    private record CopiedSettings(int radius,int depth,boolean circle,int wallMode,
+                                  int fillTries,ChalkOutline outline,int sourceSlot){}
+    @Nullable private CopiedSettings clipboard;
     private int selected, activeSlot;
     private long lastBroadcast;
     private String tabletId;
@@ -94,6 +102,67 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             statuses[slot]=Status.READY;setChanged();
         }
     }
+    public boolean hasCopiedSettings(){return clipboard!=null;}
+    public int copiedSettingsSource(){return clipboard==null?-1:clipboard.sourceSlot();}
+    /** COPY does not modify or pause the source drill. */
+    public String copySelectedSettings(){
+        clipboard=new CopiedSettings(radii[selected],depths[selected],circles[selected],
+            wallModes[selected],fillTries[selected],outlines[selected],selected);
+        setChanged();
+        return "Copied settings from Drill "+(selected+1)+". Select another drill and press PASTE.";
+    }
+
+    /**
+     * PASTE changes configuration only: never copy link, nickname, bits, cargo,
+     * controller state, progress, or ownership. A geometric change resets an
+     * existing loaded drill so its saved cutting cursor cannot skip blocks.
+     */
+    public String pasteSelectedSettings(){
+        if(clipboard==null)return "Copy a drill's settings before pasting.";
+        CopiedSettings settings=clipboard;
+        int slot=selected;
+        String before=outlines[slot]==null?"":outlines[slot].encode();
+        String after=settings.outline()==null?"":settings.outline().encode();
+        boolean geometryChanged=radii[slot]!=settings.radius()
+            ||depths[slot]!=settings.depth()||circles[slot]!=settings.circle()
+            ||wallModes[slot]!=settings.wallMode()||!before.equals(after);
+        boolean limitChanged=fillTries[slot]!=settings.fillTries();
+        if(!geometryChanged&&!limitChanged)
+            return "Drill "+(slot+1)+" already has the copied settings.";
+
+        // An unloaded drill may have a partially mined layer persisted inside
+        // its block entity. Do not change geometry until the head can reset.
+        DrillEntity drill=null;
+        ServerLevel world=level instanceof ServerLevel server?server:null;
+        if(geometryChanged && positions[slot]!=null){
+            if(world==null||!world.hasChunkAt(positions[slot]))
+                return "Drill "+(slot+1)+" is unloaded. Load its chunk before pasting a new footprint.";
+            if(!(world.getBlockEntity(positions[slot]) instanceof DrillEntity found)
+                    || !found.matchesLink(tokens[slot]))
+                return "Drill "+(slot+1)+" is missing. Reconnect it before changing its footprint.";
+            drill=found;
+        }
+
+        if(geometryChanged && running[slot]){
+            stop(slot,Status.STOPPED); // Return reserved material before reset
+        }
+        // Reset the excavation cursor, seal-stage and wall state together.
+        if(geometryChanged && drill!=null){
+            drill.resetTask(world);
+            statuses[slot]=Status.READY;
+        }
+        radii[slot]=settings.radius();
+        depths[slot]=settings.depth();
+        circles[slot]=settings.circle();
+        wallModes[slot]=settings.wallMode();
+        fillTries[slot]=settings.fillTries();
+        outlines[slot]=settings.outline(); // immutable snapshot mask
+        if(geometryChanged && !tokens[slot].isEmpty() && drill==null)
+            statuses[slot]=Status.STOPPED;
+        setChanged();syncIfServer();
+        return "Pasted Drill "+(settings.sourceSlot()+1)+" settings to Drill "+(slot+1)
+            +(geometryChanged?"; excavation reset, restart when ready.":".");
+    }
     public void applySettings(int radius,int depth,int tries){
         if(radius<1||radius>MAX_RADIUS||depth<1||depth>256
             ||tries<MIN_FILL_TRIES||tries>MAX_FILL_TRIES)return;
@@ -103,7 +172,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         if(change)settingsChanged();
     }
     /** Preserve unloaded machines, but release stale slots once the chunk proves
-     * the drill is gone. This allows unlimited consecutive drills on four slots. */
+     * the drill is gone. This allows unlimited consecutive drills on sixteen slots. */
     private boolean stale(ServerLevel server,int index){
         BlockPos pos=positions[index];
         if(tokens[index].isEmpty()||pos==null||!server.hasChunkAt(pos))return false;
@@ -194,7 +263,16 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         if(level instanceof ServerLevel server)syncActiveChunks(server);
     }
 
-    public ComputerEntity(BlockPos pos,BlockState state){super(MiningRig.COMPUTER_ENTITY,pos,state);}
+    public ComputerEntity(BlockPos pos,BlockState state){
+        super(MiningRig.COMPUTER_ENTITY,pos,state);
+        Arrays.fill(tokens,"");
+        Arrays.fill(statuses,Status.READY);
+        Arrays.fill(radii,2);
+        Arrays.fill(depths,12);
+        Arrays.fill(circles,true);
+        Arrays.fill(fillTries,DEFAULT_FILL_TRIES);
+        for(int i=0;i<MAX_DRILLS;i++)nicknames[i]="Drill "+(i+1);
+    }
     public boolean belongsTo(ComputerMenu menu){return menu.computer()==this;}
     public int selected(){return selected;}
     public int selectedRadius(){return radii[selected];}
@@ -515,6 +593,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 .append('\t').append(fillTries[i]);
         }
         out.append('\n').append("ALERT").append('\t').append(activeAlert()?"1":"0");
+        out.append('\n').append("CLIPBOARD").append('\t')
+            .append(clipboard==null?"-1":clipboard.sourceSlot());
         out.append(RigStorageMonitor.snapshot(server,this));
         return out.toString();
     }
@@ -640,6 +720,17 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         if(tabletId!=null)out.putString("TabletIdentity",tabletId);
         out.putLong("AlertSerial",alertSerial);
         out.putLong("MutedSerial",mutedAlertSerial);
+        out.putBoolean("CopiedSettings",clipboard!=null);
+        if(clipboard!=null){
+            out.putInt("CopyRadius",clipboard.radius());
+            out.putInt("CopyDepth",clipboard.depth());
+            out.putBoolean("CopyCircle",clipboard.circle());
+            out.putInt("CopyWallMode",clipboard.wallMode());
+            out.putInt("CopyFillTries",clipboard.fillTries());
+            out.putInt("CopySourceSlot",clipboard.sourceSlot());
+            if(clipboard.outline()!=null)
+                out.putString("CopyChalkOutline",clipboard.outline().encode());
+        }
         out.putInt("IgnoredDrills",Math.min(256,ignoredDrills.size()));
         int skip=0;for(String id:ignoredDrills){
             if(skip>=256)break;
@@ -665,6 +756,17 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         tabletId=in.getStringOr("TabletIdentity","");
         alertSerial=in.getLongOr("AlertSerial",0);
         mutedAlertSerial=in.getLongOr("MutedSerial",0);
+        clipboard=in.getBooleanOr("CopiedSettings",false)
+            ?new CopiedSettings(
+                Math.max(1,Math.min(MAX_RADIUS,in.getIntOr("CopyRadius",2))),
+                Math.max(1,Math.min(256,in.getIntOr("CopyDepth",12))),
+                in.getBooleanOr("CopyCircle",true),
+                Math.max(0,Math.min(2,in.getIntOr("CopyWallMode",0))),
+                Math.max(MIN_FILL_TRIES,Math.min(MAX_FILL_TRIES,
+                    in.getIntOr("CopyFillTries",DEFAULT_FILL_TRIES))),
+                ChalkOutline.decode(in.getStringOr("CopyChalkOutline","")),
+                Math.max(0,Math.min(MAX_DRILLS-1,in.getIntOr("CopySourceSlot",0))))
+            :null;
         ignoredDrills.clear();
         for(int j=0;j<Math.min(256,in.getIntOr("IgnoredDrills",0));j++)
             ignoredDrills.add(in.getStringOr("IgnoredDrill"+j,""));

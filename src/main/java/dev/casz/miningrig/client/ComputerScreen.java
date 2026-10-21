@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import dev.casz.miningrig.ComputerMenu;
+import dev.casz.miningrig.ComputerEntity;
 import dev.casz.miningrig.ComputerRenamePayload;
 import dev.casz.miningrig.ComputerSettingsPayload;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -20,15 +21,17 @@ import net.minecraft.world.entity.player.Inventory;
 public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> {
     private static final int GREEN=0xff72ff9b,MUTED=0xff9bbbad,WHITE=0xffe5fff0;
     private static final int DARK=0xff060f0b,PANEL=0xff122319;
-    private final String[][] rows=new String[4][11];
+    private static final int ROWS_PER_PAGE=4;
+    private static final int DRILL_PAGES=(ComputerEntity.MAX_DRILLS+ROWS_PER_PAGE-1)/ROWS_PER_PAGE;
+    private final String[][] rows=new String[ComputerEntity.MAX_DRILLS][11];
     private final List<String[]> storage=new ArrayList<>();
     private final List<Button> drillButtons=new ArrayList<>();
-    private int selected,tab,storagePage;
+    private int selected,tab,storagePage,drillPage,clipboardSlot=-1;
     private boolean initial=true,alert;
     private EditBox rename,radius,depth,tries;
-    private Button drillTab,networkTab,prev,next;
+    private Button drillTab,networkTab,prev,next,drillPrev,drillNext;
     private int bodyTop,editorTop,uiWidth,uiHeight;
-    private Button saveName,applySettings;
+    private Button saveName,applySettings,pasteButton;
     public ComputerScreen(ComputerMenu menu,Inventory player,Component title){
         // AbstractContainerScreen's width/height describe the occupied GUI
         // rectangle to JEI. The earlier 460x330 fixed bounds left most of
@@ -37,7 +40,7 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
         super(menu,player,title,
             Math.max(460,Minecraft.getInstance().getWindow().getGuiScaledWidth()-24),
             Math.max(330,Minecraft.getInstance().getWindow().getGuiScaledHeight()-24));
-        for(int i=0;i<4;i++)
+        for(int i=0;i<ComputerEntity.MAX_DRILLS;i++)
             rows[i]=new String[]{"0","Drill "+(i+1),"Not placed","Empty","-1","2","12","O","0","0","24"};
         titleLabelY=7;inventoryLabelY=9000;
     }
@@ -49,6 +52,16 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
             .bounds(x,y,w,h).build());
         if(drillOnly)drillButtons.add(button);
         return button;
+    }
+    /** Dynamically map a visible row to one of sixteen server-side drill slots. */
+    private Button drillAction(String label,int x,int y,int w,int h,int base,int row){
+        Button button=addRenderableWidget(Button.builder(Component.literal(label),
+            b->click(base+drillPage*ROWS_PER_PAGE+row)).bounds(x,y,w,h).build());
+        drillButtons.add(button);
+        return button;
+    }
+    private int drillRowHeight(){
+        return Math.max(26,Math.min(57,(editorTop-bodyTop-8)/ROWS_PER_PAGE));
     }
     @Override protected void init(){
         super.init();
@@ -68,20 +81,29 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
         add("START ALL",leftPos+uiWidth-352,topPos+32,108,22,42,true);
         add("STOP ALL",leftPos+uiWidth-240,topPos+32,108,22,43,true);
         add("MUTE ALERT",leftPos+uiWidth-128,topPos+32,116,22,41,false);
-        int rowHeight=Math.max(36,Math.min(57,(editorTop-bodyTop-12)/4));
+        int rowHeight=drillRowHeight();
         int x=leftPos+uiWidth-290;
-        for(int i=0;i<4;i++){
-            int n=i,y=bodyTop+i*rowHeight;
-            add("SELECT",x,y+2,66,21,n,true);
-            add("START/STOP",x+70,y+2,95,21,10+n,true);
-            add("RESET",x+169,y+2,58,21,50+n,true);
-            add("REMOVE",x+231,y+2,58,21,20+n,true);
+        for(int i=0;i<ROWS_PER_PAGE;i++){
+            int y=bodyTop+i*rowHeight;
+            drillAction("SELECT",x,y+2,66,21,100,i);
+            drillAction("START/STOP",x+70,y+2,95,21,120,i);
+            drillAction("RESET",x+169,y+2,58,21,160,i);
+            drillAction("REMOVE",x+231,y+2,58,21,140,i);
         }
-        // RESET is handled through the selected-drill control, never by unlink.
-        add("RESET TASK",leftPos+14,editorTop+79,104,22,40,true);
-        add("RESCAN",leftPos+122,editorTop+79,85,22,44,true);
-        add("SHAPE",leftPos+211,editorTop+79,68,22,34,true);
-        add("WALL MODE",leftPos+283,editorTop+79,103,22,35,true);
+        drillPrev=addRenderableWidget(Button.builder(Component.literal("PREV DRILLS"),b->{
+            drillPage=Math.max(0,drillPage-1);
+        }).bounds(leftPos+14,topPos+58,100,19).build());
+        drillNext=addRenderableWidget(Button.builder(Component.literal("NEXT DRILLS"),b->{
+            drillPage=Math.min(DRILL_PAGES-1,drillPage+1);
+        }).bounds(leftPos+120,topPos+58,100,19).build());
+        // The complete bottom toolbar fits even at a 460px GUI width.
+        // Copy/paste operates on the SELECTED slot, across all four pages.
+        add("RESET TASK",leftPos+14,editorTop+79,84,22,40,true);
+        add("RESCAN",leftPos+102,editorTop+79,57,22,44,true);
+        add("SHAPE",leftPos+163,editorTop+79,53,22,34,true);
+        add("WALL MODE",leftPos+220,editorTop+79,79,22,35,true);
+        add("COPY",leftPos+303,editorTop+79,60,22,45,true);
+        pasteButton=add("PASTE",leftPos+367,editorTop+79,75,22,46,true);
         prev=addRenderableWidget(Button.builder(Component.literal("PREVIOUS"),b->{
             storagePage=Math.max(0,storagePage-1);
         }).bounds(leftPos+uiWidth-205,topPos+58,93,19).build());
@@ -125,8 +147,12 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
         boolean drilling=tab==0;
         for(Button button:drillButtons)button.visible=drilling;
         prev.visible=!drilling;next.visible=!drilling;
+        drillPrev.visible=drilling;drillNext.visible=drilling;
+        drillPrev.active=drilling&&drillPage>0;
+        drillNext.active=drilling&&drillPage<DRILL_PAGES-1;
         if(saveName!=null)saveName.visible=drilling;
         if(applySettings!=null)applySettings.visible=drilling;
+        if(pasteButton!=null)pasteButton.active=drilling && clipboardSlot>=0;
         for(EditBox input:new EditBox[]{rename,radius,depth,tries})
             if(input!=null){input.visible=drilling;input.setFocused(false);}
         // Name and APPLY widgets are rendered only on the Drill page via their layout region.
@@ -141,20 +167,23 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
     }
     public void updateState(String raw){
         String[] lines=raw.split("\n",-1);
-        if(lines.length<5)return;
+        if(lines.length<ComputerEntity.MAX_DRILLS+2)return;
         try{
             int nextSelected=Integer.parseInt(lines[0]);
-            if(nextSelected<0||nextSelected>=4)return;
+            if(nextSelected<0||nextSelected>=ComputerEntity.MAX_DRILLS)return;
             boolean changed=nextSelected!=selected||initial;
             selected=nextSelected;initial=false;
-            for(int i=0;i<4;i++){
+            if(changed)drillPage=selected/ROWS_PER_PAGE;
+            for(int i=0;i<ComputerEntity.MAX_DRILLS;i++){
                 String[] values=lines[i+1].split("\t",-1);
                 if(values.length>=11)rows[i]=Arrays.copyOf(values,11);
             }
             storage.clear();
-            for(int i=5;i<lines.length;i++){
+            for(int i=ComputerEntity.MAX_DRILLS+2;i<lines.length;i++){
                 String[] parts=lines[i].split("\t",-1);
                 if(parts.length>=2&&parts[0].equals("ALERT"))alert=parts[1].equals("1");
+                if(parts.length>=2&&parts[0].equals("CLIPBOARD"))
+                    clipboardSlot=Integer.parseInt(parts[1]);
                 if(parts.length>=6&&parts[0].equals("STORAGE"))
                     storage.add(Arrays.copyOf(parts,6));
             }
@@ -170,6 +199,9 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
     private void refreshButtonLabels(){
         drillTab.setMessage(Component.literal(tab==0?"[ DRILLS ]":"DRILLS"));
         networkTab.setMessage(Component.literal(tab==1?"[ NETWORK STORAGE ]":"NETWORK STORAGE"));
+        drillPrev.active=tab==0&&drillPage>0;
+        drillNext.active=tab==0&&drillPage<DRILL_PAGES-1;
+        if(pasteButton!=null)pasteButton.active=tab==0&&clipboardSlot>=0;
     }
     private static String eta(String value){
         try{
@@ -187,13 +219,14 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
         g.fill(leftPos+5,topPos+5,leftPos+uiWidth-5,topPos+27,PANEL);
         g.fill(leftPos+8,topPos+28,leftPos+uiWidth-8,topPos+78,0xff0c1e13);
         if(tab==0){
-            int rowHeight=Math.max(36,Math.min(57,(editorTop-bodyTop-12)/4));
-            for(int i=0;i<4;i++){
+            int rowHeight=drillRowHeight();
+            for(int i=0;i<ROWS_PER_PAGE;i++){
+                int slot=drillPage*ROWS_PER_PAGE+i;
                 int y=bodyTop+i*rowHeight;
                 g.fill(leftPos+8,y,leftPos+uiWidth-8,y+rowHeight-3,
-                    i==selected?0xff1c4230:0xff11271b);
+                    slot==selected?0xff1c4230:0xff11271b);
                 g.fill(leftPos+8,y,leftPos+11,y+rowHeight-3,
-                    i==selected?GREEN:0xff365d45);
+                    slot==selected?GREEN:0xff365d45);
             }
             g.fill(leftPos+8,editorTop,leftPos+uiWidth-8,
                 topPos+uiHeight-6,PANEL);
@@ -207,18 +240,31 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
         g.text(font,"CASZUAL MINING COMPUTER",leftPos+14,topPos+12,GREEN,false);
         if(alert)g.text(font,"! ACTIVE ALERT !",leftPos+uiWidth-126,topPos+14,
             0xffff7777,false);
+        int connected=0;
+        for(String[] entry:rows)if(!entry[0].equals("0"))connected++;
+        g.text(font,"DRILLS "+connected+"/"+ComputerEntity.MAX_DRILLS,
+            leftPos+264,topPos+12,GREEN,false);
         if(tab==0){
-            int rowHeight=Math.max(36,Math.min(57,(editorTop-bodyTop-12)/4));
-            for(int i=0;i<4;i++){
-                String[] r=rows[i];
+            g.text(font,"DRILL PAGE "+(drillPage+1)+"/"+DRILL_PAGES
+                +"  ("+ComputerEntity.MAX_DRILLS+" SLOTS)",leftPos+235,topPos+63,GREEN,false);
+            int rowHeight=drillRowHeight();
+            for(int i=0;i<ROWS_PER_PAGE;i++){
+                int slot=drillPage*ROWS_PER_PAGE+i;
+                String[] r=rows[slot];
                 int y=bodyTop+i*rowHeight;
                 String name=r[1].length()>26?r[1].substring(0,26):r[1];
-                g.text(font,(i+1)+". "+name,leftPos+16,y+4,WHITE,false);
-                g.text(font,r[3],leftPos+16,y+16,GREEN,false);
-                g.text(font,"XYZ "+r[2]+"   |   "+r[9]+"/"+r[6]+" layers   |   ETA "+eta(r[4]),
-                    leftPos+16,y+29,MUTED,false);
+                g.text(font,(slot+1)+". "+name,leftPos+16,y+3,WHITE,false);
+                g.text(font,r[3],leftPos+16,y+15,GREEN,false);
+                if(rowHeight>=40)
+                    g.text(font,"XYZ "+r[2]+"   |   "+r[9]+"/"+r[6]
+                        +" layers   |   ETA "+eta(r[4]),
+                        leftPos+16,y+27,MUTED,false);
             }
             g.text(font,"SELECTED DRILL SETTINGS",leftPos+16,editorTop+6,GREEN,false);
+            g.text(font,clipboardSlot>=0
+                    ?"COPIED: DRILL "+(clipboardSlot+1):"NO COPIED SETTINGS",
+                leftPos+uiWidth-155,editorTop+6,
+                clipboardSlot>=0?GREEN:MUTED,false);
             g.text(font,"Nickname",leftPos+14,editorTop+20,MUTED,false);
             int first=leftPos+Math.max(235,uiWidth/2);
             g.text(font,"Radius 1-20",first,editorTop+19,MUTED,false);

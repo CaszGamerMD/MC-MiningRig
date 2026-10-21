@@ -1,10 +1,29 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.12 — break waterlogged blocks before fluid sealing**
+**Version 0.6.14 — copy/paste 16-drill settings**
 
-Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
+Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to sixteen drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.14 — Copy and paste drill settings
+
+- The Mining Computer and linked tablet now have **COPY** and **PASTE** buttons in the selected-drill settings toolbar. Select a source drill, click COPY, select any destination drill across all four pages, and click PASTE. The same clipboard can be reused for multiple target drills.
+- A copied snapshot includes **radius, depth, circle/square selection, wall mode, filler attempt limit, and complete Target Chalk mask**, including compound outlines with cut-outs and additions.
+- The clipboard is **saved in the Mining Computer's block entity**, surviving world reloads and usable through its linked tablet. It records the source drill number and doesn't change when the source drill is later edited. The UI indicates which drill was copied and disables PASTE when empty.
+- Paste **never copies** the drill's nickname, registered pairing token, location, installed bits, storage, running status or excavation progress. Empty slots can be pre-configured, but are not automatically linked or started.
+- Changing a destination's mining geometry safely pauses it, returns staged filler/wall supplies, and resets its excavation and sealing cursor before applying the new shape. A disconnected or unloaded registered drill refuses a geometry-changing paste until its chunk can be loaded safely; unchanged geometry/fill retry-only edits do not require resetting its progress.
+- Both actions validate against the actual server menu and display clear result messages. A paste of identical settings is a no-op. Existing worlds and saved settings remain backward-compatible.
+
+## v0.6.13 — Control up to 16 mining drills
+
+- The Mining Computer and linked tablets now handle **16 concurrent drills**. All sixteen slots have independent link identities, nicknames, excavation radius (1–20), depth, shape (circle/square/chalk), wall mode, filler retry limit, running state, status and saved task progress.
+- The full-screen computer/tablet interface shows **four drills per page, four pages**, with PREV DRILLS/NEXT DRILLS navigation. Each row has its own **Select, Start/Stop, Reset, Remove** actions; global Start All/Stop All controls all sixteen. The selected drill's settings and custom chalk boundaries remain independent.
+- All new commands use separate menu action IDs for 16 slots; previous four-slot command IDs remain recognized. UI state packets report all 16 slots plus existing network-storage information.
+- The automatic CC repair supervisor now allocates 16 independent repair jobs, including their in-flight cargo and persisted job state.
+- Prior worlds with four drill slots migrate without losing settings or registered drills. Slots 5–16 initialize as unused, preserving the saved versioned per-slot NBT keys and tablet pairing.
+- Per-drill chunks, CC network discovery, status alerts and progress reports iterate over all 16 slots. Sixteen simultaneous drills will increase chunk-loading, filler/wall supply and machine load; use enough coordinated CCs and hardware/output capacity.
+- The previous CC Organizer retrieval, irregular Target Chalk shapes, waterlogged-block clearing, computer rotations and model improvements remain included.
 
 ## v0.6.12 — Break waterlogged blocks, then seal the water
 

@@ -36,8 +36,18 @@ public final class ComputerMenu extends AbstractContainerMenu {
                 computer.getBlockPos().getY()+.5,computer.getBlockPos().getZ()+.5)<=64));
     }
     @Override public boolean clickMenuButton(Player player,int id){
-        if(computer==null)return id>=0&&id<=53;
-        if(id>=0&&id<4)computer.select(id);
+        if(computer==null)return (id>=0&&id<=53)||(id>=100&&id<176);
+        // New sixteen-drill controls use nonoverlapping, stable slot IDs.
+        // Keep the old four-slot IDs functional for older GUI interactions.
+        if(id>=100&&id<100+ComputerEntity.MAX_DRILLS)
+            computer.select(id-100);
+        else if(id>=120&&id<120+ComputerEntity.MAX_DRILLS)
+            computer.toggle(id-120);
+        else if(id>=140&&id<140+ComputerEntity.MAX_DRILLS)
+            computer.unlink(id-140);
+        else if(id>=160&&id<160+ComputerEntity.MAX_DRILLS)
+            computer.resetTask(id-160);
+        else if(id>=0&&id<4)computer.select(id);
         else if(id>=10&&id<14)computer.toggle(id-10);
         else if(id>=20&&id<24)computer.unlink(id-20);
         else if(id==30)computer.setRadius(computer.selectedRadius()-1);
@@ -55,6 +65,10 @@ public final class ComputerMenu extends AbstractContainerMenu {
         else if(id==42)computer.startAll();
         else if(id==43)computer.stopAll();
         else if(id==44)computer.allowRescan();
+        else if(id==45)player.sendSystemMessage(
+            net.minecraft.network.chat.Component.literal(computer.copySelectedSettings()));
+        else if(id==46)player.sendSystemMessage(
+            net.minecraft.network.chat.Component.literal(computer.pasteSelectedSettings()));
         else if(id>=50&&id<=53)computer.resetTask(id-50);
         else return false;
         broadcastChanges();return true;
