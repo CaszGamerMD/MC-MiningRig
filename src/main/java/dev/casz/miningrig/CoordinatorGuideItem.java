@@ -17,6 +17,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.sounds.SoundEvents;
@@ -33,6 +37,7 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class CoordinatorGuideItem extends Item {
     private static final int MAX_DISTANCE=20;
+    public static final int RETRIEVAL_REACH=100;
     public CoordinatorGuideItem(Properties properties){super(properties);}
 
     /** Old guide items default to Placement; no item ID or NBT migration. */
@@ -47,8 +52,8 @@ public final class CoordinatorGuideItem extends Item {
         tag.putBoolean("OrganizerRetrieval",retrieving);
         tool.set(DataComponents.CUSTOM_DATA,CustomData.of(tag));
         say(player,retrieving
-            ?"CC Organizer: RETRIEVAL. Right-click any CC to store it in Hardware, "
-                +"or Output if no Hardware space exists. Sneak-use air to switch."
+            ?"CC Organizer: RETRIEVAL (100 blocks). Aim at a visible CC and right-click. "
+                +"Hardware storage first, Output if full. Sneak-use air to switch."
             :"CC Organizer: PLACEMENT. Right-click a CC face to select it, "
                 +"sneak-click the same CC to change spacing. Sneak-use air to switch.");
     }
@@ -171,7 +176,7 @@ public final class CoordinatorGuideItem extends Item {
             return InteractionResult.SUCCESS;
         }
         if(isRetrieval(tool)){
-            say(player,"CC Organizer: point at a Collection Coordinator and right-click to retrieve.");
+            retrieveInSight(server,player,tool);
             return InteractionResult.SUCCESS;
         }
         Plan plan=read(tool);
@@ -181,6 +186,38 @@ public final class CoordinatorGuideItem extends Item {
         }
         place(server,player,tool,plan);
         return InteractionResult.SUCCESS;
+    }
+
+    /**
+     * In Retrieval mode the vanilla interaction range (about five blocks)
+     * does not permit useItemOn to reach a distant CC. The client calls
+     * Item.use on a miss; raycast on the server to a full 100 blocks.
+     *
+     * Stops at the FIRST collidable block. No retrieving through walls,
+     * no nearest-CC guesses, and no forced chunk loading at long range.
+     */
+    private static void retrieveInSight(ServerLevel world,Player player,ItemStack tool){
+        Vec3 eye=player.getEyePosition();
+        Vec3 look=player.getViewVector(1.0F).normalize();
+        // Don't raycast through unloaded chunks: that would synchronously
+        // load distant terrain or let the organizer act on an unseen CC.
+        for(int step=0;step<=RETRIEVAL_REACH;step++){
+            BlockPos along=BlockPos.containing(eye.add(look.scale(step)));
+            if(!world.hasChunkAt(along)){
+                say(player,"CC Organizer: target path enters an unloaded chunk. Move closer.");
+                return;
+            }
+        }
+        Vec3 reach=eye.add(look.scale(RETRIEVAL_REACH));
+        BlockHitResult hit=world.clip(new ClipContext(eye,reach,
+            ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,player));
+        if(hit.getType()!=HitResult.Type.BLOCK
+                || !world.getBlockState(hit.getBlockPos()).is(MiningRig.COORDINATOR)){
+            say(player,"CC Organizer: no visible CC within "+RETRIEVAL_REACH
+                +" blocks. A clear line of sight is required.");
+            return;
+        }
+        CoordinatorRetrieval.recall(world,hit.getBlockPos(),player,tool,hit.getDirection());
     }
 
     private static int findCC(Player player){
