@@ -1,10 +1,29 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.10 — Irregular, hollow and compound Target Chalk excavations**
+**Version 0.6.12 — break waterlogged blocks before fluid sealing**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.12 — Break waterlogged blocks, then seal the water
+
+- Detect waterlogged blocks (including a WATERLOGGED block-state property or a fluid-bearing non-liquid block) during **fluid scanning** in vertical shafts and in a horizontal drill's forward bulkhead.
+- **Break the actual waterlogged block first** using an equipped drill bit, respecting hardness, harvest requirements, unbreakable blocks, inventory space, block-entity protection, drop collection and bit durability. The water is preserved in its coordinate as a fluid block, rather than destroying both contents.
+- Then let the normal CC filler supply, placement, and per-position verification **seal the newly exposed water** with a supported solid block. A drain cannot skip directly from waterlogged obstruction to mining.
+- This priority is enforced in the forward fluid barrier, normal fluid recovery, AIR walls, REPLACE walls, pending filler retries and arriving cargo. Even if no filler is currently stocked, the drill can first break the waterlogged obstruction; filling still waits for stock.
+- Unlike the older non-full collision check, this recognizes a waterlogged full-collision block and catches cases where a modded block reports its waterlog state without a normal water fluid state.
+- Never overwrites a waterlogged tile entity or an unbreakable block without harvesting; if it cannot be mined safely the drill stops instead of voiding a block/item. Existing saves, custom chalk shapes, CC Organizer and 20-block radius remain compatible.
+- Fabric 26.2 build verification is automated. Runtime testing recommended: waterlogged stairs/slabs/fences, waterlogged modded blocks, low-stock CCs, ocean pressure, wet horizontal faces and wall-mode variants.
+
+## v0.6.11 — CC Organizer (formerly CC Placement Guide)
+
+- The existing item is now called **CC Organizer** in-game. Its original `miningrig:cc_placement_guide` registry ID and recipe are retained to preserve saved inventories, world items, recipes and old organizer NBT.
+- **Sneak-right-click in AIR** to toggle **PLACEMENT** / **RETRIEVAL**. Each Organizer stores its mode in Custom Data. Old tools start in Placement and preserve their linked CC and spacing.
+- **PLACEMENT:** Right-click a CC face to choose the route. Sneak-right-click the currently selected CC to cycle its spacing (1–20 blocks). Right-click air to place, or right-click another surface to snap to a chosen distance. Placement previews disappear in retrieval mode.
+- **RETRIEVAL:** Point at any CC and right-click. The Organizer searches the *connected loaded CC network* for a chest or other inventory on a configured **Hardware port**, testing actual room, insert restrictions, and sided-access rules. It prefers filling existing stacks, then free slots. If no Hardware location can accept the CC block, it checks configured **Output ports** instead. It removes the physical CC only when a valid storage destination exists. Does not force-load chunks or insert into unrelated networks.
+- Coordinators with stored inventory, reserved filler/wall caches, or in-flight cargo cannot be recalled until cleared. This prevents silent item loss and transit spills. If no eligible destination accepts the CC, retrieval leaves the CC in place. If a storage block unexpectedly disappears during removal, the reclaimed CC block drops at the original position rather than being voided.
+- Retrieving the selected placement origin also clears that obsolete plan. The same organizer item retains its configured mode until changed again.
 
 ## v0.6.10 — Draw concave rainbows and hollow shapes with Target Chalk
 

@@ -116,6 +116,11 @@ public final class CoordinatorEntity extends BlockEntity implements Container,Me
                 || container instanceof CoordinatorEntity || container instanceof DrillEntity)return null;
         return container;
     }
+    /** A recalled coordinator must not abandon stored cargo or flights. */
+    public boolean hasRecallCargo(){
+        return !isEmpty() || !flights.isEmpty()
+            || fillerDepot.stored()>0 || wallDepot.stored()>0;
+    }
     public int stored(){return RigStorage.count(items,0);}
     public int freeStorage(){return CAPACITY-stored();}
     public boolean canReceive(List<ItemStack> cargo){return RigStorage.canInsert(items,0,CAPACITY,cargo);}
