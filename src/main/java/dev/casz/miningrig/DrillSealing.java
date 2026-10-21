@@ -226,6 +226,8 @@ final class DrillSealing {
         if(wallFallback && RigNetwork.hasAvailable(world,drill,true))wallFallback=false;
     }
     static boolean contains(ComputerEntity computer,int x,int z,boolean expanded){
+        ChalkOutline outline=computer.outline();
+        if(outline!=null)return outline.contains(x,z,expanded);
         int r=computer.radius()+(expanded?1:0);
         return computer.circle()?x*x+z*z<=r*r:Math.max(Math.abs(x),Math.abs(z))<=r;
     }

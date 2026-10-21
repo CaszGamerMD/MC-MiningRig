@@ -76,6 +76,8 @@ public final class DrillBlock extends BaseEntityBlock {
     @Nullable @Override public BlockEntity newBlockEntity(BlockPos pos,BlockState state){return new DrillEntity(pos,state);}
     @Override protected InteractionResult useItemOn(ItemStack stack,BlockState state,Level level,BlockPos pos,
                                             Player player,InteractionHand hand,BlockHitResult hit){
+        if(stack.is(MiningRig.TARGET_CHALK))
+            return TargetChalkItem.interact(level,player,stack,pos,hit.getDirection());
         if(!(stack.getItem() instanceof DrillBit)){
             if(!level.isClientSide() && level.getBlockEntity(pos) instanceof DrillEntity drill)
                 player.openMenu(drill);

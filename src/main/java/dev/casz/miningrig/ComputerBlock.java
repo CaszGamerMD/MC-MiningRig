@@ -2,6 +2,7 @@ package dev.casz.miningrig;
 
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
@@ -20,26 +21,30 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
 public final class ComputerBlock extends BaseEntityBlock {
+    public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
     public static final BooleanProperty ALARM = BooleanProperty.create("alarm");
     public static final BooleanProperty WARN = BooleanProperty.create("warn");
     public ComputerBlock(Properties properties) {
         super(properties);
-        registerDefaultState(defaultBlockState().setValue(ALARM, false).setValue(WARN,false));
+        registerDefaultState(defaultBlockState().setValue(FACING, Direction.NORTH).setValue(ALARM, false).setValue(WARN,false));
     }
     @Override protected MapCodec<? extends BaseEntityBlock> codec() { return simpleCodec(ComputerBlock::new); }
     @Override protected void createBlockStateDefinition(StateDefinition.Builder<net.minecraft.world.level.block.Block, BlockState> builder) {
-        builder.add(ALARM,WARN);
+        builder.add(FACING,ALARM,WARN);
     }
     @Override protected RenderShape getRenderShape(BlockState state) { return RenderShape.MODEL; }
     @Nullable @Override public BlockState getStateForPlacement(BlockPlaceContext context){
         if(!context.getLevel().getBlockState(context.getClickedPos().above()).canBeReplaced(context))
             return null;
-        return super.getStateForPlacement(context);
+        // The screen faces the player who placed the workstation.
+        return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
     }
     @Override public void setPlacedBy(Level level,BlockPos pos,BlockState state,
             @Nullable LivingEntity placer,ItemStack stack){
@@ -53,6 +58,9 @@ public final class ComputerBlock extends BaseEntityBlock {
     }
     public static InteractionResult handleItem(ItemStack stack,Level level,BlockPos pos,Player player) {
         if (!(level.getBlockEntity(pos) instanceof ComputerEntity computer)) return InteractionResult.PASS;
+        if(stack.is(MiningRig.TARGET_CHALK))
+            return TargetChalkItem.interact(level,player,stack,pos,
+                net.minecraft.core.Direction.UP);
         if(stack.is(MiningRig.TABLET)){
             if(level instanceof ServerLevel server){
                 TabletLink.write(stack,TabletLink.of(server,computer));

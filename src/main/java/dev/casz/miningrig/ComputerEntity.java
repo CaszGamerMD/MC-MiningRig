@@ -32,6 +32,8 @@ import org.jetbrains.annotations.Nullable;
 /** Independent supervisor of up to four item-linked drills. */
 public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public static final int MAX_DRILLS=4;
+    /** Inclusive maximum excavation radius, shared by controls and persisted settings. */
+    public static final int MAX_RADIUS=20;
     public enum Status {
         READY("Ready"), RUNNING("Mining"), STOPPED("Manually stopped"), DONE("Job done"),
         OUT_OF_BITS("Out of bits"), NO_COLLECTOR("No collector in range"),
@@ -53,6 +55,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     private final Status[] statuses={Status.READY,Status.READY,Status.READY,Status.READY};
     private final boolean[] running=new boolean[MAX_DRILLS];
     private final int[] radii={2,2,2,2};
+    private final ChalkOutline[] outlines=new ChalkOutline[MAX_DRILLS];
+    private final int[] missingChecks=new int[MAX_DRILLS];
     private final int[] depths={12,12,12,12};
     private final boolean[] circles={true,true,true,true};
     // 0 OFF, 1 AIR boundary sealing, 2 ALWAYS (extended mining and wall blocks)
@@ -91,32 +95,66 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         }
     }
     public void applySettings(int radius,int depth,int tries){
-        if(radius<1||radius>12||depth<1||depth>256
+        if(radius<1||radius>MAX_RADIUS||depth<1||depth>256
             ||tries<MIN_FILL_TRIES||tries>MAX_FILL_TRIES)return;
         boolean change=radius!=radii[selected]||depth!=depths[selected];
         radii[selected]=radius;depths[selected]=depth;
         if(fillTries[selected]!=tries)setFillAttemptLimit(tries);
         if(change)settingsChanged();
     }
+    /** Preserve unloaded machines, but release stale slots once the chunk proves
+     * the drill is gone. This allows unlimited consecutive drills on four slots. */
+    private boolean stale(ServerLevel server,int index){
+        BlockPos pos=positions[index];
+        if(tokens[index].isEmpty()||pos==null||!server.hasChunkAt(pos))return false;
+        return !(server.getBlockEntity(pos) instanceof DrillEntity actual)
+            || !actual.matchesLink(tokens[index]);
+    }
+    private void freeMissingSlot(int index){
+        if(tokens[index].isEmpty())return;
+        tokens[index]="";positions[index]=null;running[index]=false;
+        statuses[index]=Status.READY;
+        nicknames[index]="Drill "+(index+1);
+        outlines[index]=null;missingChecks[index]=0;
+        setChanged();
+    }
     private void autoDiscover(ServerLevel server){
+        for(int i=0;i<MAX_DRILLS;i++){
+            if(stale(server,i)){
+                if(++missingChecks[i]>=3)freeMissingSlot(i); // 3 x 20-tick checks
+            }else missingChecks[i]=0;
+        }
         for(DrillEntity drill:RigTopology.networkDrills(server,this)){
             boolean changed=false;
             String id=drill.identity();
             if(ignoredDrills.contains(id))continue;
             int slot=-1;
             for(int i=0;i<MAX_DRILLS;i++)
-                if(id.equals(tokens[i])){slot=i;break;}
+                // A paired item has a UUID link token distinct from the
+                // drill's persistent physical identity; never count it twice.
+                if(id.equals(tokens[i]) || (positions[i]!=null
+                        && positions[i].equals(drill.getBlockPos())
+                        && drill.matchesLink(tokens[i]))){slot=i;break;}
             if(slot<0){
                 for(int i=0;i<MAX_DRILLS;i++)
                     if(tokens[i].isEmpty()){slot=i;break;}
+                if(slot<0){
+                    // A real, loaded drill takes precedence over an unplaced
+                    // item reservation. Never replace an active or unloaded drill.
+                    for(int i=0;i<MAX_DRILLS;i++)
+                        if(positions[i]==null && !running[i]){freeMissingSlot(i);slot=i;break;}
+                }
                 if(slot<0)continue;
                 tokens[slot]=id;positions[slot]=drill.getBlockPos().immutable();
+                outlines[slot]=null;missingChecks[slot]=0;
                 nicknames[slot]="Drill "+(slot+1);
                 statuses[slot]=Status.READY;changed=true;
             }else if(positions[slot]==null||!positions[slot].equals(drill.getBlockPos())){
                 positions[slot]=drill.getBlockPos().immutable();changed=true;
             }
-            if(!drill.matchesLink(id)){drill.adoptController(server,this,id);changed=true;}
+            if(!drill.matchesLink(tokens[slot])){
+                drill.adoptController(server,this,tokens[slot]);changed=true;
+            }
             if(changed)setChanged();
         }
     }
@@ -134,7 +172,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         for(int i=0;i<MAX_DRILLS;i++){
             if(!running[i] || positions[i]==null)continue;
             active=true;
-            RigChunkTickets.cover(desired,positions[i],radii[i]+1);
+            RigChunkTickets.cover(desired,positions[i],footprintRadius(i)+1);
             if(server.hasChunkAt(positions[i]) &&
                 server.getBlockEntity(positions[i]) instanceof DrillEntity drill){
                 RigNetwork.includeLoadedNetwork(server,drill,desired);
@@ -189,17 +227,69 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         wallModes[selected]=Math.floorMod(value,3);
         settingsChanged();
     }
-    public int radius(){return radii[activeSlot];}
+    private int footprintRadius(int slot){
+        ChalkOutline shape=outlines[slot];
+        return shape==null?radii[slot]:shape.radius();
+    }
+    public int radius(){return footprintRadius(activeSlot);}
+    public ChalkOutline outline(){return outlines[activeSlot];}
+    public ChalkOutline outline(int slot){return slot>=0&&slot<MAX_DRILLS?outlines[slot]:null;}
+    /** Return the saved footprint for this specific physical drill. */
+    public ChalkOutline outline(DrillEntity drill){
+        for(int i=0;i<MAX_DRILLS;i++)
+            if(positions[i]!=null && positions[i].equals(drill.getBlockPos())
+                    && drill.matchesLink(tokens[i]))
+                return outlines[i];
+        return null;
+    }
+    /**
+     * Attach only to an actual registered drill, never an unplaced reservation.
+     * Resets the task to avoid applying a different geometry to an in-flight cursor.
+     */
+    public boolean installOutline(ServerLevel server,DrillEntity drill,ChalkOutline shape){
+        for(int i=0;i<MAX_DRILLS;i++)
+            if(!tokens[i].isEmpty() && positions[i]!=null
+                    && positions[i].equals(drill.getBlockPos())
+                    && drill.matchesLink(tokens[i])){
+                if(running[i])stop(i,Status.STOPPED);
+                drill.resetTask(server);
+                outlines[i]=shape;
+                statuses[i]=Status.READY;
+                setChanged();syncIfServer();
+                return true;
+            }
+        return false;
+    }
+    public boolean clearOutline(ServerLevel server,DrillEntity drill){
+        for(int i=0;i<MAX_DRILLS;i++)
+            if(positions[i]!=null && positions[i].equals(drill.getBlockPos())
+                    && drill.matchesLink(tokens[i]))
+                return clearOutline(server,i);
+        return false;
+    }
+    public boolean clearOutline(ServerLevel server,int slot){
+        if(slot<0||slot>=MAX_DRILLS||outlines[slot]==null)return false;
+        if(running[slot])stop(slot,Status.STOPPED);
+        if(positions[slot]!=null && server.hasChunkAt(positions[slot])
+                && server.getBlockEntity(positions[slot]) instanceof DrillEntity drill
+                && drill.matchesLink(tokens[slot]))drill.resetTask(server);
+        outlines[slot]=null;
+        statuses[slot]=Status.READY;
+        setChanged();syncIfServer();
+        return true;
+    }
     public int depth(){return depths[activeSlot];}
     public boolean circle(){return circles[activeSlot];}
     public boolean contains(int x,int z){
+        ChalkOutline shape=outline();
+        if(shape!=null)return shape.has(x,z);
         int r=radius();
         return circle()?x*x+z*z<=r*r:Math.max(Math.abs(x),Math.abs(z))<=r;
     }
     public void select(int slot){
         if(slot>=0&&slot<MAX_DRILLS){selected=slot;activeSlot=slot;setChanged();}
     }
-    public void setRadius(int value){radii[selected]=Math.max(1,Math.min(12,value));settingsChanged();}
+    public void setRadius(int value){radii[selected]=Math.max(1,Math.min(MAX_RADIUS,value));settingsChanged();}
     public void setDepth(int value){depths[selected]=Math.max(1,Math.min(256,value));settingsChanged();}
     public void setCircle(boolean value){circles[selected]=value;settingsChanged();}
     private void settingsChanged(){
@@ -279,10 +369,14 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         if(level instanceof ServerLevel server && positions[index]!=null &&
                 server.hasChunkAt(positions[index])
                 && server.getBlockEntity(positions[index]) instanceof DrillEntity drill
-                && drill.matchesLink(tokens[index]))drill.detachController();
+                && drill.matchesLink(tokens[index])){
+            ignoredDrills.add(drill.identity());
+            drill.detachController();
+        }
         if(!tokens[index].isEmpty())ignoredDrills.add(tokens[index]);
         tokens[index]="";positions[index]=null;running[index]=false;
-        statuses[index]=Status.READY;nicknames[index]="Drill "+(index+1);setChanged();syncIfServer();
+        statuses[index]=Status.READY;nicknames[index]="Drill "+(index+1);
+        outlines[index]=null;missingChecks[index]=0;setChanged();syncIfServer();
     }
     public void toggle(){toggle(selected);}
     public void toggle(int slot){
@@ -375,7 +469,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     }
     public String description(){
         return "Caszual Mining Rig | "+screenStatus()+" | Drill "+(selected+1)
-            +" "+(circles[selected]?"Circle":"Square")+" r="+radii[selected]
+            +" "+(outlines[selected]!=null?"Chalk":circles[selected]?"Circle":"Square")+" r="+footprintRadius(selected)
             +" depth="+depths[selected];
     }
     public String snapshot(ServerLevel server){
@@ -406,14 +500,14 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                         status="Fill blocked @ "+failed.getX()+","
                             +failed.getY()+","+failed.getZ();
                     }
-                    eta=drill.estimatedSeconds(radii[i],depths[i],circles[i],running[i]);
+                    eta=drill.estimatedSeconds(footprintRadius(i),depths[i],circles[i],running[i],outlines[i]);
                 }else status=Status.NO_DRILL.display;
             }
             out.append('\n').append(tokens[i].isEmpty()?"0":"1")
                 .append('\t').append(nicknames[i]).append('\t').append(location)
                 .append('\t').append(status).append('\t').append(eta)
-                .append('\t').append(radii[i]).append('\t').append(depths[i])
-                .append('\t').append(circles[i]?"O":"S")
+                .append('\t').append(footprintRadius(i)).append('\t').append(depths[i])
+                .append('\t').append(outlines[i]!=null?"C":circles[i]?"O":"S")
                 .append('\t').append(wallModes[i])
                 .append('\t').append(pos==null||!server.hasChunkAt(pos)?0:
                     server.getBlockEntity(pos) instanceof DrillEntity drill
@@ -560,6 +654,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             out.putBoolean("Running"+i,running[i]);
             out.putString("Status"+i,statuses[i].name());
             out.putInt("Radius"+i,radii[i]);out.putInt("Depth"+i,depths[i]);
+            if(outlines[i]!=null)out.putString("ChalkOutline"+i,outlines[i].encode());
             out.putBoolean("Circle"+i,circles[i]);
             out.putInt("WallMode"+i,wallModes[i]);
             out.putInt("FillTries"+i,fillTries[i]);
@@ -583,7 +678,9 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             running[i]=in.getBooleanOr("Running"+i,false);
             try{statuses[i]=Status.valueOf(in.getStringOr("Status"+i,"READY"));}
             catch(IllegalArgumentException e){statuses[i]=Status.READY;}
-            radii[i]=Math.max(1,Math.min(12,in.getIntOr("Radius"+i,2)));
+            radii[i]=Math.max(1,Math.min(MAX_RADIUS,in.getIntOr("Radius"+i,2)));
+            outlines[i]=ChalkOutline.decode(in.getStringOr("ChalkOutline"+i,""));
+            missingChecks[i]=0;
             depths[i]=Math.max(1,Math.min(256,in.getIntOr("Depth"+i,12)));
             circles[i]=in.getBooleanOr("Circle"+i,true);
             wallModes[i]=Math.max(0,Math.min(2,in.getIntOr("WallMode"+i,0)));
@@ -595,7 +692,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             tokens[0]=UUID.randomUUID().toString();
             positions[0]=BlockPos.of(in.getLongOr("Drill",0));
             running[0]=in.getBooleanOr("Running",false);
-            radii[0]=Math.max(1,Math.min(12,in.getIntOr("Radius",2)));
+            radii[0]=Math.max(1,Math.min(MAX_RADIUS,in.getIntOr("Radius",2)));
             depths[0]=Math.max(1,Math.min(256,in.getIntOr("Depth",12)));
             circles[0]=in.getBooleanOr("Circle",true);
         }

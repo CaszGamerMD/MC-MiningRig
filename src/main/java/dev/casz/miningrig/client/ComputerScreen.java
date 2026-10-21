@@ -221,10 +221,10 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
             g.text(font,"SELECTED DRILL SETTINGS",leftPos+16,editorTop+6,GREEN,false);
             g.text(font,"Nickname",leftPos+14,editorTop+20,MUTED,false);
             int first=leftPos+Math.max(235,uiWidth/2);
-            g.text(font,"Radius",first,editorTop+19,MUTED,false);
+            g.text(font,"Radius 1-20",first,editorTop+19,MUTED,false);
             g.text(font,"Depth",first+78,editorTop+19,MUTED,false);
             g.text(font,"Fill tries",first+156,editorTop+19,MUTED,false);
-            g.text(font,"Footprint: "+(rows[selected][7].equals("O")?"Circle":"Square")
+            g.text(font,"Footprint: "+(rows[selected][7].equals("C")?"Chalk":rows[selected][7].equals("O")?"Circle":"Square")
                 +"   Wall: "+switch(rows[selected][8]){
                     case "1"->"Air";case "2"->"Replace";default->"Off";
                 },leftPos+14,editorTop+60,WHITE,false);

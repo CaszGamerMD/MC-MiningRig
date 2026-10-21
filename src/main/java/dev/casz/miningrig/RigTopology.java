@@ -144,6 +144,23 @@ public final class RigTopology {
                 if(seen.add(drill.getBlockPos()))result.add(drill);
         return result;
     }
+    /**
+     * Registered drills in loaded chunks only. Used when committing a chalk
+     * outline; it does not search or load the world outside the machine index.
+     */
+    public static List<DrillEntity> loadedDrills(ServerLevel world){
+        List<DrillEntity> result=new ArrayList<>();
+        Set<BlockPos> registered=drills.get(world);
+        if(registered==null)return result;
+        for(BlockPos point:new ArrayList<>(registered)){
+            if(!world.hasChunkAt(point))continue;
+            if(world.getBlockEntity(point) instanceof DrillEntity drill)
+                result.add(drill);
+            else registered.remove(point);
+        }
+        return result;
+    }
+
     public static boolean joined(ServerLevel world,ComputerEntity computer,DrillEntity drill){
         for(CoordinatorEntity cc:network(world,computer))
             if(nearDrill(cc.getBlockPos(),drill))return true;

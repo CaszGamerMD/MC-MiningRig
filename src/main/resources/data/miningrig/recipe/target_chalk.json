@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    "minecraft:clay_ball",
+    "minecraft:white_dye",
+    "minecraft:red_dye"
+  ],
+  "result": {
+    "id": "miningrig:target_chalk",
+    "count": 1
+  }
+}

@@ -1,10 +1,43 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.6 — forward-facing horizontal fluid wall**
+**Version 0.6.10 — Irregular, hollow and compound Target Chalk excavations**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to four drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.10 — Draw concave rainbows and hollow shapes with Target Chalk
+
+- The polygon tool now has three editable modes, saved directly on each Target Chalk item. With **no unfinished drawing**, **sneak-right-click in air** to cycle **REPLACE → ADD → CUT → REPLACE**.
+- **REPLACE:** Draw and close an outer outline that includes a registered drill. It can be concave (U-shapes, rainbow arches, stair-steps, letters) with as many as 128 corner marks.
+- **ADD:** Draw another area adjoining/overlapping the old footprint to enlarge the cut. The mask is combined with the previous selection rather than replacing it.
+- **CUT:** Draw and close an area overlapping the footprint to exclude it from excavation, including a hole inside a rainbow or ring. The remaining area must still include the drill head; a cut cannot remove the drill's cell.
+- To create a rainbow: draw an outer arch in REPLACE, close it, switch to CUT and outline the inner hollow area. To create a ring: outline a disc in REPLACE, then subtract its center in CUT. Minecraft's block grid renders curves as stepped shapes, not smooth geometric curves.
+- The custom outline remains saved per drill and carries across vertical/horizontal excavation and world reload. Mining, ETA, fluid barriers, wall placement, outlines and chunk coverage all operate on the exact resulting mask, including inward edges of hollow regions.
+- New contours must stay within 20 blocks of the owning drill. Existing shapes, machines, and other mods' worlds are unchanged until you explicitly edit them. As before, applying an outline pauses and resets that drill's excavation task.
+
+## v0.6.9 — Custom Target Chalk footprints and drill discovery cleanup
+
+- The Mining Computer automatically frees a slot after three consecutive 20-tick checks find its former drill missing in a **loaded** chunk. Unloaded drills are preserved; available slots are reused without a permanent four-drill history limit. A newly discovered real drill can also replace an unplaced item reservation when all slots are full. Manual Unlink and Rescan still work.
+- **Target Chalk** is crafted using clay ball, white dye and red dye. Right-click corners on the top of a flat ground layer for downward drilling, or a vertical wall face for a horizontal drill. Click the first corner again or sneak-right-click air to close the polygon. Up to 128 points. Point-to-point drawing has white particle feedback.
+- Closed chalk outlines select **every already registered, loaded drill inside them**, provided all marked corners are within 20 blocks of that drill along the excavation slice. The outline must contain the drill head. All marker clicks must be on the same plane and face. Matching drills pause and reset their excavation task when the new shape is assigned.
+- Chalk masks are computed as exact block-cell polygons, including boundary cells, and serialized in each computer slot. The drill retains the cutout through each vertical/horizontal movement and through world save/reload. Walls, filler, perimeter previews, chunk tickets, ETA and excavation share the mask. A one-cell outer seal ring prevents fluids from bypassing irregular edges.
+- Sneak-right-click a Mining Computer with clear Target Chalk to remove the selected drill's mask, or sneak-right-click the corresponding drill. The original circle/square settings remain saved and become active again.
+- An outline needs a recognized drill attached to a loaded Mining Computer; incomplete drawings stay on the chalk item. The visual stroke uses particles instead of permanently replacing terrain with decals.
+
+## v0.6.8 — Mining radius up to 20
+
+- The Mining Computer now accepts radii from **1 through 20**, including the GUI field and its server-side settings validation, sneak-stick adjustment, and settings loaded from saved worlds.
+- Excavation, wall and fluid-sealing footprints, horizontal tunnels, particle outlines, work estimates and chunk coverage all use the selected radius. A radius of 20 allows a 41-block-wide square tunnel or diameter-41 circular footprint.
+- The optional hopper collector range grows with the larger mining footprint rather than stopping at the former 14-block cap; the collector continues respecting output capacity and scan limits.
+- All other machine settings and previously placed machines retain their saved data. Large excavations may require more time, CC supplies and server resources.
+
+## v0.6.7 — Mining Computer visual and facing update
+
+- Placing a Mining Computer now orients the full workstation screen and keyboard toward its placing player, for all green, amber and red indicator states.
+- The inventory item has a dedicated compact 3D workstation icon with terminal display, status light, individual keys and a better-defined housing, independent of the full-sized placed model.
+- Reduced first- and third-person hand display scales so held computers no longer cover the player's view; tuned inventory, ground and item-frame transforms independently.
+- Existing placed computers preserve their north-facing default, stored data and mod namespace. Functional drilling and CC networking are unchanged.
 
 ## v0.6.6 — Horizontal forward fluid barrier
 
@@ -74,7 +107,7 @@ Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable too
 
 **Automatic discovery.** Place a Mining Computer within 24 blocks of a loaded Collection Coordinator, and it will discover and assign up to four drills near **any loaded CC in the same connected CC network**. Drills no longer need item pairing or manual linking. Each drill has a persistent identity even as it moves down. Discovery is limited to loaded chunks; old assignments survive save/load and drill relocation. Use **Rescan** if you previously removed a drill assignment; removing one assignment does not reset the drill's own excavation. A separate **Reset Task** clears that drill's layers and cursor without breaking it or removing its bits.
 
-**New computer console.** The interface expands to the screen size in a black/green theme, with Start/Stop per drill, Start All, Stop All, a current-alert mute, selective task resets, Shape/Wall buttons, and editable Radius (1-12), Depth (1-256), and Fill Tries (1-4096). Press **Apply** to submit all three numbers to the server with range validation. Focused text boxes swallow inventory and other gameplay shortcut keys; drill nicknames have a separate Save Name button.
+**New computer console.** The interface expands to the screen size in a black/green theme, with Start/Stop per drill, Start All, Stop All, a current-alert mute, selective task resets, Shape/Wall buttons, and editable Radius (1-20), Depth (1-256), and Fill Tries (1-4096). Press **Apply** to submit all three numbers to the server with range validation. Focused text boxes swallow inventory and other gameplay shortcut keys; drill nicknames have a separate Save Name button.
 
 **Network Storage page.** Each connected CC face can assign a **container nickname**, up to 32 characters, which is saved per CC face and shown in its GUI. The computer and linked tablet display connected container names, source coordinates, assigned type (Filler, Walls, Output, or Hardware), and live item count/estimated stack capacity. The CC graph and its loaded adjacent inventories are the source of truth; no forced loads for offline containers. Storage pages support more than ten containers.
 
