@@ -17,11 +17,64 @@ public final class GroupOutline {
     private final int minX,minZ,width,height;
     private final BitSet cells;
     private final int count;
+    private final int topY;
+    private final List<BlockPos> markers;
 
-    private GroupOutline(int minX,int minZ,int width,int height,BitSet cells){
+    private GroupOutline(int minX,int minZ,int width,int height,BitSet cells,
+                         int topY,List<BlockPos> markers){
         this.minX=minX;this.minZ=minZ;this.width=width;this.height=height;
         this.cells=(BitSet)cells.clone();
-        this.count=cells.cardinality();
+        this.count=cells.cardinality();this.topY=topY;
+        this.markers=List.copyOf(markers);
+    }
+    public List<BlockPos> markers(){return markers;}
+    public int topY(){return topY;}
+    public int requiredDrills(){return markers.size();}
+    public BlockPos marker(int n){return markers.get(n);}
+    /** Closest drill owns every inside cell and the one-block outside ring. */
+    public int owner(int x,int z){
+        int winner=-1;
+        long nearest=Long.MAX_VALUE;
+        for(int i=0;i<markers.size();i++){
+            BlockPos p=markers.get(i);
+            int dx=Math.abs(p.getX()-x),dz=Math.abs(p.getZ()-z);
+            if(dx>ComputerEntity.MAX_RADIUS+1||dz>ComputerEntity.MAX_RADIUS+1)continue;
+            long distance=(long)dx*dx+(long)dz*dz;
+            if(distance<nearest){nearest=distance;winner=i;}
+        }
+        return winner;
+    }
+    /** Plan one marker for every needed 41x41 coverage area, accounting for
+     * irregular boundaries. Each marker is a tip block directly above chalk.
+     * No new chunks are loaded and plans exceeding sixteen drills are refused. */
+    public GroupOutline plan(int tipY){
+        List<BlockPos> planned=new ArrayList<>();
+        for(int z=minZ;z<minZ+height;z++)for(int x=minX;x<minX+width;x++){
+            if(!has(x,z))continue;
+            boolean covered=false;
+            for(BlockPos p:planned)
+                if(Math.abs(p.getX()-x)<=ComputerEntity.MAX_RADIUS
+                    &&Math.abs(p.getZ()-z)<=ComputerEntity.MAX_RADIUS){
+                    covered=true;break;
+                }
+            if(covered)continue;
+            int wantedX=Math.min(minX+width-1,x+ComputerEntity.MAX_RADIUS);
+            int wantedZ=Math.min(minZ+height-1,z+ComputerEntity.MAX_RADIUS);
+            BlockPos chosen=null;
+            long best=Long.MAX_VALUE;
+            for(int z1=Math.max(minZ,z-ComputerEntity.MAX_RADIUS);
+                    z1<=Math.min(minZ+height-1,z+ComputerEntity.MAX_RADIUS);z1++)
+                for(int x1=Math.max(minX,x-ComputerEntity.MAX_RADIUS);
+                        x1<=Math.min(minX+width-1,x+ComputerEntity.MAX_RADIUS);x1++){
+                    if(!has(x1,z1))continue;
+                    long dx=x1-wantedX,dz=z1-wantedZ,score=dx*dx+dz*dz;
+                    if(score<best){best=score;chosen=new BlockPos(x1,tipY,z1);}
+                }
+            if(chosen==null)return null;
+            planned.add(chosen);
+            if(planned.size()>ComputerEntity.MAX_DRILLS)return null;
+        }
+        return new GroupOutline(minX,minZ,width,height,cells,tipY,planned);
     }
     public int count(){return count;}
     public boolean has(int x,int z){
@@ -36,20 +89,34 @@ public final class GroupOutline {
         return false;
     }
     public String encode(){
-        return minX+","+minZ+","+width+","+height+";"
-            +Base64.getEncoder().encodeToString(cells.toByteArray());
+        StringBuilder result=new StringBuilder(minX+","+minZ+","+width+","+height
+            +","+topY+";"+Base64.getEncoder().encodeToString(cells.toByteArray()));
+        for(BlockPos p:markers)result.append(";").append(p.getX())
+            .append(",").append(p.getY()).append(",").append(p.getZ());
+        return result.toString();
     }
     public static GroupOutline decode(String encoded){
         if(encoded==null||encoded.isBlank()||encoded.length()>15000)return null;
         try{
-            String[] parts=encoded.split(";",2);
+            String[] parts=encoded.split(";");
             String[] sizes=parts[0].split(",");
             int x=Integer.parseInt(sizes[0]),z=Integer.parseInt(sizes[1]);
             int w=Integer.parseInt(sizes[2]),h=Integer.parseInt(sizes[3]);
-            if(w<1||h<1||w>MAX_SIDE||h>MAX_SIDE||parts.length!=2)return null;
+            if(w<1||h<1||w>MAX_SIDE||h>MAX_SIDE||parts.length<2
+                ||sizes.length<5||parts.length-2>ComputerEntity.MAX_DRILLS)return null;
             BitSet bits=BitSet.valueOf(Base64.getDecoder().decode(parts[1]));
             if(bits.length()>w*h||bits.isEmpty())return null;
-            return new GroupOutline(x,z,w,h,bits);
+            int top=Integer.parseInt(sizes[4]);
+            List<BlockPos> marks=new ArrayList<>();
+            for(int i=2;i<parts.length;i++){
+                String[] c=parts[i].split(",");
+                BlockPos p=new BlockPos(Integer.parseInt(c[0]),Integer.parseInt(c[1]),
+                    Integer.parseInt(c[2]));
+                marks.add(p);
+            }
+            if(marks.isEmpty())return null;
+            GroupOutline result=new GroupOutline(x,z,w,h,bits,top,marks);
+            return result.coveredBy(marks)?result:null;
         }catch(RuntimeException ignored){return null;}
     }
     private static boolean inside(List<int[]> poly,int x,int z){
@@ -99,7 +166,7 @@ public final class GroupOutline {
             if(active)bits.set((z-loZ)*width+x-loX);
         }
         if(bits.isEmpty())return null;
-        GroupOutline result=new GroupOutline(loX,loZ,width,height,bits);
+        GroupOutline result=new GroupOutline(loX,loZ,width,height,bits,0,List.of());
         if(previous!=null&&result.count()==previous.count()){
             boolean same=true;
             for(int z=loZ;z<=hiZ&&same;z++)for(int x=loX;x<=hiX;x++)
