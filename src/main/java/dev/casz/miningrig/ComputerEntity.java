@@ -386,11 +386,16 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         if(!(level instanceof ServerLevel world))return false;
         for(int m=0;m<groupTokens.size();m++){
             int slot=groupSlot(m);
-            if(slot<0||!running[slot]||positions[slot]==null
+            if(slot<0||positions[slot]==null
                     ||!world.hasChunkAt(positions[slot]))return false;
             if(!(world.getBlockEntity(positions[slot]) instanceof DrillEntity member)
-                    ||!member.matchesLink(tokens[slot])
-                    ||!member.groupSealedAt(layer))return false;
+                    ||!member.matchesLink(tokens[slot]))return false;
+            // A quicker partner may have already finished and moved to the
+            // next layer (or completed the whole task). It has necessarily
+            // passed this layer's preparation barrier.
+            if(member.completedLayers()>layer
+                    &&(running[slot]||statuses[slot]==Status.DONE))continue;
+            if(!running[slot]||!member.groupSealedAt(layer))return false;
         }
         return true;
     }
