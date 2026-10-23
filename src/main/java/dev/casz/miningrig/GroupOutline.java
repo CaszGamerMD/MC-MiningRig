@@ -159,7 +159,7 @@ public final class GroupOutline {
             boolean painted=inside(vertices,x,z);
             boolean before=previous!=null&&previous.has(x,z);
             boolean active=switch(operation){
-                case REPLACE->painted;
+                case REPLACE,GROUP->painted;
                 case ADD->before||painted;
                 case CUT->before&&!painted;
             };
