@@ -65,7 +65,7 @@ public final class ChalkOutline {
     }
 
     /** The chalk has independent replace, additive, and subtractive contour modes. */
-    public enum Operation { REPLACE, ADD, CUT }
+    public enum Operation { REPLACE, ADD, CUT, GROUP }
 
     /** Existing single-polygon behavior, retained for existing callers. */
     public static ChalkOutline create(List<BlockPos> marks, DrillEntity drill, Direction face) {
