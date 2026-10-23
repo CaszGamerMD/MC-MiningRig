@@ -38,43 +38,70 @@ public final class GroupOutline {
         for(int i=0;i<markers.size();i++){
             BlockPos p=markers.get(i);
             int dx=Math.abs(p.getX()-x),dz=Math.abs(p.getZ()-z);
-            if(dx>ComputerEntity.MAX_RADIUS+1||dz>ComputerEntity.MAX_RADIUS+1)continue;
+            // Interior cells can only be assigned to a drill capable of
+            // reaching them. The one-block exterior ring can reach radius+1.
+            int reach=has(x,z)?ComputerEntity.MAX_RADIUS
+                :ComputerEntity.MAX_RADIUS+1;
+            if(dx>reach||dz>reach)continue;
             long distance=(long)dx*dx+(long)dz*dz;
             if(distance<nearest){nearest=distance;winner=i;}
         }
         return winner;
     }
-    /** Plan one marker for every needed 41x41 coverage area, accounting for
-     * irregular boundaries. Each marker is a tip block directly above chalk.
-     * No new chunks are loaded and plans exceeding sixteen drills are refused. */
+    /**
+     * Repeated maximum-new-coverage planner. Every potential tip must be
+     * inside the marked hole. Each iteration picks the one 41x41-square
+     * footprint that covers the most STILL-uncovered excavation cells.
+     *
+     * Unlike the former row-scan heuristic (which pushed heads toward the
+     * same corner), this prioritizes large, distinct work zones and avoids
+     * almost-touching markers. A summed-area table keeps each selection
+     * O(width * height) even for the full 256x256 mask.
+     */
     public GroupOutline plan(int tipY){
+        int radius=ComputerEntity.MAX_RADIUS;
+        int stride=width+1;
+        int[] prefix=new int[(width+1)*(height+1)];
+        BitSet remaining=(BitSet)cells.clone();
+        int left=count;
         List<BlockPos> planned=new ArrayList<>();
-        for(int z=minZ;z<minZ+height;z++)for(int x=minX;x<minX+width;x++){
-            if(!has(x,z))continue;
-            boolean covered=false;
-            for(BlockPos p:planned)
-                if(Math.abs(p.getX()-x)<=ComputerEntity.MAX_RADIUS
-                    &&Math.abs(p.getZ()-z)<=ComputerEntity.MAX_RADIUS){
-                    covered=true;break;
+        while(left>0){
+            for(int z=0;z<height;z++){
+                int row=0;
+                for(int x=0;x<width;x++){
+                    if(remaining.get(z*width+x))row++;
+                    prefix[(z+1)*stride+x+1]=prefix[z*stride+x+1]+row;
                 }
-            if(covered)continue;
-            int wantedX=Math.min(minX+width-1,x+ComputerEntity.MAX_RADIUS);
-            int wantedZ=Math.min(minZ+height-1,z+ComputerEntity.MAX_RADIUS);
-            BlockPos chosen=null;
-            long best=Long.MAX_VALUE;
-            for(int z1=Math.max(minZ,z-ComputerEntity.MAX_RADIUS);
-                    z1<=Math.min(minZ+height-1,z+ComputerEntity.MAX_RADIUS);z1++)
-                for(int x1=Math.max(minX,x-ComputerEntity.MAX_RADIUS);
-                        x1<=Math.min(minX+width-1,x+ComputerEntity.MAX_RADIUS);x1++){
-                    if(!has(x1,z1))continue;
-                    long dx=x1-wantedX,dz=z1-wantedZ,score=dx*dx+dz*dz;
-                    if(score<best){best=score;chosen=new BlockPos(x1,tipY,z1);}
+            }
+            int bestGain=0,bestX=-1,bestZ=-1;
+            long bestSpread=Long.MIN_VALUE;
+            for(int z=0;z<height;z++)for(int x=0;x<width;x++){
+                if(!cells.get(z*width+x))continue;
+                int x0=Math.max(0,x-radius),x1=Math.min(width-1,x+radius);
+                int z0=Math.max(0,z-radius),z1=Math.min(height-1,z+radius);
+                int gain=prefix[(z1+1)*stride+x1+1]-prefix[z0*stride+x1+1]
+                    -prefix[(z1+1)*stride+x0]+prefix[z0*stride+x0];
+                if(gain<bestGain||gain==0)continue;
+                long spread=Long.MAX_VALUE;
+                for(BlockPos p:planned){
+                    long dx=(long)(minX+x)-p.getX(),dz=(long)(minZ+z)-p.getZ();
+                    spread=Math.min(spread,dx*dx+dz*dz);
                 }
-            if(chosen==null)return null;
-            planned.add(chosen);
+                if(gain==bestGain && spread<=bestSpread)continue;
+                bestGain=gain;bestSpread=spread;bestX=x;bestZ=z;
+            }
+            if(bestGain==0)return null;
+            planned.add(new BlockPos(minX+bestX,tipY,minZ+bestZ));
             if(planned.size()>ComputerEntity.MAX_DRILLS)return null;
+            for(int z=Math.max(0,bestZ-radius);z<=Math.min(height-1,bestZ+radius);z++)
+                for(int x=Math.max(0,bestX-radius);x<=Math.min(width-1,bestX+radius);x++)
+                    if(remaining.get(z*width+x)){
+                        remaining.clear(z*width+x);
+                        left--;
+                    }
         }
-        return new GroupOutline(minX,minZ,width,height,cells,tipY,planned);
+        GroupOutline result=new GroupOutline(minX,minZ,width,height,cells,tipY,planned);
+        return result.coveredBy(planned)?result:null;
     }
     public int count(){return count;}
     public boolean has(int x,int z){
