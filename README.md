@@ -1,10 +1,16 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.16 — CC Organizer unified controls and safer 100-block retrieval**
+**Version 0.6.18 — Caszual Additions creative tab integration**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to sixteen drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.18 — Show all Mining Rig items in Caszual Additions creative tab
+
+- When **Caszual Additions** is installed, the Mining Rig automatically contributes **all 12 obtainable registered items** to the existing Caszual Additions **main** creative inventory page, including the Mining Computer, Mining Drill, Collection Coordinator, Mining Tablet, Target Chalk, CC Organizer and six drill bits (wood, stone, iron, gold, diamond and netherite).
+- Uses Fabric creative-tab output events keyed to `caszual_additions:main`, with no source dependency on Caszual Additions and no hard dependency in `fabric.mod.json`; Mining Rig continues to load on its own. Hidden upper machine-half blocks have no obtainable items and are intentionally omitted.
+- The same twelve items remain discoverable in Minecraft's **Redstone Blocks** creative tab for existing workflows. Item IDs, recipes, save compatibility, standalone drilling and cooperative groups remain unchanged.
 
 ## v0.6.17 — Cooperative Drilling Group (up to 16 drills)
 
