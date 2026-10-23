@@ -380,7 +380,10 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         int layer=drill.completedLayers();
         for(int m=0;m<groupTokens.size();m++){
             int slot=groupSlot(m);
-            if(slot<0||!running[slot]||positions[slot]==null)return false;
+            // A partner that already completed the FINAL layer has stopped
+            // normally; it must not strand the remaining group at the barrier.
+            if(slot<0||positions[slot]==null
+                    ||(!running[slot]&&statuses[slot]!=Status.DONE))return false;
             if(!(level instanceof ServerLevel world)
                     ||!world.hasChunkAt(positions[slot]))return false;
             if(!(world.getBlockEntity(positions[slot]) instanceof DrillEntity member)
