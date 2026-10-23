@@ -2,6 +2,7 @@ package dev.casz.miningrig;
 
 import java.util.function.Function;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityTypeBuilder;
 import net.minecraft.core.Registry;
@@ -12,6 +13,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ToolMaterial;
 import net.minecraft.world.level.block.Block;
@@ -21,6 +23,11 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 public final class MiningRig implements ModInitializer {
     public static final String ID = "miningrig";
     public static Identifier id(String path) { return Identifier.fromNamespaceAndPath(ID, path); }
+    /** Optional Caszual Additions creative page; no classes or APIs from that
+     * mod are linked, so Mining Rig remains usable on its own. */
+    private static final ResourceKey<CreativeModeTab> CASZUAL_ADDITIONS_TAB =
+        ResourceKey.create(Registries.CREATIVE_MODE_TAB,
+            Identifier.fromNamespaceAndPath("caszual_additions","main"));
 
     private static Block block(String name, Function<BlockBehaviour.Properties, Block> factory) {
         BlockItemId key = BlockItemId.create(id(name), id(name));
@@ -83,6 +90,23 @@ public final class MiningRig implements ModInitializer {
         return item(name, properties -> new DrillBit(properties, rank, speed),
                 new Item.Properties().pickaxe(material, 1.0f, -2.8f).durability(durability).enchantable(14));
     }
+    /** All twelve obtainable Mining Rig items; the upper machine halves
+     * deliberately have no item registrations and must not be listed. */
+    private static void addMiningRigCreativeItems(CreativeModeTab.Output output){
+        output.accept(COMPUTER);
+        output.accept(DRILL);
+        output.accept(COORDINATOR);
+        output.accept(CC_GUIDE);
+        output.accept(TARGET_CHALK);
+        output.accept(TABLET);
+        output.accept(WOOD_BIT);
+        output.accept(STONE_BIT);
+        output.accept(IRON_BIT);
+        output.accept(GOLD_BIT);
+        output.accept(DIAMOND_BIT);
+        output.accept(NETHERITE_BIT);
+    }
+
     @Override public void onInitialize() {
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(TargetChalkItem::tickServer);
         RigMachineSounds.initialize();
@@ -92,10 +116,14 @@ public final class MiningRig implements ModInitializer {
         TabletAccess.initialize();
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(TabletAccess::tickServer);
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(CoordinatorGuideItem::tickServer);
-        CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.REDSTONE_BLOCKS).register(tab -> {
-            tab.accept(COMPUTER); tab.accept(DRILL); tab.accept(COORDINATOR); tab.accept(CC_GUIDE); tab.accept(TARGET_CHALK); tab.accept(TABLET);
-            tab.accept(WOOD_BIT); tab.accept(STONE_BIT); tab.accept(IRON_BIT);
-            tab.accept(GOLD_BIT); tab.accept(DIAMOND_BIT); tab.accept(NETHERITE_BIT);
-        });
+        // Keep the historical Redstone entries, including standalone installs.
+        CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.REDSTONE_BLOCKS)
+            .register(MiningRig::addMiningRigCreativeItems);
+        // Add the identical set to Caszual Additions' existing creative page
+        // when that mod is loaded. Different tabs may show the same items;
+        // register this callback only once to avoid duplicate stacks IN a tab.
+        if(FabricLoader.getInstance().isModLoaded("caszual_additions"))
+            CreativeModeTabEvents.modifyOutputEvent(CASZUAL_ADDITIONS_TAB)
+                .register(MiningRig::addMiningRigCreativeItems);
     }
 }
