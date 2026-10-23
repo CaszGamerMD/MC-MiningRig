@@ -56,6 +56,15 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private int placementBit=-1;
     private BlockPos wallWorkTarget;
     public int completedLayers(){return completedLayers;}
+    /** A member is ready for the shared group layer barrier only when all
+     * local cells have been visited and no mining lane still owns a block. */
+    public boolean layerWorkDone(ComputerEntity computer,int slot){
+        int r=computer.radiusForGroupSlot(slot);
+        int edge=2*r+1;
+        if(cursor<edge*edge)return false;
+        for(int assignedIndex:assigned)if(assignedIndex>=0)return false;
+        return true;
+    }
     /** Travel direction is saved in the block state, including during motion. */
     public Direction drillingDirection(){
         BlockState state=getBlockState();
@@ -627,6 +636,10 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
             ?ComputerEntity.Status.RUNNING:ComputerEntity.Status.OUT_OF_BITS;
         if(cursor>=total){
             for(int lane=0;lane<BIT_SLOTS;lane++)if(assigned[lane]>=0)return ComputerEntity.Status.RUNNING;
+            // Group workers all finish a slice before ANY member advances.
+            // This prevents unsealed internal seams when drills run at
+            // different speeds or wait for bits, storage or fluid sealing.
+            if(!computer.mayDescend(this))return ComputerEntity.Status.RUNNING;
             return descend(world,computer);
         }
         return ComputerEntity.Status.RUNNING;
