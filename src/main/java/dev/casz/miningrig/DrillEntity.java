@@ -42,6 +42,9 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private final float[] progress=new float[BIT_SLOTS];
     private int startY, completedLayers, cursor;
     private boolean initialized, relocating, contentsDropped, layerBitsRequested;
+    /** True after this member has completed wall/fluid preparation for its
+     * current layer. Peers must also prepare before any group member cuts. */
+    private boolean groupSealed;
     private String hardwareIdentity="";
     @Nullable private BlockPos lastConnectedCoordinator;
     @Nullable private BlockPos lastConnectedPosition;
@@ -56,6 +59,9 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private int placementBit=-1;
     private BlockPos wallWorkTarget;
     public int completedLayers(){return completedLayers;}
+    public boolean groupSealedAt(int layer){
+        return groupSealed && completedLayers==layer;
+    }
     /** A member is ready for the shared group layer barrier only when all
      * local cells have been visited and no mining lane still owns a block. */
     public boolean layerWorkDone(ComputerEntity computer,int slot){
@@ -153,6 +159,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     public void resetTask(ServerLevel world){
         pauseSupply(world);
         sealing.resetForPlacement(world,worldPosition);
+        groupSealed=false;
         initialized=false;layerBitsRequested=false;startY=worldPosition.getY();
         completedLayers=0;cursor=0;workTicks=0;
         placementCharge=0;wallWorkCharge=0;
@@ -569,6 +576,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         // so the bit does not immediately break the block preventing influx.
         // Vertical drills still follow the original WALL -> FLUID -> MINING.
         sealing.setTryLimit(computer.fillAttemptLimit());
+        groupSealed=false;
         ComputerEntity.Status forward=sealing.forwardSealStep(world,this,computer);
         if(forward!=null)return forward;
         ComputerEntity.Status walls=sealing.wallStep(world,this,computer);
@@ -577,6 +585,10 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         ComputerEntity.Status fluid=sealing.fluidStep(world,this,computer);
         if(fluid!=null)return fluid==ComputerEntity.Status.RUNNING
             ?ComputerEntity.Status.FILLING:fluid;
+        groupSealed=true;
+        // An active group first builds and verifies ALL exterior walls and
+        // fluid barriers; only then may any worker cut its assigned cells.
+        if(!computer.mayExcavateGroup(this))return ComputerEntity.Status.FILLING;
         if(!initialized){startY=worldPosition.getY();initialized=true;}
         // Replace mode excavates its one-block perimeter in the Wall step.
         // Core mining ALWAYS scans the selected footprint and all requested
@@ -684,6 +696,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         // until inventory and sealing state are completely transferred.
         for(int i=0;i<SLOT_COUNT;i++)moved.items.set(i,items.get(i).copy());
         moved.initialized=true;moved.startY=startY;
+        moved.groupSealed=false;
         moved.collectionRadius=collectionRadius;
         moved.layerBitsRequested=false; // the descending drill starts a new layer
         moved.hardwareIdentity=identity();
