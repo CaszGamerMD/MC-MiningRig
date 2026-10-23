@@ -421,7 +421,9 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         return true;
     }
     private void drawGroupMarkers(ServerLevel world){
-        if(drillingGroup==null)return;
+        // Markers are a placement aid, not a permanent particle machine.
+        // Once all mandatory drill tips are registered, they disappear.
+        if(drillingGroup==null||groupPlaced()>=groupRequired())return;
         for(int i=0;i<drillingGroup.requiredDrills();i++){
             BlockPos p=drillingGroup.marker(i);
             if(!world.hasChunkAt(p))continue;
