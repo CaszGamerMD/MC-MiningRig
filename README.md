@@ -1,10 +1,18 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.18 — Caszual Additions creative tab integration**
+**Version 0.6.19 — CC Organizer screen + balanced cooperative drill placement**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to sixteen drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.19 — CC Organizer settings screen and balanced drilling groups
+
+**CC Organizer:** Sneak-right-click with the Organizer (whether pointing at a CC, terrain or air) to open its own settings screen. **Mode** selects Place or Retrieve. In Place mode, the **Distance** control chooses 1–20 blocks along the clicked CC face, and **Preview First** changes the action from single-click placement to clicking once to show a temporary particle projection and double-clicking the same CC face within 12 ticks to place it. The 3D marker persists briefly for inspection, and blocked destinations appear as smoke. When Preview First is OFF, one right-click on the existing CC face places the new CC directly at the configured distance, and the Organizer keeps that distance for the next placement. Retrieval retains its 100-block clear-line-of-sight range and hardware-first/output-second safety rules. All settings are saved on the item, not the screen. The old sneak-cycle and separate click-to-adjust-spacing controls are replaced by this UI.
+
+**Cooperative drilling groups:** The planner now repeatedly chooses the valid drill-tip location that covers the **most still-unassigned hole cells** within a 41×41 max footprint. This spreads drill heads across the hole instead of grouping them along the first scanned edge. Each of the 1–16 placement markers is inside the chalked shape, the full marked shape must be covered before the plan is accepted, and Voronoi partitioning now prevents assignment to drills outside their own reachable radius. Existing saved groups retain their previously generated marker coordinates; redraw/replan a group to receive the improved placements.
+
+**Checks:** Automated CC Organizer interaction smoke checks and Fabric 26.2 compilation; manual in-world confirmation is still important for click timing and drill distribution on irregular hole shapes.
 
 ## v0.6.18 — Show all Mining Rig items in Caszual Additions creative tab
 
