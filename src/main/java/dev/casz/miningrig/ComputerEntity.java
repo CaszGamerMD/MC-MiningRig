@@ -322,6 +322,11 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 if(world.getBlockEntity(marker) instanceof DrillEntity drill
                         &&drill.matchesLink(tokens[slot])
                         &&drill.drillingDirection()==net.minecraft.core.Direction.DOWN){
+                    // A drill previously running an independent job must
+                    // not keep its old cursor or sealed layers when enrolled.
+                    if(running[slot])stop(slot,Status.STOPPED);
+                    drill.resetTask(world);
+                    statuses[slot]=Status.READY;
                     groupTokens.set(m,tokens[slot]);
                     depths[slot]=groupDepth;
                     wallModes[slot]=groupWallMode;
