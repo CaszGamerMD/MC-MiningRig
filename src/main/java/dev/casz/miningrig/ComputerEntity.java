@@ -65,6 +65,9 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     // linked drill. Higher limits permit tall sand/gravel shafts in oceans.
     public static final int MIN_FILL_TRIES=1,MAX_FILL_TRIES=4096,DEFAULT_FILL_TRIES=24;
     private final int[] fillTries=new int[MAX_DRILLS];
+    /** One persistent world-X/Z hole, independent of any drill's moving Y. */
+    @Nullable private GroupOutline drillingGroup;
+    private final java.util.List<String> groupTokens=new java.util.ArrayList<>();
     /**
      * Persisted snapshot, not a reference to the source drill. Preserves the
      * exact copied settings even if the operator later changes the source.
@@ -274,6 +277,129 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         for(int i=0;i<MAX_DRILLS;i++)nicknames[i]="Drill "+(i+1);
     }
     public boolean belongsTo(ComputerMenu menu){return menu.computer()==this;}
+    @Nullable public GroupOutline group(){return drillingGroup;}
+    public int groupRequired(){return drillingGroup==null?0:drillingGroup.requiredDrills();}
+    public int groupPlaced(){
+        int count=0;
+        for(String token:groupTokens)if(!token.isBlank())count++;
+        return count;
+    }
+    private int groupMarker(int slot){
+        if(drillingGroup==null||slot<0||slot>=MAX_DRILLS)return -1;
+        for(int i=0;i<groupTokens.size();i++)
+            if(!groupTokens.get(i).isBlank()
+                    &&groupTokens.get(i).equals(tokens[slot]))return i;
+        return -1;
+    }
+    private int groupSlot(int marker){
+        if(marker<0||marker>=groupTokens.size())return -1;
+        String token=groupTokens.get(marker);
+        if(token.isBlank())return -1;
+        for(int i=0;i<MAX_DRILLS;i++)if(!token.isEmpty()
+                &&token.equals(tokens[i]))return i;
+        return -1;
+    }
+    private void discoverGroupMembers(ServerLevel world){
+        if(drillingGroup==null)return;
+        boolean changed=false;
+        for(int m=0;m<drillingGroup.requiredDrills();m++){
+            if(groupSlot(m)>=0)continue;
+            BlockPos marker=drillingGroup.marker(m);
+            if(!world.hasChunkAt(marker))continue;
+            for(int slot=0;slot<MAX_DRILLS;slot++){
+                if(tokens[slot].isEmpty()||positions[slot]==null
+                        ||!positions[slot].equals(marker))continue;
+                if(groupMarker(slot)>=0)continue;
+                if(world.getBlockEntity(marker) instanceof DrillEntity drill
+                        &&drill.matchesLink(tokens[slot])
+                        &&drill.drillingDirection()==net.minecraft.core.Direction.DOWN){
+                    groupTokens.set(m,tokens[slot]);
+                    depths[slot]=depths[selected];
+                    wallModes[slot]=wallModes[selected];
+                    fillTries[slot]=fillTries[selected];
+                    outlines[slot]=null;
+                    changed=true;break;
+                }
+            }
+        }
+        if(changed)setChanged();
+    }
+    /** A polygon saved before any drill is placed. Once planned, the markers
+     * always designate the expected drill TIP position, above the chalk plane. */
+    public String planGroup(ServerLevel world,GroupOutline shape){
+        if(shape==null)return "Drilling Group: invalid outline.";
+        if(shape.requiredDrills()>MAX_DRILLS)return "Drilling Group: exceeds 16 drills.";
+        if(drillingGroup!=null)
+            for(String token:groupTokens)if(!token.isBlank())
+                for(int i=0;i<MAX_DRILLS;i++)if(token.equals(tokens[i])&&running[i])
+                    return "Drilling Group: stop all member drills before replanning.";
+        drillingGroup=shape;
+        groupTokens.clear();
+        for(int i=0;i<shape.requiredDrills();i++)groupTokens.add("");
+        discoverGroupMembers(world);
+        setChanged();syncIfServer();
+        return "Drilling Group planned: "+shape.count()+" blocks/layer, "
+            +shape.requiredDrills()+" drills required. Follow the glowing placement markers. "
+            +groupPlaced()+"/"+groupRequired()+" already placed.";
+    }
+    public String clearGroup(ServerLevel world){
+        for(String token:groupTokens)if(!token.isBlank())
+            for(int i=0;i<MAX_DRILLS;i++)if(token.equals(tokens[i])&&running[i])
+                return "Stop all group drills before clearing the group.";
+        drillingGroup=null;groupTokens.clear();setChanged();syncIfServer();
+        return "Drilling Group removed; individual drill footprints restored.";
+    }
+    public int groupDepth(){return drillingGroup==null?0:depths[selected];}
+    /** Ownership is nearest planned marker, NOT nearest present drill.
+     * This guarantees stable, nonoverlapping excavation even across unloads. */
+    public boolean groupContains(int u,int v,boolean expanded){
+        int marker=groupMarker(activeSlot);
+        if(marker<0||drillingGroup==null||positions[activeSlot]==null)return false;
+        BlockPos head=positions[activeSlot];
+        int x=head.getX()+u,z=head.getZ()+v;
+        return drillingGroup.contains(x,z,expanded)
+            &&drillingGroup.owner(x,z)==marker;
+    }
+    public boolean groupedActiveSlot(){return groupMarker(activeSlot)>=0;}
+    /** One layer barrier: workers never drill the next slice ahead of their
+     * slower partners. This holds during refill, recovery, or unloaded chunks. */
+    public boolean mayDescend(DrillEntity drill){
+        if(!groupedActiveSlot())return true;
+        int layer=drill.completedLayers();
+        for(int m=0;m<groupTokens.size();m++){
+            int slot=groupSlot(m);
+            if(slot<0||!running[slot]||positions[slot]==null)return false;
+            if(!(level instanceof ServerLevel world)
+                    ||!world.hasChunkAt(positions[slot]))return false;
+            if(!(world.getBlockEntity(positions[slot]) instanceof DrillEntity member)
+                    ||!member.matchesLink(tokens[slot]))return false;
+            if(member.completedLayers()<layer
+                    ||member.completedLayers()==layer&&!member.layerWorkDone(this,slot))
+                return false;
+        }
+        return true;
+    }
+    private void drawGroupMarkers(ServerLevel world){
+        if(drillingGroup==null)return;
+        for(int i=0;i<drillingGroup.requiredDrills();i++){
+            BlockPos p=drillingGroup.marker(i);
+            if(!world.hasChunkAt(p))continue;
+            boolean built=groupSlot(i)>=0;
+            // Vertical beacon and foot-level corners make placement markers
+            // visible without creating world entities or unbreakable blocks.
+            for(int dy=0;dy<3;dy++)world.sendParticles(
+                built?net.minecraft.core.particles.ParticleTypes.HAPPY_VILLAGER
+                    :net.minecraft.core.particles.ParticleTypes.END_ROD,
+                p.getX()+.5,p.getY()+.2+dy*.55,p.getZ()+.5,
+                1,0,0,0,0);
+            for(int dx=0;dx<=1;dx++)for(int dz=0;dz<=1;dz++)
+                world.sendParticles(built
+                        ?net.minecraft.core.particles.ParticleTypes.HAPPY_VILLAGER
+                        :net.minecraft.core.particles.ParticleTypes.FLAME,
+                    p.getX()+.1+dx*.8,p.getY()+.08,p.getZ()+.1+dz*.8,
+                    1,0,0,0,0);
+        }
+    }
     public int selected(){return selected;}
     public int selectedRadius(){return radii[selected];}
     public int selectedDepth(){return depths[selected];}
@@ -306,6 +432,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         settingsChanged();
     }
     private int footprintRadius(int slot){
+        if(groupMarker(slot)>=0)return MAX_RADIUS;
         ChalkOutline shape=outlines[slot];
         return shape==null?radii[slot]:shape.radius();
     }
@@ -359,6 +486,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public int depth(){return depths[activeSlot];}
     public boolean circle(){return circles[activeSlot];}
     public boolean contains(int x,int z){
+        if(groupedActiveSlot())return groupContains(x,z,false);
         ChalkOutline shape=outline();
         if(shape!=null)return shape.has(x,z);
         int r=radius();
@@ -595,6 +723,10 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         out.append('\n').append("ALERT").append('\t').append(activeAlert()?"1":"0");
         out.append('\n').append("CLIPBOARD").append('\t')
             .append(clipboard==null?"-1":clipboard.sourceSlot());
+        out.append('\n').append("GROUP").append('\t').append(groupRequired())
+            .append('\t').append(groupPlaced())
+            .append('\t').append(drillingGroup==null?0:drillingGroup.count())
+            .append('\t').append(groupDepth());
         out.append(RigStorageMonitor.snapshot(server,this));
         return out.toString();
     }
@@ -605,7 +737,11 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         // the space is clear, without overwriting a player-built block.
         if(now%20==0 && server.getBlockState(pos.above()).isAir())
             server.setBlock(pos.above(),MiningRig.COMPUTER_UPPER.defaultBlockState(),Block.UPDATE_ALL);
-        if(now%20==0)computer.autoDiscover(server);
+        if(now%20==0){
+            computer.autoDiscover(server);
+            computer.discoverGroupMembers(server);
+            computer.drawGroupMarkers(server);
+        }
         computer.syncActiveChunks(server);
         if(now%60==0&&computer.activeAlert())RigMachineSounds.problem(server,pos);
         // A halted drill recovers automatically once the exact failed block
@@ -717,6 +853,10 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     @Override protected void saveAdditional(ValueOutput out){
         super.saveAdditional(out);
         out.putInt("Selected",selected);
+        if(drillingGroup!=null){
+            out.putString("DrillingGroup",drillingGroup.encode());
+            for(int i=0;i<groupTokens.size();i++)out.putString("GroupMember"+i,groupTokens.get(i));
+        }
         if(tabletId!=null)out.putString("TabletIdentity",tabletId);
         out.putLong("AlertSerial",alertSerial);
         out.putLong("MutedSerial",mutedAlertSerial);
@@ -771,6 +911,11 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         for(int j=0;j<Math.min(256,in.getIntOr("IgnoredDrills",0));j++)
             ignoredDrills.add(in.getStringOr("IgnoredDrill"+j,""));
         selected=Math.max(0,Math.min(MAX_DRILLS-1,in.getIntOr("Selected",0)));
+        drillingGroup=GroupOutline.decode(in.getStringOr("DrillingGroup",""));
+        groupTokens.clear();
+        if(drillingGroup!=null)
+            for(int i=0;i<drillingGroup.requiredDrills();i++)
+                groupTokens.add(in.getStringOr("GroupMember"+i,""));
         activeSlot=selected;
         repair.load(in);
         for(int i=0;i<MAX_DRILLS;i++){
