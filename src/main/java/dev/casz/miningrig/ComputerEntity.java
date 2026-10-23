@@ -373,6 +373,22 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             &&drillingGroup.owner(x,z)==marker;
     }
     public boolean groupedActiveSlot(){return groupMarker(activeSlot)>=0;}
+    /** Finish every member's outer-wall and fluid work before anybody mines
+     * the shared interior. This is the shared-hole PREPARATION barrier. */
+    public boolean mayExcavateGroup(DrillEntity drill){
+        if(!groupedActiveSlot())return true;
+        int layer=drill.completedLayers();
+        if(!(level instanceof ServerLevel world))return false;
+        for(int m=0;m<groupTokens.size();m++){
+            int slot=groupSlot(m);
+            if(slot<0||!running[slot]||positions[slot]==null
+                    ||!world.hasChunkAt(positions[slot]))return false;
+            if(!(world.getBlockEntity(positions[slot]) instanceof DrillEntity member)
+                    ||!member.matchesLink(tokens[slot])
+                    ||!member.groupSealedAt(layer))return false;
+        }
+        return true;
+    }
     /** One layer barrier: workers never drill the next slice ahead of their
      * slower partners. This holds during refill, recovery, or unloaded chunks. */
     public boolean mayDescend(DrillEntity drill){
