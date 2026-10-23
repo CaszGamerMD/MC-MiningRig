@@ -279,6 +279,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public boolean belongsTo(ComputerMenu menu){return menu.computer()==this;}
     @Nullable public GroupOutline group(){return drillingGroup;}
     public int groupRequired(){return drillingGroup==null?0:drillingGroup.requiredDrills();}
+    public int radiusForGroupSlot(int slot){return footprintRadius(slot);}
     public int groupPlaced(){
         int count=0;
         for(String token:groupTokens)if(!token.isBlank())count++;
