@@ -363,8 +363,27 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         for(String token:groupTokens)if(!token.isBlank())
             for(int i=0;i<MAX_DRILLS;i++)if(token.equals(tokens[i])&&running[i])
                 return "Stop all group drills before clearing the group.";
+        // Reset every enrolled cursor before reverting to small individual
+        // footprints; otherwise the old 41x41 cursor could skip new work.
+        for(int marker=0;marker<groupTokens.size();marker++){
+            int slot=groupSlot(marker);
+            if(slot<0||positions[slot]==null)continue;
+            if(!world.hasChunkAt(positions[slot]))
+                return "Load all group drill chunks before clearing their shared plan.";
+            if(!(world.getBlockEntity(positions[slot]) instanceof DrillEntity member)
+                    ||!member.matchesLink(tokens[slot]))
+                return "Resolve missing group drills before clearing the plan.";
+        }
+        for(int marker=0;marker<groupTokens.size();marker++){
+            int slot=groupSlot(marker);
+            if(slot<0)continue;
+            releaseDrillSupplies(slot);
+            DrillEntity member=(DrillEntity)world.getBlockEntity(positions[slot]);
+            member.resetTask(world);
+            statuses[slot]=Status.READY;
+        }
         drillingGroup=null;groupTokens.clear();setChanged();syncIfServer();
-        return "Drilling Group removed; individual drill footprints restored.";
+        return "Drilling Group removed; worker cursors safely reset for independent work.";
     }
     public int groupDepth(){return drillingGroup==null?0:groupDepth;}
     /** Ownership is nearest planned marker, NOT nearest present drill.
