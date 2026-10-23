@@ -67,6 +67,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     private final int[] fillTries=new int[MAX_DRILLS];
     /** One persistent world-X/Z hole, independent of any drill's moving Y. */
     @Nullable private GroupOutline drillingGroup;
+    private int groupDepth=12,groupWallMode,groupFillTries=DEFAULT_FILL_TRIES;
     private final java.util.List<String> groupTokens=new java.util.ArrayList<>();
     /**
      * Persisted snapshot, not a reference to the source drill. Preserves the
@@ -322,9 +323,9 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                         &&drill.matchesLink(tokens[slot])
                         &&drill.drillingDirection()==net.minecraft.core.Direction.DOWN){
                     groupTokens.set(m,tokens[slot]);
-                    depths[slot]=depths[selected];
-                    wallModes[slot]=wallModes[selected];
-                    fillTries[slot]=fillTries[selected];
+                    depths[slot]=groupDepth;
+                    wallModes[slot]=groupWallMode;
+                    fillTries[slot]=groupFillTries;
                     outlines[slot]=null;
                     changed=true;break;
                 }
@@ -342,6 +343,9 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 for(int i=0;i<MAX_DRILLS;i++)if(token.equals(tokens[i])&&running[i])
                     return "Drilling Group: stop all member drills before replanning.";
         drillingGroup=shape;
+        groupDepth=depths[selected];
+        groupWallMode=wallModes[selected];
+        groupFillTries=fillTries[selected];
         groupTokens.clear();
         for(int i=0;i<shape.requiredDrills();i++)groupTokens.add("");
         discoverGroupMembers(world);
@@ -357,7 +361,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         drillingGroup=null;groupTokens.clear();setChanged();syncIfServer();
         return "Drilling Group removed; individual drill footprints restored.";
     }
-    public int groupDepth(){return drillingGroup==null?0:depths[selected];}
+    public int groupDepth(){return drillingGroup==null?0:groupDepth;}
     /** Ownership is nearest planned marker, NOT nearest present drill.
      * This guarantees stable, nonoverlapping excavation even across unloads. */
     public boolean groupContains(int u,int v,boolean expanded){
@@ -412,6 +416,9 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     /** Changing depth or wall mode on a member updates every group worker. */
     private void syncGroupSettings(){
         if(groupMarker(selected)<0)return;
+        groupDepth=depths[selected];
+        groupWallMode=wallModes[selected];
+        groupFillTries=fillTries[selected];
         for(int i=0;i<MAX_DRILLS;i++){
             if(i==selected || groupMarker(i)<0)continue;
             if(running[i])stop(i,Status.STOPPED);
@@ -437,8 +444,10 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         int newValue=Math.max(MIN_FILL_TRIES,Math.min(MAX_FILL_TRIES,value));
         if(newValue==fillTries[selected])return;
         fillTries[selected]=newValue;
-        if(groupMarker(selected)>=0)
+        if(groupMarker(selected)>=0){
+            groupFillTries=newValue;
             for(int i=0;i<MAX_DRILLS;i++)if(groupMarker(i)>=0)fillTries[i]=newValue;
+        }
         // Adjusting a safety limit is permitted while drilling, and does
         // not reset mining progress, wall stage or reserved filler cargo.
         if(level instanceof ServerLevel server && !running[selected]
@@ -901,6 +910,9 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         out.putInt("Selected",selected);
         if(drillingGroup!=null){
             out.putString("DrillingGroup",drillingGroup.encode());
+            out.putInt("DrillingGroupDepth",groupDepth);
+            out.putInt("DrillingGroupWallMode",groupWallMode);
+            out.putInt("DrillingGroupFillTries",groupFillTries);
             for(int i=0;i<groupTokens.size();i++)out.putString("GroupMember"+i,groupTokens.get(i));
         }
         if(tabletId!=null)out.putString("TabletIdentity",tabletId);
@@ -958,6 +970,10 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             ignoredDrills.add(in.getStringOr("IgnoredDrill"+j,""));
         selected=Math.max(0,Math.min(MAX_DRILLS-1,in.getIntOr("Selected",0)));
         drillingGroup=GroupOutline.decode(in.getStringOr("DrillingGroup",""));
+        groupDepth=Math.max(1,Math.min(256,in.getIntOr("DrillingGroupDepth",12)));
+        groupWallMode=Math.max(0,Math.min(2,in.getIntOr("DrillingGroupWallMode",0)));
+        groupFillTries=Math.max(MIN_FILL_TRIES,Math.min(MAX_FILL_TRIES,
+            in.getIntOr("DrillingGroupFillTries",DEFAULT_FILL_TRIES)));
         groupTokens.clear();
         if(drillingGroup!=null)
             for(int i=0;i<drillingGroup.requiredDrills();i++)
