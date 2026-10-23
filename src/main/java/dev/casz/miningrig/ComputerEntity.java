@@ -124,6 +124,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         if(clipboard==null)return "Copy a drill's settings before pasting.";
         CopiedSettings settings=clipboard;
         int slot=selected;
+        if(groupMarker(slot)>=0)
+            return "Drill "+(slot+1)+" belongs to a shared Group. Edit its shared depth or wall mode instead.";
         String before=outlines[slot]==null?"":outlines[slot].encode();
         String after=settings.outline()==null?"":settings.outline().encode();
         boolean geometryChanged=radii[slot]!=settings.radius()
@@ -169,6 +171,11 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public void applySettings(int radius,int depth,int tries){
         if(radius<1||radius>MAX_RADIUS||depth<1||depth>256
             ||tries<MIN_FILL_TRIES||tries>MAX_FILL_TRIES)return;
+        if(groupMarker(selected)>=0){
+            if(depth!=depths[selected])setDepth(depth);
+            if(tries!=fillTries[selected])setFillAttemptLimit(tries);
+            return;
+        }
         boolean change=radius!=radii[selected]||depth!=depths[selected];
         radii[selected]=radius;depths[selected]=depth;
         if(fillTries[selected]!=tries)setFillAttemptLimit(tries);
@@ -282,7 +289,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public int radiusForGroupSlot(int slot){return footprintRadius(slot);}
     public int groupPlaced(){
         int count=0;
-        for(String token:groupTokens)if(!token.isBlank())count++;
+        for(int i=0;i<groupTokens.size();i++)if(groupSlot(i)>=0)count++;
         return count;
     }
     private int groupMarker(int slot){
@@ -402,6 +409,23 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         }
     }
     public int selected(){return selected;}
+    /** Changing depth or wall mode on a member updates every group worker. */
+    private void syncGroupSettings(){
+        if(groupMarker(selected)<0)return;
+        for(int i=0;i<MAX_DRILLS;i++){
+            if(i==selected || groupMarker(i)<0)continue;
+            if(running[i])stop(i,Status.STOPPED);
+            releaseDrillSupplies(i);
+            if(level instanceof ServerLevel world && positions[i]!=null
+                    &&world.hasChunkAt(positions[i])
+                    &&world.getBlockEntity(positions[i]) instanceof DrillEntity drill
+                    &&drill.matchesLink(tokens[i]))drill.resetTask(world);
+            depths[i]=depths[selected];
+            wallModes[i]=wallModes[selected];
+            fillTries[i]=fillTries[selected];
+            statuses[i]=Status.STOPPED;
+        }
+    }
     public int selectedRadius(){return radii[selected];}
     public int selectedDepth(){return depths[selected];}
     public boolean selectedCircle(){return circles[selected];}
@@ -413,6 +437,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         int newValue=Math.max(MIN_FILL_TRIES,Math.min(MAX_FILL_TRIES,value));
         if(newValue==fillTries[selected])return;
         fillTries[selected]=newValue;
+        if(groupMarker(selected)>=0)
+            for(int i=0;i<MAX_DRILLS;i++)if(groupMarker(i)>=0)fillTries[i]=newValue;
         // Adjusting a safety limit is permitted while drilling, and does
         // not reset mining progress, wall stage or reserved filler cargo.
         if(level instanceof ServerLevel server && !running[selected]
@@ -454,7 +480,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
      */
     public boolean installOutline(ServerLevel server,DrillEntity drill,ChalkOutline shape){
         for(int i=0;i<MAX_DRILLS;i++)
-            if(!tokens[i].isEmpty() && positions[i]!=null
+            if(!tokens[i].isEmpty() && groupMarker(i)<0 && positions[i]!=null
                     && positions[i].equals(drill.getBlockPos())
                     && drill.matchesLink(tokens[i])){
                 if(running[i])stop(i,Status.STOPPED);
@@ -496,10 +522,24 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public void select(int slot){
         if(slot>=0&&slot<MAX_DRILLS){selected=slot;activeSlot=slot;setChanged();}
     }
-    public void setRadius(int value){radii[selected]=Math.max(1,Math.min(MAX_RADIUS,value));settingsChanged();}
+    public void setRadius(int value){
+        if(groupMarker(selected)>=0)return;
+        radii[selected]=Math.max(1,Math.min(MAX_RADIUS,value));settingsChanged();
+    }
     public void setDepth(int value){depths[selected]=Math.max(1,Math.min(256,value));settingsChanged();}
-    public void setCircle(boolean value){circles[selected]=value;settingsChanged();}
+    public void setCircle(boolean value){
+        if(groupMarker(selected)>=0)return;
+        circles[selected]=value;settingsChanged();
+    }
     private void settingsChanged(){
+        if(groupMarker(selected)>=0){
+            if(running[selected])stop(selected,Status.STOPPED);
+            if(level instanceof ServerLevel world && positions[selected]!=null
+                    &&world.hasChunkAt(positions[selected])
+                    &&world.getBlockEntity(positions[selected]) instanceof DrillEntity drill
+                    &&drill.matchesLink(tokens[selected]))drill.resetTask(world);
+            syncGroupSettings();
+        }
         releaseDrillSupplies(selected);
         running[selected]=false;
         if(!tokens[selected].isEmpty())statuses[selected]=Status.STOPPED;
@@ -588,6 +628,11 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     public void toggle(){toggle(selected);}
     public void toggle(int slot){
         if(slot<0||slot>=MAX_DRILLS)return;
+        if(groupMarker(slot)>=0 && !running[slot]
+                && groupPlaced()<groupRequired()){
+            statuses[slot]=Status.WAITING;setChanged();
+            return;
+        }
         Status before=statuses[slot];
         if(running[slot]){stop(slot,Status.STOPPED);}
         else if(tokens[slot].isEmpty()||positions[slot]==null)
