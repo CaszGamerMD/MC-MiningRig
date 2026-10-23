@@ -69,6 +69,9 @@ public final class ComputerMenu extends AbstractContainerMenu {
             net.minecraft.network.chat.Component.literal(computer.copySelectedSettings()));
         else if(id==46)player.sendSystemMessage(
             net.minecraft.network.chat.Component.literal(computer.pasteSelectedSettings()));
+        else if(id==47 && computer.getLevel() instanceof net.minecraft.server.level.ServerLevel world)
+            player.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                computer.clearGroup(world)));
         else if(id>=50&&id<=53)computer.resetTask(id-50);
         else return false;
         broadcastChanges();return true;
