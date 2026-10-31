@@ -81,7 +81,7 @@ public final class ChalkOutline {
     public static ChalkOutline apply(List<BlockPos> marks, DrillEntity drill,
             Direction face, ChalkOutline previous, Operation operation) {
         Direction forward = drill.drillingDirection();
-        if (marks.size() < 3 || marks.size() > 128
+        if (marks.size() < 3 || marks.size() > TargetChalkItem.MAX_POINTS
                 || forward != face.getOpposite()) return null;
         if (operation != Operation.REPLACE && previous == null) return null;
         BlockPos origin = drill.getBlockPos();
