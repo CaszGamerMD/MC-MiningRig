@@ -161,7 +161,7 @@ public final class GroupOutline {
     }
     public static GroupOutline apply(List<BlockPos> marks,GroupOutline previous,
                                       ChalkOutline.Operation operation){
-        if(marks.size()<3||marks.size()>128
+        if(marks.size()<3||marks.size()>TargetChalkItem.MAX_POINTS
                 ||(operation!=ChalkOutline.Operation.REPLACE&&previous==null))return null;
         List<int[]> vertices=new ArrayList<>();
         int loX=Integer.MAX_VALUE,loZ=Integer.MAX_VALUE,hiX=Integer.MIN_VALUE,hiZ=Integer.MIN_VALUE;
