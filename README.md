@@ -1,10 +1,18 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.19 — CC Organizer screen + balanced cooperative drill placement**
+**Version 0.6.20 — Target Chalk Undo and 256-point outlines**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to sixteen drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.20 — Target Chalk Undo Last Point and 256-vertex outlines
+
+- **Right-click air while holding Target Chalk** (without sneaking) to open the new Target Chalk controls. The screen shows the current operation (**REPLACE, ADD, CUT, GROUP**) and a live **points / 256** counter.
+- **UNDO LAST POINT** removes exactly the most recent clicked vertex from the unfinished outline; all earlier points, their drawing plane, and the selected group computer remain unchanged. If you undo the first/only point, the draft is cleared so the next click can start a fresh plane. Undo never touches already-applied shapes or world blocks.
+- The screen also offers **FINISH OUTLINE** (enabled with at least three points), **CLEAR DRAFT** and **BACK TO DRAWING**. The mode can be changed from the screen only when no draft is active. Existing **sneak-right-click air** to finish/cycle mode and click-first-vertex-to-close shortcuts still work.
+- The maximum number of outline vertices doubles from **128 to 256** in the item NBT parser/writer, both per-drill and group polygon rasterizers, and UI/messages. Existing unfinished 128-point drawings, saved outlines and group plans continue to load without migration.
+- Every edit runs on the server, updates the held Target Chalk's persistent CustomData, and uses the existing Minecraft/Fabric menu sync. No extra items, permissions or dependency changes are required.
 
 ## v0.6.19 — CC Organizer settings screen and balanced drilling groups
 
