@@ -1,10 +1,17 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.20 — Target Chalk Undo and 256-point outlines**
+**Version 0.6.21 — Netherite Drill Bit smithing upgrade**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to sixteen drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.21 — Netherite Drill Bit now requires Smithing
+
+- The old four-Netherite-Ingot crafting-table recipe is **replaced** with the vanilla-style **smithing transform**: **Netherite Upgrade Smithing Template + Diamond Drill Bit + Netherite Ingot → Netherite Drill Bit**.
+- Minecraft's normal smithing recipe carries the Diamond Drill Bit's enchantments, custom name, wear and other carried components to the upgrade, so an enchanted diamond bit does not need to be re-enchanted. The template is consumed as with normal Netherite tools.
+- Recipes for wooden, stone, iron, gold and diamond drill bits remain unchanged. Existing Netherite Drill Bits in inventories, drills and storage remain intact; only new crafting changes.
+- The change does not yet add an independent, probabilistic enchantment-sharing station: that mechanic is being designed separately.
 
 ## v0.6.20 — Target Chalk Undo Last Point and 256-vertex outlines
 
