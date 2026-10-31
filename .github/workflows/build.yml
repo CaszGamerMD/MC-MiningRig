@@ -20,6 +20,8 @@ jobs:
           gradle-version: '9.7.0'
       - name: Check CC Organizer mode/selection/retrieval control routing
         run: python3 scripts/cc_organizer_control_smoke.py
+      - name: Check Target Chalk undo UI and 256-point outlines
+        run: python3 scripts/target_chalk_editor_smoke.py
       - run: gradle build --stacktrace
       - uses: actions/upload-artifact@v4
         if: success()
