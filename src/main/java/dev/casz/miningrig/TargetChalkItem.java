@@ -9,6 +9,8 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -25,16 +27,16 @@ import net.minecraft.world.level.Level;
  * Never changes or breaks the clicked world blocks.
  */
 public final class TargetChalkItem extends Item {
-    private static final int MAX_POINTS=128;
+    public static final int MAX_POINTS=256;
     public TargetChalkItem(Properties properties){super(properties);}
 
-    private static ChalkOutline.Operation operation(ItemStack chalk){
+    public static ChalkOutline.Operation operation(ItemStack chalk){
         CustomData custom=chalk.get(DataComponents.CUSTOM_DATA);
         String stored=custom==null?"REPLACE":custom.copyTag().getStringOr("ChalkMode","REPLACE");
         try{return ChalkOutline.Operation.valueOf(stored);}
         catch(IllegalArgumentException ignored){return ChalkOutline.Operation.REPLACE;}
     }
-    private static void cycleOperation(ItemStack chalk,Player player){
+    public static void cycleOperation(ItemStack chalk,Player player){
         ChalkOutline.Operation previous=operation(chalk);
         ChalkOutline.Operation[] modes=ChalkOutline.Operation.values();
         ChalkOutline.Operation next=modes[(previous.ordinal()+1)%modes.length];
@@ -114,6 +116,66 @@ public final class TargetChalkItem extends Item {
         }
         chalk.set(DataComponents.CUSTOM_DATA,CustomData.of(tag));
     }
+    /** Editing the held sketch never changes an already-installed drill mask,
+     * the owning computer, or any placed blocks. The draft is stored on the
+     * exact Target Chalk stack and survives saves/reloads. */
+    public static int pointCount(ItemStack chalk){
+        Drawing drawing=read(chalk);
+        return drawing==null?0:drawing.points().size();
+    }
+    public static boolean undoLastPoint(ServerLevel world,Player player,ItemStack chalk){
+        Drawing draft=read(chalk);
+        if(draft==null){
+            say(player,"Target Chalk: no points to undo.");
+            return false;
+        }
+        if(!draft.dimension().equals(dimension(world))){
+            say(player,"Target Chalk: this outline belongs to another dimension.");
+            return false;
+        }
+        List<BlockPos> remaining=new ArrayList<>(draft.points());
+        BlockPos removed=remaining.remove(remaining.size()-1);
+        // With zero points there is no active draft. A new click chooses a
+        // fresh drawing plane, allowing the player to correct the first mark.
+        save(chalk,remaining.isEmpty()?null
+            :new Drawing(draft.dimension(),draft.face(),draft.plane(),remaining));
+        say(player,"Target Chalk: undone "+removed.toShortString()
+            +". "+remaining.size()+"/"+MAX_POINTS+" points remain.");
+        return true;
+    }
+    public static boolean clearDraft(ServerLevel world,Player player,ItemStack chalk){
+        Drawing draft=read(chalk);
+        if(draft==null){
+            say(player,"Target Chalk: no unfinished outline to clear.");
+            return false;
+        }
+        if(!draft.dimension().equals(dimension(world))){
+            say(player,"Target Chalk: draft is in another dimension.");
+            return false;
+        }
+        save(chalk,null);
+        say(player,"Target Chalk: erased the unfinished "+draft.points().size()+"-point outline.");
+        return true;
+    }
+    public static boolean finishDraft(ServerLevel world,Player player,ItemStack chalk){
+        Drawing draft=read(chalk);
+        if(draft==null||draft.points().size()<3){
+            say(player,"Target Chalk: at least three points are required to finish.");
+            return false;
+        }
+        if(!draft.dimension().equals(dimension(world))){
+            say(player,"Target Chalk: outline is in another dimension.");
+            return false;
+        }
+        return finish(world,player,chalk,draft)==InteractionResult.SUCCESS
+            && read(chalk)==null;
+    }
+    private static void openControls(Player player,InteractionHand hand){
+        if(player instanceof ServerPlayer)
+            player.openMenu(new SimpleMenuProvider(
+                (id,inventory,owner)->new ChalkMenu(id,inventory,hand),
+                Component.literal("TARGET CHALK")));
+    }
     private static void stroke(ServerLevel world,BlockPos first,BlockPos second,Direction face) {
         double dx=second.getX()-first.getX(),dy=second.getY()-first.getY(),
             dz=second.getZ()-first.getZ();
@@ -180,7 +242,7 @@ public final class TargetChalkItem extends Item {
             return InteractionResult.SUCCESS;
         }
         if(points.size()>=MAX_POINTS){
-            say(player,"Target Chalk: maximum 128 points. Sneak-use to finish.");
+            say(player,"Target Chalk: maximum "+MAX_POINTS+" points. Open controls to undo or finish.");
             return InteractionResult.SUCCESS;
         }
         if(!points.isEmpty())stroke(world,points.get(points.size()-1),clicked,face);
@@ -188,7 +250,8 @@ public final class TargetChalkItem extends Item {
         points.add(clicked.immutable());
         save(chalk,draft);
         say(player,"Target Chalk ["+operation(chalk)+"]: "+points.size()
-            +" points. Click the first point again or sneak-right-click air to finish.");
+            +"/"+MAX_POINTS+" points. Click the first point again, sneak-use air to finish, "
+            +"or right-click air for Undo / Finish / Clear controls.");
         return InteractionResult.SUCCESS;
     }
     @Override public InteractionResult useOn(UseOnContext context){
@@ -203,14 +266,12 @@ public final class TargetChalkItem extends Item {
         Drawing draft=read(chalk);
         if(draft==null){
             if(player.isShiftKeyDown())cycleOperation(chalk,player);
-            else say(player,"Target Chalk ["+operation(chalk)
-                +"]: right-click corners on the ground or wall. Close at the first mark. "
-                +"Sneak-use AIR to change REPLACE / ADD / CUT / GROUP.");
+            else openControls(player,hand);
         }else if(player.isShiftKeyDown()){
             if(draft.points().size()>=3)finish(world,player,chalk,draft);
             else{save(chalk,null);say(player,"Target Chalk: incomplete draft erased.");}
         }else{
-            say(player,"Target Chalk: "+draft.points().size()+" points. Sneak-right-click air to close.");
+            openControls(player,hand);
         }
         return InteractionResult.SUCCESS;
     }
