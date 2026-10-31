@@ -14,5 +14,7 @@ public final class RigMenus {
             MiningRig.id("coordinator_menu"),new MenuType<>(CoordinatorMenu::new,FeatureFlagSet.of()));
     public static final MenuType<OrganizerMenu> ORGANIZER = Registry.register(BuiltInRegistries.MENU,
             MiningRig.id("organizer_menu"),new MenuType<>(OrganizerMenu::new,FeatureFlagSet.of()));
+    public static final MenuType<ChalkMenu> TARGET_CHALK = Registry.register(BuiltInRegistries.MENU,
+            MiningRig.id("chalk_menu"),new MenuType<>(ChalkMenu::new,FeatureFlagSet.of()));
     public static void initialize() { }
 }
