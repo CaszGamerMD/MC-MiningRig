@@ -69,6 +69,14 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     @Nullable private GroupOutline drillingGroup;
     private int groupDepth=12,groupWallMode,groupFillTries=DEFAULT_FILL_TRIES;
     private final java.util.List<String> groupTokens=new java.util.ArrayList<>();
+    /** Round-robin scheduling starts where the previous tick stopped.
+     * Only four expensive mine/seal steps run per tick for large crews.
+     * Other workers retain their state and keep their chunks loaded. */
+    private int workCursor;
+    private static final int HEAVY_CREW_THRESHOLD=8;
+    private static final int HEAVY_CREW_STEPS_PER_TICK=4;
+    private static final int MEDIUM_CREW_THRESHOLD=5;
+    private static final int MEDIUM_CREW_STEPS_PER_TICK=5;
     /**
      * Persisted snapshot, not a reference to the source drill. Preserves the
      * exact copied settings even if the operator later changes the source.
@@ -847,7 +855,11 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             computer.discoverGroupMembers(server);
             computer.drawGroupMarkers(server);
         }
-        computer.syncActiveChunks(server);
+        // The old implementation rebuilt and re-synced the ENTIRE CC
+        // graph + every 41x41 drill footprint TWICE per server tick. Chunk
+        // coverage changes on start/stop immediately through syncIfServer(),
+        // and while running it only needs a periodic refresh (10 ticks).
+        if(now%10==0)computer.syncActiveChunks(server);
         if(now%60==0&&computer.activeAlert())RigMachineSounds.problem(server,pos);
         // A halted drill recovers automatically once the exact failed block
         // becomes permanently solid; do not require unlinking or replacing it.
@@ -864,8 +876,19 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 computer.setChanged();
             }
         }
-        for(int i=0;i<MAX_DRILLS;i++){
+        int activeWorkers=0;
+        for(boolean active:computer.running)if(active)activeWorkers++;
+        int workBudget=activeWorkers>=HEAVY_CREW_THRESHOLD
+            ?HEAVY_CREW_STEPS_PER_TICK
+            :activeWorkers>=MEDIUM_CREW_THRESHOLD
+                ?MEDIUM_CREW_STEPS_PER_TICK:MAX_DRILLS;
+        int first=computer.workCursor,scanned=0,workDone=0;
+        // Rotating, bounded, deterministic worker turn allocation. Preserves
+        // group barriers and mining state; only delays a worker's next step.
+        for(;scanned<MAX_DRILLS&&workDone<workBudget;scanned++){
+            int i=(first+scanned)%MAX_DRILLS;
             if(!computer.running[i])continue;
+            workDone++;
             BlockPos drillPos=computer.positions[i];
             if(drillPos==null){computer.stop(i,Status.WAITING);continue;}
             if(!server.hasChunkAt(drillPos)){
@@ -899,7 +922,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 }
             }else computer.stop(i,result);
         }
-        computer.syncActiveChunks(server);
+        computer.workCursor=(first+Math.max(1,scanned))%MAX_DRILLS;
         if(now%10==0){
             boolean warn=false;
             for(int i=0;i<MAX_DRILLS;i++)if(computer.running[i] && computer.positions[i]!=null
@@ -928,7 +951,12 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             if(selectedPos!=null&&server.hasChunkAt(selectedPos)
                     &&server.getBlockEntity(selectedPos) instanceof DrillEntity displayed){
                 int rad=computer.radius();
+                // Each tick displays one quarter of the outline. Cycling
+                // the phase keeps all edges visible over four refreshes,
+                // without flooding players with hundreds of particles.
+                int visualPhase=(int)((now/20)%4);
                 for(int dx=-rad;dx<=rad;dx++)for(int dz=-rad;dz<=rad;dz++){
+                    if(((dx*31+dz*17)&3)!=visualPhase)continue;
                     boolean boundary=computer.contains(dx,dz)
                         &&(!computer.contains(dx+1,dz)||!computer.contains(dx-1,dz)
                             ||!computer.contains(dx,dz+1)||!computer.contains(dx,dz-1));
