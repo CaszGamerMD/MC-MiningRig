@@ -64,6 +64,51 @@ final class DrillSealing {
     private int cachedGroupRadius=-1;
     private List<BlockPos> cachedGroupCells=List.of();
     private List<BlockPos> cachedGroupRing=List.of();
+    /** Next-layer geometry is prepared incrementally while the CURRENT
+     * layer's three bits continue working. This precomputes only immutable
+     * X/Z ownership and target positions, never speculative block/fluid
+     * states (which must always be checked live). */
+    @Nullable private BlockPos nextGroupHead;
+    @Nullable private GroupOutline nextGroupOutline;
+    private int nextGroupRadius=-1,nextGroupIndex;
+    private List<BlockPos> nextGroupCells=new ArrayList<>();
+    private List<BlockPos> nextGroupRing=new ArrayList<>();
+    private static final int NEXT_LAYER_GEOMETRY_STEPS=96;
+
+    private void clearNextGroupCache(){
+        nextGroupHead=null;
+        nextGroupOutline=null;
+        nextGroupRadius=-1;
+        nextGroupIndex=0;
+        nextGroupCells=new ArrayList<>();
+        nextGroupRing=new ArrayList<>();
+    }
+
+    void precomputeNextLayer(DrillEntity drill,ComputerEntity computer){
+        if(!computer.groupedActiveSlot()
+                ||drill.drillingDirection()!=net.minecraft.core.Direction.DOWN
+                ||drill.completedLayers()+1>=computer.depth()){
+            clearNextGroupCache();
+            return;
+        }
+        BlockPos nextHead=drill.getBlockPos().below();
+        GroupOutline outline=computer.group();
+        int radius=computer.radius()+1,edge=2*radius+1,total=edge*edge;
+        if(!nextHead.equals(nextGroupHead)||nextGroupOutline!=outline
+                ||nextGroupRadius!=radius){
+            clearNextGroupCache();
+            nextGroupHead=nextHead.immutable();
+            nextGroupOutline=outline;
+            nextGroupRadius=radius;
+        }
+        for(int n=0;n<NEXT_LAYER_GEOMETRY_STEPS&&nextGroupIndex<total;n++){
+            int at=nextGroupIndex++,dx=at/edge-radius,dz=at%edge-radius;
+            if(!contains(computer,dx,dz,true))continue;
+            BlockPos target=drill.slicePosition(dx,dz).below();
+            nextGroupCells.add(target);
+            if(!contains(computer,dx,dz,false))nextGroupRing.add(target);
+        }
+    }
 
     private void invalidateGroupCache(){
         cachedGroupHead=null;
@@ -79,6 +124,17 @@ final class DrillSealing {
         int radius=computer.radius()+1;
         if(head.equals(cachedGroupHead)&&cachedGroupOutline==group
                 &&cachedGroupRadius==radius)return;
+        int span=2*radius+1;
+        if(head.equals(nextGroupHead)&&group==nextGroupOutline
+                && nextGroupRadius==radius&&nextGroupIndex==span*span){
+            cachedGroupHead=head.immutable();
+            cachedGroupOutline=group;
+            cachedGroupRadius=radius;
+            cachedGroupCells=List.copyOf(nextGroupCells);
+            cachedGroupRing=List.copyOf(nextGroupRing);
+            clearNextGroupCache();
+            return;
+        }
         List<BlockPos> cells=new ArrayList<>(),walls=new ArrayList<>();
         for(int dx=-radius;dx<=radius;dx++)
             for(int dz=-radius;dz<=radius;dz++){
@@ -336,9 +392,19 @@ final class DrillSealing {
         next.deliveryWall=deliveryWall;next.pendingSourceWalls=pendingSourceWalls;
         next.flightTicks=flightTicks;
         next.visual=visual;
+        // Carry the precomputed next-layer geometry into the relocated drill.
+        // It is inert until the new head's X/Y/Z, shape and radius all match.
+        next.nextGroupHead=nextGroupHead;
+        next.nextGroupOutline=nextGroupOutline;
+        next.nextGroupRadius=nextGroupRadius;
+        next.nextGroupIndex=nextGroupIndex;
+        next.nextGroupCells=nextGroupCells;
+        next.nextGroupRing=nextGroupRing;
+        clearNextGroupCache();
         delivery=null;deliveryTarget=null;visual=null; // ownership moves, never duplicates
     }
     void resetForPlacement(ServerLevel world,BlockPos at){
+        clearNextGroupCache();
         dropCargo(world,at);
         nextLayer();
         wallFallback=false;wallSourceChecked=false;wallFinished=false;
