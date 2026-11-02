@@ -54,6 +54,45 @@ final class DrillSealing {
     private boolean deliveryWall,pendingSourceWalls;
     private int flightTicks;
     @Nullable private Display.ItemDisplay visual;
+    /** A group member's X/Z work cells never change during a layer.
+     * Build the fully owned scan set and outside wall ring ONCE, and reuse
+     * them for every one of the drill's three-bit mining ticks. The old path
+     * walked a 43x43 square, allocated wall lists and rechecked ownership
+     * and shape for each drill on every server tick. */
+    @Nullable private BlockPos cachedGroupHead;
+    @Nullable private GroupOutline cachedGroupOutline;
+    private int cachedGroupRadius=-1;
+    private List<BlockPos> cachedGroupCells=List.of();
+    private List<BlockPos> cachedGroupRing=List.of();
+
+    private void invalidateGroupCache(){
+        cachedGroupHead=null;
+        cachedGroupOutline=null;
+        cachedGroupRadius=-1;
+        cachedGroupCells=List.of();
+        cachedGroupRing=List.of();
+    }
+    private void ensureGroupCache(DrillEntity drill,ComputerEntity computer){
+        if(!computer.groupedActiveSlot())return;
+        BlockPos head=drill.getBlockPos();
+        GroupOutline group=computer.group();
+        int radius=computer.radius()+1;
+        if(head.equals(cachedGroupHead)&&cachedGroupOutline==group
+                &&cachedGroupRadius==radius)return;
+        List<BlockPos> cells=new ArrayList<>(),walls=new ArrayList<>();
+        for(int dx=-radius;dx<=radius;dx++)
+            for(int dz=-radius;dz<=radius;dz++){
+                if(!contains(computer,dx,dz,true))continue;
+                BlockPos pos=drill.slicePosition(dx,dz);
+                cells.add(pos);
+                if(!contains(computer,dx,dz,false))walls.add(pos);
+            }
+        cachedGroupHead=head.immutable();
+        cachedGroupOutline=group;
+        cachedGroupRadius=radius;
+        cachedGroupCells=List.copyOf(cells);
+        cachedGroupRing=List.copyOf(walls);
+    }
 
     boolean warning(){return !fluidSpots.isEmpty()||!forwardSpots.isEmpty()
         ||pending!=null||cautionTicks>0;}
@@ -312,6 +351,7 @@ final class DrillSealing {
         discardVisual();
     }
     void nextLayer(){
+        invalidateGroupCache();
         fluidSpots.clear();forwardSpots.clear();finishedWalls.clear();
         pending=null;pendingGoal=null;pendingWall=false;pendingForward=false;
         wait=0;attempts=0;wallFinished=false;wallSourceChecked=false;
@@ -323,6 +363,20 @@ final class DrillSealing {
         return !drill.inSlice(pos,computer,false);
     }
     private void scanFluids(ServerLevel world,DrillEntity drill,ComputerEntity computer){
+        if(computer.groupedActiveSlot()){
+            // Read only the cells OWNED by this worker, not an entire
+            // 43x43 footprint around every one of the 13 group drills.
+            // Every owned coordinate is still checked on EVERY tick, so
+            // waterlogged blocks and newly introduced fluids cannot be skipped.
+            ensureGroupCache(drill,computer);
+            for(BlockPos p:cachedGroupCells)
+                if(world.hasChunkAt(p)&&(!world.getFluidState(p).isEmpty()
+                        ||waterloggedObstruction(world,p))){
+                    fluidSpots.add(p);
+                    cautionTicks=200;
+                }
+            return;
+        }
         int r=computer.radius()+1;
         for(int dx=-r;dx<=r;dx++)for(int dz=-r;dz<=r;dz++){
             if(!contains(computer,dx,dz,true))continue;
@@ -616,6 +670,10 @@ final class DrillSealing {
         return null;
     }
     private List<BlockPos> ring(DrillEntity drill,ComputerEntity computer){
+        if(computer.groupedActiveSlot()){
+            ensureGroupCache(drill,computer);
+            return cachedGroupRing;
+        }
         List<BlockPos> positions=new ArrayList<>();
         int r=computer.radius()+1;
         for(int dx=-r;dx<=r;dx++)for(int dz=-r;dz<=r;dz++)
