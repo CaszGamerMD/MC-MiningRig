@@ -133,6 +133,9 @@ public final class RigNetwork {
                     if(stack.isEmpty()||!isHardware(stack)
                         ||(coordinator?!stack.is(MiningRig.COORDINATOR.asItem())
                             :!(stack.getItem() instanceof DrillBit)))continue;
+                    // Nearly exhausted bits returned through CC Output must
+                    // not get reserved again as replacement hardware.
+                    if(!coordinator&&DrillEntity.bitNeedsRetirement(stack))continue;
                     if(box instanceof WorldlyContainer sided &&
                         !sided.canTakeItemThroughFace(slot,stack,face))continue;
                     List<BlockPos> route=routeBetween(world,cc,destination);
