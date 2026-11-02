@@ -17,6 +17,16 @@ public final class GroupOutline {
     private final int minX,minZ,width,height;
     private final BitSet cells;
     private final int count;
+    /**
+     * Precomputed per-cell owner and one-block exterior mask. The older
+     * groupContains() path calculated 13-16 squared distances on EVERY
+     * wall/fluid scan (and repeatedly checked all eight neighbors). This
+     * immutable cache is built once on outline creation or world load,
+     * without world/chunk access. 256x256 groups use roughly 70 KiB.
+     */
+    private final byte[] ownerCache;
+    private final BitSet expandedCells;
+    private final int cacheWidth,cacheHeight;
     private final int topY;
     private final List<BlockPos> markers;
 
@@ -26,27 +36,45 @@ public final class GroupOutline {
         this.cells=(BitSet)cells.clone();
         this.count=cells.cardinality();this.topY=topY;
         this.markers=List.copyOf(markers);
+        this.cacheWidth=width+2;this.cacheHeight=height+2;
+        this.ownerCache=new byte[cacheWidth*cacheHeight];
+        this.expandedCells=new BitSet(cacheWidth*cacheHeight);
+        // Includes a one-block ring outside the marked shape; inner holes
+        // still have their correct external boundary.
+        for(int dz=-1;dz<=height;dz++)for(int dx=-1;dx<=width;dx++){
+            int x=minX+dx,z=minZ+dz,index=(dz+1)*cacheWidth+dx+1;
+            boolean core=has(x,z);
+            boolean expanded=core;
+            if(!expanded)for(int stepX=-1;stepX<=1&&!expanded;stepX++)
+                for(int stepZ=-1;stepZ<=1&&!expanded;stepZ++)
+                    if(has(x+stepX,z+stepZ))expanded=true;
+            if(!expanded)continue;
+            expandedCells.set(index);
+            int best=-1;long nearest=Long.MAX_VALUE;
+            for(int i=0;i<markers.size();i++){
+                BlockPos p=markers.get(i);
+                int ax=Math.abs(p.getX()-x),az=Math.abs(p.getZ()-z);
+                int reach=core?ComputerEntity.MAX_RADIUS:ComputerEntity.MAX_RADIUS+1;
+                if(ax>reach||az>reach)continue;
+                long dist=(long)ax*ax+(long)az*az;
+                if(dist<nearest){nearest=dist;best=i;}
+            }
+            ownerCache[index]=(byte)(best+1); // 0=uncovered, 1..16=owner
+        }
     }
     public List<BlockPos> markers(){return markers;}
     public int topY(){return topY;}
     public int requiredDrills(){return markers.size();}
     public BlockPos marker(int n){return markers.get(n);}
-    /** Closest drill owns every inside cell and the one-block outside ring. */
+    /** O(1) world-coordinate lookup for interior and exterior group cells. */
+    private int cacheIndex(int x,int z){
+        int dx=x-minX+1,dz=z-minZ+1;
+        return dx>=0&&dz>=0&&dx<cacheWidth&&dz<cacheHeight
+            ?dz*cacheWidth+dx:-1;
+    }
     public int owner(int x,int z){
-        int winner=-1;
-        long nearest=Long.MAX_VALUE;
-        for(int i=0;i<markers.size();i++){
-            BlockPos p=markers.get(i);
-            int dx=Math.abs(p.getX()-x),dz=Math.abs(p.getZ()-z);
-            // Interior cells can only be assigned to a drill capable of
-            // reaching them. The one-block exterior ring can reach radius+1.
-            int reach=has(x,z)?ComputerEntity.MAX_RADIUS
-                :ComputerEntity.MAX_RADIUS+1;
-            if(dx>reach||dz>reach)continue;
-            long distance=(long)dx*dx+(long)dz*dz;
-            if(distance<nearest){nearest=distance;winner=i;}
-        }
-        return winner;
+        int index=cacheIndex(x,z);
+        return index<0?-1:Byte.toUnsignedInt(ownerCache[index])-1;
     }
     /**
      * Repeated maximum-new-coverage planner. Every potential tip must be
@@ -109,11 +137,9 @@ public final class GroupOutline {
             &&cells.get((z-minZ)*width+x-minX);
     }
     public boolean contains(int x,int z,boolean expanded){
-        if(has(x,z))return true;
-        if(!expanded)return false;
-        for(int dx=-1;dx<=1;dx++)for(int dz=-1;dz<=1;dz++)
-            if(has(x+dx,z+dz))return true;
-        return false;
+        if(!expanded)return has(x,z);
+        int index=cacheIndex(x,z);
+        return index>=0&&expandedCells.get(index);
     }
     public String encode(){
         StringBuilder result=new StringBuilder(minX+","+minZ+","+width+","+height
