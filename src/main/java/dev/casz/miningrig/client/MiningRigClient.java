@@ -14,6 +14,8 @@ public final class MiningRigClient implements ClientModInitializer {
         BlockEntityRenderers.register(MiningRig.COMPUTER_ENTITY, ComputerScreenRenderer::new);
         BlockEntityRenderers.register(MiningRig.DRILL_ENTITY, DrillIndicatorRenderer::new);
         MenuScreens.register(RigMenus.COMPUTER, ComputerScreen::new);
+        MenuScreens.register(RigMenus.ORGANIZER, OrganizerScreen::new);
+        MenuScreens.register(RigMenus.TARGET_CHALK, ChalkScreen::new);
         ClientPlayNetworking.registerGlobalReceiver(ComputerStatePayload.TYPE,(payload,context)->{
             context.client().execute(()->{
                 if(context.client().gui.screen() instanceof ComputerScreen screen)

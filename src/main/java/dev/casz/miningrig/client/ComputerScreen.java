@@ -27,9 +27,10 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
     private final List<String[]> storage=new ArrayList<>();
     private final List<Button> drillButtons=new ArrayList<>();
     private int selected,tab,storagePage,drillPage,clipboardSlot=-1;
+    private int groupRequired,groupPlaced,groupCells,groupDepth;
     private boolean initial=true,alert;
     private EditBox rename,radius,depth,tries;
-    private Button drillTab,networkTab,prev,next,drillPrev,drillNext;
+    private Button drillTab,networkTab,prev,next,drillPrev,drillNext,clearGroupButton;
     private int bodyTop,editorTop,uiWidth,uiHeight;
     private Button saveName,applySettings,pasteButton;
     public ComputerScreen(ComputerMenu menu,Inventory player,Component title){
@@ -96,6 +97,8 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
         drillNext=addRenderableWidget(Button.builder(Component.literal("NEXT DRILLS"),b->{
             drillPage=Math.min(DRILL_PAGES-1,drillPage+1);
         }).bounds(leftPos+120,topPos+58,100,19).build());
+        clearGroupButton=add("CLEAR GROUP",leftPos+uiWidth-114,topPos+58,
+            100,19,47,true);
         // The complete bottom toolbar fits even at a 460px GUI width.
         // Copy/paste operates on the SELECTED slot, across all four pages.
         add("RESET TASK",leftPos+14,editorTop+79,84,22,40,true);
@@ -148,6 +151,7 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
         for(Button button:drillButtons)button.visible=drilling;
         prev.visible=!drilling;next.visible=!drilling;
         drillPrev.visible=drilling;drillNext.visible=drilling;
+        clearGroupButton.visible=drilling&&groupRequired>0;
         drillPrev.active=drilling&&drillPage>0;
         drillNext.active=drilling&&drillPage<DRILL_PAGES-1;
         if(saveName!=null)saveName.visible=drilling;
@@ -184,6 +188,14 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
                 if(parts.length>=2&&parts[0].equals("ALERT"))alert=parts[1].equals("1");
                 if(parts.length>=2&&parts[0].equals("CLIPBOARD"))
                     clipboardSlot=Integer.parseInt(parts[1]);
+                if(parts.length>=5&&parts[0].equals("GROUP")){
+                    groupRequired=Integer.parseInt(parts[1]);
+                    groupPlaced=Integer.parseInt(parts[2]);
+                    groupCells=Integer.parseInt(parts[3]);
+                    groupDepth=Integer.parseInt(parts[4]);
+                    if(clearGroupButton!=null)
+                        clearGroupButton.visible=tab==0&&groupRequired>0;
+                }
                 if(parts.length>=6&&parts[0].equals("STORAGE"))
                     storage.add(Arrays.copyOf(parts,6));
             }
@@ -201,6 +213,7 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
         networkTab.setMessage(Component.literal(tab==1?"[ NETWORK STORAGE ]":"NETWORK STORAGE"));
         drillPrev.active=tab==0&&drillPage>0;
         drillNext.active=tab==0&&drillPage<DRILL_PAGES-1;
+        clearGroupButton.visible=tab==0&&groupRequired>0;
         if(pasteButton!=null)pasteButton.active=tab==0&&clipboardSlot>=0;
     }
     private static String eta(String value){
@@ -245,8 +258,11 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
         g.text(font,"DRILLS "+connected+"/"+ComputerEntity.MAX_DRILLS,
             leftPos+264,topPos+12,GREEN,false);
         if(tab==0){
-            g.text(font,"DRILL PAGE "+(drillPage+1)+"/"+DRILL_PAGES
-                +"  ("+ComputerEntity.MAX_DRILLS+" SLOTS)",leftPos+235,topPos+63,GREEN,false);
+            g.text(font,groupRequired>0
+                ?"GROUP "+groupPlaced+"/"+groupRequired+" DRILLS | "+groupCells+" CELLS"
+                :"DRILL PAGE "+(drillPage+1)+"/"+DRILL_PAGES
+                    +"  ("+ComputerEntity.MAX_DRILLS+" SLOTS)",
+                leftPos+235,topPos+63,GREEN,false);
             int rowHeight=drillRowHeight();
             for(int i=0;i<ROWS_PER_PAGE;i++){
                 int slot=drillPage*ROWS_PER_PAGE+i;
@@ -260,7 +276,9 @@ public final class ComputerScreen extends AbstractContainerScreen<ComputerMenu> 
                         +" layers   |   ETA "+eta(r[4]),
                         leftPos+16,y+27,MUTED,false);
             }
-            g.text(font,"SELECTED DRILL SETTINGS",leftPos+16,editorTop+6,GREEN,false);
+            g.text(font,groupRequired>0
+                ?"GROUP: "+groupPlaced+"/"+groupRequired+" AT MARKERS (DEPTH "+groupDepth+")"
+                :"SELECTED DRILL SETTINGS",leftPos+16,editorTop+6,GREEN,false);
             g.text(font,clipboardSlot>=0
                     ?"COPIED: DRILL "+(clipboardSlot+1):"NO COPIED SETTINGS",
                 leftPos+uiWidth-155,editorTop+6,

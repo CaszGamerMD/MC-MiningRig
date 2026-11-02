@@ -245,6 +245,8 @@ final class DrillSealing {
         if(wallFallback && RigNetwork.hasAvailable(world,drill,true))wallFallback=false;
     }
     static boolean contains(ComputerEntity computer,int x,int z,boolean expanded){
+        if(computer.groupedActiveSlot())
+            return computer.groupContains(x,z,expanded);
         ChalkOutline outline=computer.outline();
         if(outline!=null)return outline.contains(x,z,expanded);
         int r=computer.radius()+(expanded?1:0);

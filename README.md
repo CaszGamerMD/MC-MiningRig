@@ -1,10 +1,61 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.16 — CC Organizer unified controls and safer 100-block retrieval**
+**Version 0.6.22 — Large drilling-group performance and server health**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to sixteen drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.22 — Large drilling groups: server-health optimizations
+
+Designed for 8–16 simultaneous drills excavating thousands of blocks per layer. All existing drill positions, saved progress, wall modes, fluid safety and group ownership survive unchanged.
+
+- **Fair work budget:** If 8+ drills are running, at most **4 expensive drill mining/sealing steps run per server tick**; 5–7 drills use 5 steps; smaller crews retain their normal per-tick behavior. A rotating cursor distributes turns evenly, so no drill monopolizes the server or starves. Existing CC supply transport/block entities still tick normally.
+- **O(1) group ownership:** The group outline precomputes its one-block exterior ring and closest reachable worker on group creation/world load. Wall, fluid, and excavation scans no longer perform up to 16 distance checks and repeated eight-neighbor scans **for every cell each tick**. The cached area includes the full perimeter and internal hole edges, and remains immutable until group replanning.
+- **Chunk-ticket refresh:** The old two network+footprint ticket syncs **every tick** are reduced to **one every 10 ticks** while active, with immediate sync on explicit start/stop, movement and setting changes. A shared CC spine is scanned once per computer, not once per drill, keeping all loaded working chunks maintained without unnecessary rebuilds.
+- **Particle volume:** The selected-drill boundary now projects a rotating quarter of its perimeter each second; all four parts cycle without repeatedly flooding the client/server with the whole shape.
+- **Performance checks:** CI validates 13-drill scheduling fairness, owner/cache bounds and chunk sync hot-path changes. Compile/in-game testing is still necessary under stress.
+
+**What changes in practice:** Multi-drill raw blocks/second may be lower than uncapped mining, but the server has far less recurring bookkeeping and a predictable per-tick ceiling. A healthy **20 TPS** is preferred to 13 simultaneous expensive operations causing lag spikes. To compare, note server TPS/MSPT with all 13 drills running and with the job paused, plus any high-cpu CCs. Commands such as `/tick query` or a server profiler (e.g. spark) can help identify other non-drill sources.
+
+## v0.6.21 — Netherite Drill Bit now requires Smithing
+
+- The old four-Netherite-Ingot crafting-table recipe is **replaced** with the vanilla-style **smithing transform**: **Netherite Upgrade Smithing Template + Diamond Drill Bit + Netherite Ingot → Netherite Drill Bit**.
+- Minecraft's normal smithing recipe carries the Diamond Drill Bit's enchantments, custom name, wear and other carried components to the upgrade, so an enchanted diamond bit does not need to be re-enchanted. The template is consumed as with normal Netherite tools.
+- Recipes for wooden, stone, iron, gold and diamond drill bits remain unchanged. Existing Netherite Drill Bits in inventories, drills and storage remain intact; only new crafting changes.
+- The change does not yet add an independent, probabilistic enchantment-sharing station: that mechanic is being designed separately.
+
+## v0.6.20 — Target Chalk Undo Last Point and 256-vertex outlines
+
+- **Right-click air while holding Target Chalk** (without sneaking) to open the new Target Chalk controls. The screen shows the current operation (**REPLACE, ADD, CUT, GROUP**) and a live **points / 256** counter.
+- **UNDO LAST POINT** removes exactly the most recent clicked vertex from the unfinished outline; all earlier points, their drawing plane, and the selected group computer remain unchanged. If you undo the first/only point, the draft is cleared so the next click can start a fresh plane. Undo never touches already-applied shapes or world blocks.
+- The screen also offers **FINISH OUTLINE** (enabled with at least three points), **CLEAR DRAFT** and **BACK TO DRAWING**. The mode can be changed from the screen only when no draft is active. Existing **sneak-right-click air** to finish/cycle mode and click-first-vertex-to-close shortcuts still work.
+- The maximum number of outline vertices doubles from **128 to 256** in the item NBT parser/writer, both per-drill and group polygon rasterizers, and UI/messages. Existing unfinished 128-point drawings, saved outlines and group plans continue to load without migration.
+- Every edit runs on the server, updates the held Target Chalk's persistent CustomData, and uses the existing Minecraft/Fabric menu sync. No extra items, permissions or dependency changes are required.
+
+## v0.6.19 — CC Organizer settings screen and balanced drilling groups
+
+**CC Organizer:** Sneak-right-click with the Organizer (whether pointing at a CC, terrain or air) to open its own settings screen. **Mode** selects Place or Retrieve. In Place mode, the **Distance** control chooses 1–20 blocks along the clicked CC face, and **Preview First** changes the action from single-click placement to clicking once to show a temporary particle projection and double-clicking the same CC face within 12 ticks to place it. The 3D marker persists briefly for inspection, and blocked destinations appear as smoke. When Preview First is OFF, one right-click on the existing CC face places the new CC directly at the configured distance, and the Organizer keeps that distance for the next placement. Retrieval retains its 100-block clear-line-of-sight range and hardware-first/output-second safety rules. All settings are saved on the item, not the screen. The old sneak-cycle and separate click-to-adjust-spacing controls are replaced by this UI.
+
+**Cooperative drilling groups:** The planner now repeatedly chooses the valid drill-tip location that covers the **most still-unassigned hole cells** within a 41×41 max footprint. This spreads drill heads across the hole instead of grouping them along the first scanned edge. Each of the 1–16 placement markers is inside the chalked shape, the full marked shape must be covered before the plan is accepted, and Voronoi partitioning now prevents assignment to drills outside their own reachable radius. Existing saved groups retain their previously generated marker coordinates; redraw/replan a group to receive the improved placements.
+
+**Checks:** Automated CC Organizer interaction smoke checks and Fabric 26.2 compilation; manual in-world confirmation is still important for click timing and drill distribution on irregular hole shapes.
+
+## v0.6.18 — Show all Mining Rig items in Caszual Additions creative tab
+
+- When **Caszual Additions** is installed, the Mining Rig automatically contributes **all 12 obtainable registered items** to the existing Caszual Additions **main** creative inventory page, including the Mining Computer, Mining Drill, Collection Coordinator, Mining Tablet, Target Chalk, CC Organizer and six drill bits (wood, stone, iron, gold, diamond and netherite).
+- Uses Fabric creative-tab output events keyed to `caszual_additions:main`, with no source dependency on Caszual Additions and no hard dependency in `fabric.mod.json`; Mining Rig continues to load on its own. Hidden upper machine-half blocks have no obtainable items and are intentionally omitted.
+- The same twelve items remain discoverable in Minecraft's **Redstone Blocks** creative tab for existing workflows. Item IDs, recipes, save compatibility, standalone drilling and cooperative groups remain unchanged.
+
+## v0.6.17 — Cooperative Drilling Group (up to 16 drills)
+
+- A **single large hole** can be drilled by multiple downward-facing drills connected to the same Mining Computer. One persistent world-aligned Target Chalk boundary defines the shared shape, across up to 256×256 blocks, and the controller assigns each interior cell and one-block exterior wall/fluid border to exactly one drill. **No walls on internal division lines.**
+- The footprint determines how many drills are required: each head covers at most its normal 20-block X/Z radius. The group planner produces between **1 and 16 required placement markers**, or refuses an oversized group instead of silently leaving areas unmined. All required marker positions are shown with **glowing particle beacons/corner markers** (unoccupied in amber/white, paired drill in green); the exact X/Y/Z of each tip position is reported in chat.
+- **Setup:** Hold Target Chalk and sneak-right-click AIR to cycle to **GROUP**. Right-click the Mining Computer to select which machine owns the hole. Mark corners on a common top-facing plane, then close the polygon by clicking its first point or sneak-right-clicking air. Place a **downward drill tip** at each numbered marker (the drill body is one block above). Connect all drills to the same CC/computer network and use Start All. The UI shows the required and paired drill count. The group cannot start until every marker is paired.
+- Member drills receive a stable, non-overlapping slice assignment based on nearest required marker, and automatically use **one shared exterior boundary** for wall replacement, water/waterlogged detection and filler. Each group member continues using its own existing drill bit, CC supply, output and inventory logic. At the end of each layer, the group waits until all members finish before moving to the next layer.
+- Configuring group **depth or wall mode** on one member synchronizes the other group workers. Individual member radius/shape edits and pasted unrelated footprints are blocked while grouped, avoiding accidental overlapping excavation.
+- The plan survives world saves and works from the linked Mining Tablet. The computer provides a **CLEAR GROUP** control (requires all members stopped); old independent drilling is unchanged. Existing CC Organizer/target chalk modes and saves remain compatible.
+- Practical restrictions: only **downward mining** for this initial group feature; marks must lie on a shared horizontal plane; all 16 workers must be registered to the same computer. Blocks added after planning or moving already-running drills may require stopping and replanning. Live in-game testing is recommended.
 
 ## v0.6.16 — CC Organizer controls (no mixed actions)
 - **Sneak-right-click anywhere:** switch **PLACEMENT ↔ RETRIEVAL**. No simultaneous spacing adjustment, placement or recall.

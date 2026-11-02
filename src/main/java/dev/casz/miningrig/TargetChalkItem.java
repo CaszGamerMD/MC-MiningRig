@@ -9,6 +9,8 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -25,16 +27,16 @@ import net.minecraft.world.level.Level;
  * Never changes or breaks the clicked world blocks.
  */
 public final class TargetChalkItem extends Item {
-    private static final int MAX_POINTS=128;
+    public static final int MAX_POINTS=256;
     public TargetChalkItem(Properties properties){super(properties);}
 
-    private static ChalkOutline.Operation operation(ItemStack chalk){
+    public static ChalkOutline.Operation operation(ItemStack chalk){
         CustomData custom=chalk.get(DataComponents.CUSTOM_DATA);
         String stored=custom==null?"REPLACE":custom.copyTag().getStringOr("ChalkMode","REPLACE");
         try{return ChalkOutline.Operation.valueOf(stored);}
         catch(IllegalArgumentException ignored){return ChalkOutline.Operation.REPLACE;}
     }
-    private static void cycleOperation(ItemStack chalk,Player player){
+    public static void cycleOperation(ItemStack chalk,Player player){
         ChalkOutline.Operation previous=operation(chalk);
         ChalkOutline.Operation[] modes=ChalkOutline.Operation.values();
         ChalkOutline.Operation next=modes[(previous.ordinal()+1)%modes.length];
@@ -47,9 +49,27 @@ public final class TargetChalkItem extends Item {
                 case REPLACE->"draw a new enclosing outline for a drill.";
                 case ADD->"draw a second area touching the existing excavation to extend it.";
                 case CUT->"draw an interior area to leave unmined, such as the inside of a rainbow.";
+                case GROUP->"select a Mining Computer, then outline a shared hole; the drill markers are automatic.";
             });
     }
 
+    private static void selectComputer(ItemStack chalk,ServerLevel world,BlockPos pos){
+        CustomData data=chalk.get(DataComponents.CUSTOM_DATA);
+        CompoundTag tag=data==null?new CompoundTag():data.copyTag();
+        tag.putString("GroupDimension",dimension(world));
+        tag.putLong("GroupComputer",pos.asLong());
+        chalk.set(DataComponents.CUSTOM_DATA,CustomData.of(tag));
+    }
+    private static ComputerEntity selectedComputer(ItemStack chalk,ServerLevel world){
+        CustomData data=chalk.get(DataComponents.CUSTOM_DATA);
+        if(data==null)return null;
+        CompoundTag tag=data.copyTag();
+        if(!dimension(world).equals(tag.getStringOr("GroupDimension",""))
+                ||!tag.contains("GroupComputer"))return null;
+        BlockPos pos=BlockPos.of(tag.getLongOr("GroupComputer",0));
+        if(!world.hasChunkAt(pos))return null;
+        return world.getBlockEntity(pos) instanceof ComputerEntity cc?cc:null;
+    }
     private record Drawing(String dimension,Direction face,int plane,List<BlockPos> points){}
     private static String dimension(ServerLevel world) {
         return world.dimension().identifier().toString();
@@ -96,6 +116,66 @@ public final class TargetChalkItem extends Item {
         }
         chalk.set(DataComponents.CUSTOM_DATA,CustomData.of(tag));
     }
+    /** Editing the held sketch never changes an already-installed drill mask,
+     * the owning computer, or any placed blocks. The draft is stored on the
+     * exact Target Chalk stack and survives saves/reloads. */
+    public static int pointCount(ItemStack chalk){
+        Drawing drawing=read(chalk);
+        return drawing==null?0:drawing.points().size();
+    }
+    public static boolean undoLastPoint(ServerLevel world,Player player,ItemStack chalk){
+        Drawing draft=read(chalk);
+        if(draft==null){
+            say(player,"Target Chalk: no points to undo.");
+            return false;
+        }
+        if(!draft.dimension().equals(dimension(world))){
+            say(player,"Target Chalk: this outline belongs to another dimension.");
+            return false;
+        }
+        List<BlockPos> remaining=new ArrayList<>(draft.points());
+        BlockPos removed=remaining.remove(remaining.size()-1);
+        // With zero points there is no active draft. A new click chooses a
+        // fresh drawing plane, allowing the player to correct the first mark.
+        save(chalk,remaining.isEmpty()?null
+            :new Drawing(draft.dimension(),draft.face(),draft.plane(),remaining));
+        say(player,"Target Chalk: undone "+removed.toShortString()
+            +". "+remaining.size()+"/"+MAX_POINTS+" points remain.");
+        return true;
+    }
+    public static boolean clearDraft(ServerLevel world,Player player,ItemStack chalk){
+        Drawing draft=read(chalk);
+        if(draft==null){
+            say(player,"Target Chalk: no unfinished outline to clear.");
+            return false;
+        }
+        if(!draft.dimension().equals(dimension(world))){
+            say(player,"Target Chalk: draft is in another dimension.");
+            return false;
+        }
+        save(chalk,null);
+        say(player,"Target Chalk: erased the unfinished "+draft.points().size()+"-point outline.");
+        return true;
+    }
+    public static boolean finishDraft(ServerLevel world,Player player,ItemStack chalk){
+        Drawing draft=read(chalk);
+        if(draft==null||draft.points().size()<3){
+            say(player,"Target Chalk: at least three points are required to finish.");
+            return false;
+        }
+        if(!draft.dimension().equals(dimension(world))){
+            say(player,"Target Chalk: outline is in another dimension.");
+            return false;
+        }
+        return finish(world,player,chalk,draft)==InteractionResult.SUCCESS
+            && read(chalk)==null;
+    }
+    private static void openControls(Player player,InteractionHand hand){
+        if(player instanceof ServerPlayer)
+            player.openMenu(new SimpleMenuProvider(
+                (id,inventory,owner)->new ChalkMenu(id,inventory,hand),
+                Component.literal("TARGET CHALK")));
+    }
     private static void stroke(ServerLevel world,BlockPos first,BlockPos second,Direction face) {
         double dx=second.getX()-first.getX(),dy=second.getY()-first.getY(),
             dz=second.getZ()-first.getZ();
@@ -117,11 +197,33 @@ public final class TargetChalkItem extends Item {
             save(chalk,null);draft=null;
             say(player,"Target Chalk: draft cleared after changing dimensions.");
         }
+        if(operation(chalk)==ChalkOutline.Operation.GROUP && draft==null
+                && !player.isShiftKeyDown()){
+            BlockPos computerPos=clicked;
+            if(world.getBlockState(computerPos).is(MiningRig.COMPUTER_UPPER))
+                computerPos=computerPos.below();
+            if(world.getBlockEntity(computerPos) instanceof ComputerEntity){
+                selectComputer(chalk,world,computerPos);
+                say(player,"Target Chalk GROUP: selected Mining Computer "
+                    +computerPos.toShortString()+". Outline the large hole; "
+                    +"the computer will calculate and mark required drill locations.");
+                return InteractionResult.SUCCESS;
+            }
+        }
         if(player.isShiftKeyDown()){
             if(draft!=null&&draft.points().size()>=3)return finish(world,player,chalk,draft);
             if(draft!=null){save(chalk,null);say(player,"Target Chalk: incomplete outline erased.");return InteractionResult.SUCCESS;}
             if(clearAt(world,player,clicked))return InteractionResult.SUCCESS;
             say(player,"Target Chalk: no drill mask to clear. Sneak-use in AIR to switch between REPLACE, ADD and CUT modes.");
+            return InteractionResult.SUCCESS;
+        }
+        if(operation(chalk)==ChalkOutline.Operation.GROUP
+                && selectedComputer(chalk,world)==null){
+            say(player,"Target Chalk GROUP: first right-click your Mining Computer.");
+            return InteractionResult.SUCCESS;
+        }
+        if(operation(chalk)==ChalkOutline.Operation.GROUP&&face!=Direction.UP){
+            say(player,"Target Chalk GROUP: mark corners on the TOP surface of the hole.");
             return InteractionResult.SUCCESS;
         }
         if(face!=Direction.UP && face.getAxis()==Direction.Axis.Y){
@@ -140,7 +242,7 @@ public final class TargetChalkItem extends Item {
             return InteractionResult.SUCCESS;
         }
         if(points.size()>=MAX_POINTS){
-            say(player,"Target Chalk: maximum 128 points. Sneak-use to finish.");
+            say(player,"Target Chalk: maximum "+MAX_POINTS+" points. Open controls to undo or finish.");
             return InteractionResult.SUCCESS;
         }
         if(!points.isEmpty())stroke(world,points.get(points.size()-1),clicked,face);
@@ -148,7 +250,8 @@ public final class TargetChalkItem extends Item {
         points.add(clicked.immutable());
         save(chalk,draft);
         say(player,"Target Chalk ["+operation(chalk)+"]: "+points.size()
-            +" points. Click the first point again or sneak-right-click air to finish.");
+            +"/"+MAX_POINTS+" points. Click the first point again, sneak-use air to finish, "
+            +"or right-click air for Undo / Finish / Clear controls.");
         return InteractionResult.SUCCESS;
     }
     @Override public InteractionResult useOn(UseOnContext context){
@@ -163,22 +266,54 @@ public final class TargetChalkItem extends Item {
         Drawing draft=read(chalk);
         if(draft==null){
             if(player.isShiftKeyDown())cycleOperation(chalk,player);
-            else say(player,"Target Chalk ["+operation(chalk)
-                +"]: right-click corners on the ground or wall. Close at the first mark. "
-                +"Sneak-use AIR to change REPLACE / ADD / CUT.");
+            else openControls(player,hand);
         }else if(player.isShiftKeyDown()){
             if(draft.points().size()>=3)finish(world,player,chalk,draft);
             else{save(chalk,null);say(player,"Target Chalk: incomplete draft erased.");}
         }else{
-            say(player,"Target Chalk: "+draft.points().size()+" points. Sneak-right-click air to close.");
+            openControls(player,hand);
         }
         return InteractionResult.SUCCESS;
     }
 
     private static InteractionResult finish(ServerLevel world,Player player,ItemStack chalk,Drawing drawing){
         if(drawing.points().size()<3){say(player,"Target Chalk: at least three corners required.");return InteractionResult.SUCCESS;}
-        // Resolve registered, loaded drills only; no forced world-chunk scans.
         ChalkOutline.Operation mode=operation(chalk);
+        if(mode==ChalkOutline.Operation.GROUP){
+            ComputerEntity computer=selectedComputer(chalk,world);
+            if(computer==null){
+                say(player,"Target Chalk GROUP: select a loaded Mining Computer first.");
+                return InteractionResult.SUCCESS;
+            }
+            if(drawing.face()!=Direction.UP){
+                say(player,"Target Chalk GROUP: only horizontal holes are supported.");
+                return InteractionResult.SUCCESS;
+            }
+            GroupOutline raw=GroupOutline.apply(drawing.points(),null,
+                ChalkOutline.Operation.REPLACE);
+            if(raw==null){
+                say(player,"Target Chalk GROUP: invalid outline or larger than 256x256.");
+                return InteractionResult.SUCCESS;
+            }
+            GroupOutline planned=raw.plan(drawing.plane()+1);
+            if(planned==null){
+                say(player,"Target Chalk GROUP: this hole requires more than 16 drills. "
+                    +"Split the area between multiple computers.");
+                return InteractionResult.SUCCESS;
+            }
+            String result=computer.planGroup(world,planned);
+            say(player,result);
+            if(computer.group()!=planned)return InteractionResult.SUCCESS;
+            save(chalk,null);
+            List<BlockPos> marks=drawing.points();
+            stroke(world,marks.get(marks.size()-1),marks.get(0),drawing.face());
+            int n=1;
+            for(BlockPos marker:planned.markers())
+                say(player,"DRILL MARKER "+n+++"/"+planned.requiredDrills()+": "
+                    +marker.toShortString()+" (place drill TIP here, facing DOWN)");
+            return InteractionResult.SUCCESS;
+        }
+        // Resolve registered, loaded drills only; no forced world-chunk scans.
         int assigned=0,lastCells=0;
         for(DrillEntity drill:RigTopology.loadedDrills(world)){
             if(drill.drillingDirection()!=drawing.face().getOpposite())continue;
@@ -236,6 +371,10 @@ public final class TargetChalkItem extends Item {
         BlockPos at=clicked;
         if(world.getBlockState(at).is(MiningRig.COMPUTER_UPPER))at=at.below();
         if(world.getBlockEntity(at) instanceof ComputerEntity computer){
+            if(computer.group()!=null){
+                say(player,computer.clearGroup(world));
+                return true;
+            }
             if(computer.clearOutline(world,computer.selected())){
                 say(player,"Target Chalk: selected drill returned to its circle/square footprint.");
             }else say(player,"Target Chalk: selected drill has no chalk outline.");

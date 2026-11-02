@@ -9,6 +9,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -46,18 +47,60 @@ public final class CoordinatorGuideItem extends Item {
         CustomData data=tool.get(DataComponents.CUSTOM_DATA);
         return data!=null&&data.copyTag().getBooleanOr("OrganizerRetrieval",false);
     }
-    private static void toggleMode(ItemStack tool,Player player){
+    /** Item-local settings, saved to CustomData to survive inventory transfers. */
+    public static int distance(ItemStack tool){
+        CustomData data=tool.get(DataComponents.CUSTOM_DATA);
+        if(data==null)return 8;
+        CompoundTag tag=data.copyTag();
+        return Math.max(1,Math.min(MAX_DISTANCE,tag.getIntOr("OrganizerDistance",
+            tag.getIntOr("GuideDistance",8))));
+    }
+    public static boolean previewFirst(ItemStack tool){
+        CustomData data=tool.get(DataComponents.CUSTOM_DATA);
+        return data!=null&&data.copyTag().getBooleanOr("OrganizerPreviewFirst",false);
+    }
+    public static void writeOptions(ItemStack tool,boolean retrieval,int distance,boolean preview){
         CustomData data=tool.get(DataComponents.CUSTOM_DATA);
         CompoundTag tag=data==null?new CompoundTag():data.copyTag();
-        boolean retrieving=!tag.getBooleanOr("OrganizerRetrieval",false);
-        tag.putBoolean("OrganizerRetrieval",retrieving);
+        tag.putBoolean("OrganizerRetrieval",retrieval);
+        tag.putInt("OrganizerDistance",Math.max(1,Math.min(MAX_DISTANCE,distance)));
+        tag.putBoolean("OrganizerPreviewFirst",preview);
+        tag.remove("OrganizerPreviewActive");
         tool.set(DataComponents.CUSTOM_DATA,CustomData.of(tag));
-        say(player,retrieving
-            ?"CC Organizer: RETRIEVAL (100 blocks). Aim at a visible CC and right-click. "
-                +"Hardware storage first, Output if full. Sneak-right-click to switch."
-            :"CC Organizer: PLACEMENT. Right-click a CC face to select an axis; "
-                +"right-click a surface to set distance, air to place. "
-                +"Sneak-right-click to switch.");
+    }
+    private static void openSettings(Player player,InteractionHand hand){
+        if(!(player instanceof ServerPlayer))return;
+        player.openMenu(new SimpleMenuProvider(
+            (id,inv,owner)->new OrganizerMenu(id,inv,hand),
+            Component.literal("CC ORGANIZER")));
+    }
+    private static void clearPreview(ItemStack tool){
+        CustomData data=tool.get(DataComponents.CUSTOM_DATA);
+        if(data==null)return;
+        CompoundTag tag=data.copyTag();
+        tag.remove("OrganizerPreviewActive");
+        tool.set(DataComponents.CUSTOM_DATA,CustomData.of(tag));
+    }
+    private static boolean matchingPreview(ItemStack tool,Plan plan,long now){
+        CustomData data=tool.get(DataComponents.CUSTOM_DATA);
+        if(data==null)return false;
+        CompoundTag tag=data.copyTag();
+        long began=tag.getLongOr("OrganizerPreviewTick",-1);
+        return tag.getBooleanOr("OrganizerPreviewActive",false)
+            && began>=0 && now>=began && now-began<=12
+            && tag.getLongOr("OrganizerPreviewOrigin",Long.MIN_VALUE)==plan.origin().asLong()
+            && tag.getIntOr("OrganizerPreviewFace",-1)==plan.direction().get3DDataValue()
+            && tag.getStringOr("OrganizerPreviewDimension","").equals(plan.dimension());
+    }
+    private static void markPreview(ItemStack tool,Plan plan,long now){
+        CustomData data=tool.get(DataComponents.CUSTOM_DATA);
+        CompoundTag tag=data==null?new CompoundTag():data.copyTag();
+        tag.putBoolean("OrganizerPreviewActive",true);
+        tag.putLong("OrganizerPreviewTick",now);
+        tag.putLong("OrganizerPreviewOrigin",plan.origin().asLong());
+        tag.putInt("OrganizerPreviewFace",plan.direction().get3DDataValue());
+        tag.putString("OrganizerPreviewDimension",plan.dimension());
+        tool.set(DataComponents.CUSTOM_DATA,CustomData.of(tag));
     }
 
     /** Discard a placement plan if its origin was recalled. */
@@ -68,7 +111,7 @@ public final class CoordinatorGuideItem extends Item {
         if(data==null)return;
         CompoundTag tag=data.copyTag();
         for(String key:new String[]{"GuideActive","GuideDimension","GuideOrigin",
-                "GuideDirection","GuideDistance"})tag.remove(key);
+                "GuideDirection","GuideDistance","OrganizerPreviewActive"})tag.remove(key);
         tool.set(DataComponents.CUSTOM_DATA,CustomData.of(tag));
     }
 
@@ -105,86 +148,51 @@ public final class CoordinatorGuideItem extends Item {
     public static InteractionResult select(Level world,BlockPos ccPos,
             Direction outward,Player player,ItemStack tool){
         if(!(world instanceof ServerLevel server))return InteractionResult.SUCCESS;
-        // Sneak is ONLY a mode switch, even while pointing directly at a CC.
-        // Before this change it also changed spacing or recalled a CC,
-        // depending on which block/item interaction handler won the click.
         if(player.isShiftKeyDown()){
-            toggleMode(tool,player);
+            openSettings(player,player.getMainHandItem()==tool
+                ?InteractionHand.MAIN_HAND:InteractionHand.OFF_HAND);
             return InteractionResult.SUCCESS;
         }
         if(isRetrieval(tool)){
             CoordinatorRetrieval.recall(server,ccPos,player,tool,outward);
             return InteractionResult.SUCCESS;
         }
-        Plan previous=read(tool);
-        boolean same=previous!=null&&previous.origin().equals(ccPos)
-                && dimension(server).equals(previous.dimension())
-                && previous.direction()==outward;
-        int length=previous==null?1:previous.distance();
-        // Repeatedly clicking the selected CC face cycles the spacing.
-        // This is never a placement or retrieval side effect.
-        if(same)length=length%MAX_DISTANCE+1;
-        save(tool,new Plan(dimension(server),ccPos.immutable(),outward,length));
-        say(player,"CC Organizer: PLACEMENT "+ccPos.toShortString()
-            +" "+outward.getName()+" | spacing "+length+"/20. "
-            +(same?"Click this face again to cycle; ":"")
-            +"click another surface to set spacing, then right-click air to place.");
+        Plan plan=new Plan(dimension(server),ccPos.immutable(),outward,distance(tool));
+        if(previewFirst(tool)){
+            boolean confirmed=matchingPreview(tool,plan,server.getGameTime());
+            if(!confirmed){
+                save(tool,plan);
+                markPreview(tool,plan,server.getGameTime());
+                String problem=problem(server,plan);
+                say(player,"CC Organizer: PREVIEW "+plan.distance()+" blocks "+
+                    outward.getName()+" at "+
+                    ccPos.relative(outward,plan.distance()).toShortString()
+                    +(problem==null?". Double-click this CC face to place.":". "+problem));
+                return InteractionResult.SUCCESS;
+            }
+        }
+        clearPreview(tool);
+        place(server,player,tool,plan);
         return InteractionResult.SUCCESS;
     }
 
     @Override public InteractionResult useOn(UseOnContext context){
         Level world=context.getLevel();
-        BlockPos clicked=context.getClickedPos();
-        if(!(world instanceof ServerLevel server))return InteractionResult.SUCCESS;
+        if(!(world instanceof ServerLevel))return InteractionResult.SUCCESS;
         Player player=context.getPlayer();
         if(player==null)return InteractionResult.PASS;
         ItemStack tool=context.getItemInHand();
-        // Same modifier and outcome on CCs, terrain and air. Avoid consuming
-        // a placement click or recall in the same interaction as a mode switch.
         if(player.isShiftKeyDown()){
-            toggleMode(tool,player);
+            openSettings(player,context.getHand());
             return InteractionResult.SUCCESS;
         }
+        BlockPos clicked=context.getClickedPos();
         if(world.getBlockState(clicked).is(MiningRig.COORDINATOR))
             return select(world,clicked,context.getClickedFace(),player,tool);
-        if(isRetrieval(tool)){
-            say(player,"CC Organizer: RETRIEVAL. Aim at a visible CC and right-click "
-                +"(up to 100 blocks); sneak-right-click to change modes.");
-            return InteractionResult.SUCCESS;
-        }
-        Plan plan=read(tool);
-        if(plan==null){
-            say(player,"Right-click a Collection Coordinator face first.");
-            return InteractionResult.SUCCESS;
-        }
-        // Use the block the player clicked only as a distance reference.
-        // Snap the actual placement to the selected CC's exact X/Z/Y axis.
-        BlockPos aimed=clicked.relative(context.getClickedFace());
-        BlockPos origin=plan.origin();
-        Direction dir=plan.direction();
-        int dx=aimed.getX()-origin.getX(),dy=aimed.getY()-origin.getY(),
-            dz=aimed.getZ()-origin.getZ();
-        int distance=dx*dir.getStepX()+dy*dir.getStepY()+dz*dir.getStepZ();
-        if(distance<1||distance>MAX_DISTANCE){
-            say(player,"Target must be 1–20 blocks outward from the selected CC face.");
-            return InteractionResult.SUCCESS;
-        }
-        int offX=dx-distance*dir.getStepX();
-        int offY=dy-distance*dir.getStepY();
-        int offZ=dz-distance*dir.getStepZ();
-        if(Math.max(Math.abs(offX),Math.max(Math.abs(offY),Math.abs(offZ)))>4){
-            say(player,"Aim within four blocks of the guide beam, then click.");
-            return InteractionResult.SUCCESS;
-        }
-        Plan chosen=new Plan(plan.dimension(),origin,dir,distance);
-        if(!dimension(server).equals(plan.dimension())){
-            say(player,"CC Organizer: selected CC is in another dimension. Select a CC here.");
-            return InteractionResult.SUCCESS;
-        }
-        save(tool,chosen);
-        say(player,"CC Organizer: spacing set to "+distance+"/20 blocks ("
-                +dir.getName()+"). Right-click air to PLACE one CC at "
-                +origin.relative(dir,distance).toShortString()+".");
+        say(player,isRetrieval(tool)
+            ?"CC Organizer: aim at a visible CC (100-block reach) and right-click."
+            :"CC Organizer: click the FACE of an existing CC to "+
+                (previewFirst(tool)?"preview, then double-click to place.":"place immediately."));
         return InteractionResult.SUCCESS;
     }
 
@@ -192,19 +200,13 @@ public final class CoordinatorGuideItem extends Item {
         if(!(world instanceof ServerLevel server))return InteractionResult.SUCCESS;
         ItemStack tool=player.getItemInHand(hand);
         if(player.isShiftKeyDown()){
-            toggleMode(tool,player);
+            openSettings(player,hand);
             return InteractionResult.SUCCESS;
         }
-        if(isRetrieval(tool)){
-            retrieveInSight(server,player,tool);
-            return InteractionResult.SUCCESS;
-        }
-        Plan plan=read(tool);
-        if(plan==null){
-            say(player,"CC Organizer: right-click a Collection Coordinator face to select a placement axis.");
-            return InteractionResult.SUCCESS;
-        }
-        place(server,player,tool,plan);
+        if(isRetrieval(tool))retrieveInSight(server,player,tool);
+        else say(player,"CC Organizer: right-click the FACE of a CC. Distance "+
+            distance(tool)+"/20 blocks. "+
+            (previewFirst(tool)?"Double-click to confirm a preview.":"One click to place."));
         return InteractionResult.SUCCESS;
     }
 
@@ -311,33 +313,40 @@ public final class CoordinatorGuideItem extends Item {
         save(tool,new Plan(plan.dimension(),pos.immutable(),plan.direction(),plan.distance()));
     }
 
-    /** Faint axis and box preview only while holding the guide.
-     * No client mixins, network packets or chunk-force-loading required. */
+    /** Render the requested next-CC preview only after a preview-first click.
+     * Markers expire and never load terrain chunks or leave placed blocks. */
     public static void tickServer(MinecraftServer server){
         for(ServerPlayer player:server.getPlayerList().getPlayers()){
             ServerLevel world=(ServerLevel)player.level();
-            if(world.getGameTime()%15!=0)continue;
+            if(world.getGameTime()%8!=0)continue;
             ItemStack item=player.getMainHandItem().is(MiningRig.CC_GUIDE)
                 ?player.getMainHandItem():player.getOffhandItem();
-            if(!item.is(MiningRig.CC_GUIDE)||isRetrieval(item))continue;
+            if(!item.is(MiningRig.CC_GUIDE)||isRetrieval(item)||!previewFirst(item))continue;
+            CustomData data=item.get(DataComponents.CUSTOM_DATA);
+            if(data==null)continue;
+            CompoundTag tag=data.copyTag();
+            if(!tag.getBooleanOr("OrganizerPreviewActive",false))continue;
+            long age=world.getGameTime()-tag.getLongOr("OrganizerPreviewTick",0);
+            if(age<0||age>160)continue;
             Plan plan=read(item);
             if(plan==null||!dimension(world).equals(plan.dimension())
                     ||!world.hasChunkAt(plan.origin()))continue;
-            if(!(world.getBlockEntity(plan.origin()) instanceof CoordinatorEntity))continue;
             Direction dir=plan.direction();
-            for(int i=1;i<=MAX_DISTANCE;i+=2){
-                BlockPos step=plan.origin().relative(dir,i);
-                if(!world.hasChunkAt(step))break;
-                world.sendParticles(ParticleTypes.END_ROD,step.getX()+.5,
-                    step.getY()+.5,step.getZ()+.5,1,0,0,0,0);
-            }
             BlockPos target=plan.origin().relative(dir,plan.distance());
             if(!world.hasChunkAt(target))continue;
             boolean valid=problem(world,plan)==null;
+            // Project a 3D block outline exactly where the new coordinator
+            // would be placed; green denotes valid, smoke denotes blocked.
             for(int x=0;x<=1;x++)for(int y=0;y<=1;y++)for(int z=0;z<=1;z++)
                 world.sendParticles(valid?ParticleTypes.END_ROD:ParticleTypes.SMOKE,
-                    target.getX()+.12+.76*x,target.getY()+.12+.76*y,
-                    target.getZ()+.12+.76*z,1,0,0,0,0);
+                    target.getX()+.09+x*.82,target.getY()+.09+y*.82,
+                    target.getZ()+.09+z*.82,1,0,0,0,0);
+            for(int step=1;step<plan.distance();step+=3){
+                BlockPos at=plan.origin().relative(dir,step);
+                if(!world.hasChunkAt(at))break;
+                world.sendParticles(ParticleTypes.END_ROD,at.getX()+.5,
+                    at.getY()+.5,at.getZ()+.5,1,0,0,0,0);
+            }
         }
     }
 }
