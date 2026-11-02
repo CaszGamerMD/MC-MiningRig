@@ -69,14 +69,9 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     @Nullable private GroupOutline drillingGroup;
     private int groupDepth=12,groupWallMode,groupFillTries=DEFAULT_FILL_TRIES;
     private final java.util.List<String> groupTokens=new java.util.ArrayList<>();
-    /** Round-robin scheduling starts where the previous tick stopped.
-     * Only four expensive mine/seal steps run per tick for large crews.
-     * Other workers retain their state and keep their chunks loaded. */
-    private int workCursor;
-    private static final int HEAVY_CREW_THRESHOLD=8;
-    private static final int HEAVY_CREW_STEPS_PER_TICK=4;
-    private static final int MEDIUM_CREW_THRESHOLD=5;
-    private static final int MEDIUM_CREW_STEPS_PER_TICK=5;
+    // Every registered running drill executes once every server tick.
+    // Each drill has three independent mining lanes, so a 13-drill group
+    // retains the original potential 39 concurrent block operations.
     /**
      * Persisted snapshot, not a reference to the source drill. Preserves the
      * exact copied settings even if the operator later changes the source.
@@ -880,19 +875,11 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 computer.setChanged();
             }
         }
-        int activeWorkers=0;
-        for(boolean active:computer.running)if(active)activeWorkers++;
-        int workBudget=activeWorkers>=HEAVY_CREW_THRESHOLD
-            ?HEAVY_CREW_STEPS_PER_TICK
-            :activeWorkers>=MEDIUM_CREW_THRESHOLD
-                ?MEDIUM_CREW_STEPS_PER_TICK:MAX_DRILLS;
-        int first=computer.workCursor,scanned=0,workDone=0;
-        // Rotating, bounded, deterministic worker turn allocation. Preserves
-        // group barriers and mining state; only delays a worker's next step.
-        for(;scanned<MAX_DRILLS&&workDone<workBudget;scanned++){
-            int i=(first+scanned)%MAX_DRILLS;
+        // All working drills retain their full three-bit mining cadence.
+        // CPU savings must come from avoiding redundant world scans, never
+        // from skipping 9 of the player's 13 drills.
+        for(int i=0;i<MAX_DRILLS;i++){
             if(!computer.running[i])continue;
-            workDone++;
             BlockPos drillPos=computer.positions[i];
             if(drillPos==null){computer.stop(i,Status.WAITING);continue;}
             if(!server.hasChunkAt(drillPos)){
@@ -926,7 +913,6 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
                 }
             }else computer.stop(i,result);
         }
-        computer.workCursor=(first+Math.max(1,scanned))%MAX_DRILLS;
         if(now%10==0){
             boolean warn=false;
             for(int i=0;i<MAX_DRILLS;i++)if(computer.running[i] && computer.positions[i]!=null

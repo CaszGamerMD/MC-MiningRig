@@ -1,10 +1,17 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.22 — Large drilling-group performance and server health**
+**Version 0.6.23 — Full 39-bit mining throughput with cached fluid and wall scans**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to sixteen drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.23 — Restore full multi-drill throughput; retain smart performance work
+
+- **All running drills advance every server tick again.** A 13-drill crew runs 13 mining/sealing ticks, with up to **39 independent mining bit lanes** (three per drill), instead of the overly restrictive four-drill cap accidentally introduced in v0.6.22. Individual bit speed, progress, wall preparation, and per-layer group barriers are unchanged. Block breaks are conditional on hardness and supplies; 39 is the potential number of lanes, not a guaranteed number of blocks per tick.
+- **Optimized fluid and exterior wall scans instead of throttling bits:** Each group member now builds its immutable *owned per-layer scan cells* and *owned exterior wall ring* only once per layer. Each server tick continues checking **all of that worker's actual cells** for new water and waterlogged blocks, rather than rebuilding a whole 43x43 bounding area and recomputing membership for every drill. Wall passes use a cached ordered perimeter list as well. Caches invalidate when a drill descends, is reset, changes position or joins a newly planned group.
+- Retains v0.6.22's O(1) group owner/perimeter map, one CC-network/loaded-chunk sync per 10 ticks with immediate start/stop sync, and reduced selected-boundary particles.
+- CI now **fails if the old drill budget returns**, asserts three mining lanes per drill, and verifies caching and all-cells-per-tick fluid checks. This change is geared for 13 workers and a 9,000-block excavation without sacrificing the intended parallel mining rate.
 
 ## v0.6.22 — Large drilling groups: server-health optimizations
 
