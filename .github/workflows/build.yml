@@ -26,6 +26,8 @@ jobs:
         run: python3 scripts/netherite_bit_smithing_smoke.py
       - name: Check 13-drill fair scheduling and group excavation performance
         run: python3 scripts/group_mining_performance_smoke.py
+      - name: Check next-layer precomputation and lossless 3% bit retirement
+        run: python3 scripts/next_layer_and_bit_retirement_smoke.py
       - run: gradle build --stacktrace
       - uses: actions/upload-artifact@v4
         if: success()
