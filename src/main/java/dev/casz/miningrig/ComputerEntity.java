@@ -263,7 +263,9 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             RigChunkTickets.cover(desired,positions[i],footprintRadius(i)+1);
             if(server.hasChunkAt(positions[i]) &&
                 server.getBlockEntity(positions[i]) instanceof DrillEntity drill){
-                RigNetwork.includeLoadedNetwork(server,drill,desired);
+                // All paired group drills use this computer's CC
+                // component; that same graph is added ONCE below rather than
+                // rediscovered once per drill and multiplied by crew size.
                 if(drill.lastConnectedCoordinator()!=null){
                     BlockPos keep=drill.lastConnectedCoordinator();
                     desired.add(new ChunkPos(keep.getX()>>4,keep.getZ()>>4));
@@ -272,6 +274,8 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         }
         // A disconnected drill still needs the previous CC spine and the
         // Hardware source network loaded long enough to deliver a repair CC.
+        // Network topology and adjacent inventory coverage are computed once
+        // for all drills on this computer, even for a 16-worker crew.
         if(active){
             desired.add(new ChunkPos(worldPosition.getX()>>4,worldPosition.getZ()>>4));
             RigNetwork.includeLoadedCCs(server,RigTopology.network(server,this),desired);
