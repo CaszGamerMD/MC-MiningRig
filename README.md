@@ -1,10 +1,22 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.21 — Netherite Drill Bit smithing upgrade**
+**Version 0.6.22 — Large drilling-group performance and server health**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to sixteen drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.22 — Large drilling groups: server-health optimizations
+
+Designed for 8–16 simultaneous drills excavating thousands of blocks per layer. All existing drill positions, saved progress, wall modes, fluid safety and group ownership survive unchanged.
+
+- **Fair work budget:** If 8+ drills are running, at most **4 expensive drill mining/sealing steps run per server tick**; 5–7 drills use 5 steps; smaller crews retain their normal per-tick behavior. A rotating cursor distributes turns evenly, so no drill monopolizes the server or starves. Existing CC supply transport/block entities still tick normally.
+- **O(1) group ownership:** The group outline precomputes its one-block exterior ring and closest reachable worker on group creation/world load. Wall, fluid, and excavation scans no longer perform up to 16 distance checks and repeated eight-neighbor scans **for every cell each tick**. The cached area includes the full perimeter and internal hole edges, and remains immutable until group replanning.
+- **Chunk-ticket refresh:** The old two network+footprint ticket syncs **every tick** are reduced to **one every 10 ticks** while active, with immediate sync on explicit start/stop, movement and setting changes. A shared CC spine is scanned once per computer, not once per drill, keeping all loaded working chunks maintained without unnecessary rebuilds.
+- **Particle volume:** The selected-drill boundary now projects a rotating quarter of its perimeter each second; all four parts cycle without repeatedly flooding the client/server with the whole shape.
+- **Performance checks:** CI validates 13-drill scheduling fairness, owner/cache bounds and chunk sync hot-path changes. Compile/in-game testing is still necessary under stress.
+
+**What changes in practice:** Multi-drill raw blocks/second may be lower than uncapped mining, but the server has far less recurring bookkeeping and a predictable per-tick ceiling. A healthy **20 TPS** is preferred to 13 simultaneous expensive operations causing lag spikes. To compare, note server TPS/MSPT with all 13 drills running and with the job paused, plus any high-cpu CCs. Commands such as `/tick query` or a server profiler (e.g. spark) can help identify other non-drill sources.
 
 ## v0.6.21 — Netherite Drill Bit now requires Smithing
 
