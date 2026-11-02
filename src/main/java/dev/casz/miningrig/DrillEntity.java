@@ -42,6 +42,9 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private final float[] progress=new float[BIT_SLOTS];
     private int startY, completedLayers, cursor;
     private boolean initialized, relocating, contentsDropped, layerBitsRequested;
+    // Avoid traversing the entire CC graph every tick while outbound storage
+    // is full. The worn bit remains intact and cannot mine below 3% life.
+    private long nextWornBitOutputProbe;
     /** True after this member has completed wall/fluid preparation for its
      * current layer. Peers must also prepare before any group member cuts. */
     private boolean groupSealed;
@@ -161,7 +164,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         sealing.resetForPlacement(world,worldPosition);
         groupSealed=false;
         initialized=false;layerBitsRequested=false;startY=worldPosition.getY();
-        completedLayers=0;cursor=0;workTicks=0;
+        completedLayers=0;cursor=0;workTicks=0;nextWornBitOutputProbe=0;
         placementCharge=0;wallWorkCharge=0;
         placementBit=-1;wallWorkTarget=null;
         for(int i=0;i<BIT_SLOTS;i++){assigned[i]=-1;progress[i]=0;}
@@ -390,12 +393,47 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         if(ok)setChanged();
         return ok;
     }
+    /** A bit reaching 3% remaining durability is no longer usable.
+     * Long arithmetic avoids overflow and handles short-lived bit types. */
+    public static boolean bitNeedsRetirement(ItemStack bit){
+        if(!(bit.getItem() instanceof DrillBit)||!bit.isDamageableItem())return false;
+        int maximum=bit.getMaxDamage();
+        if(maximum<=0)return false;
+        return 100L*(maximum-bit.getDamageValue())<=3L*maximum;
+    }
+    private boolean hasWornBitsWaiting(){
+        for(int i=0;i<BIT_SLOTS;i++)if(bitNeedsRetirement(items.get(i)))return true;
+        return false;
+    }
+    /** Keep the EXACT enchanted/damaged item when it is handed to the CC
+     * output routing graph. Do not clear its slot until the graph accepts it.
+     * Existing CC output ports deliver it to storage with normal backpressure. */
+    private void retireWornBits(ServerLevel world){
+        long now=world.getGameTime();
+        if(now<nextWornBitOutputProbe)return;
+        for(int lane=0;lane<BIT_SLOTS;lane++){
+            ItemStack old=items.get(lane);
+            if(!bitNeedsRetirement(old))continue;
+            if(!RigNetwork.returnSurplus(world,this,old.copyWithCount(1))){
+                nextWornBitOutputProbe=now+20;
+                return; // preserve this item and try again next second
+            }
+            items.set(lane,ItemStack.EMPTY);
+            assigned[lane]=-1;
+            progress[lane]=0;
+            hardware.requestReplacement();
+            setChanged();
+        }
+        nextWornBitOutputProbe=0;
+    }
     public boolean hasWorkingBits() {
-        for(int i=0;i<BIT_SLOTS;i++)if(items.get(i).getItem() instanceof DrillBit)return true;
+        for(int i=0;i<BIT_SLOTS;i++)
+            if(items.get(i).getItem() instanceof DrillBit
+                    &&!bitNeedsRetirement(items.get(i)))return true;
         return false;
     }
     public int insertBit(ItemStack stack) {
-        if(!(stack.getItem() instanceof DrillBit))return -1;
+        if(!(stack.getItem() instanceof DrillBit)||bitNeedsRetirement(stack))return -1;
         for(int i=0;i<BIT_SLOTS;i++)if(items.get(i).isEmpty()){
             items.set(i,stack.copyWithCount(1));setChanged();return i;
         }
@@ -432,7 +470,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private int bestBit(ServerLevel world,BlockState state){
         int best=-1;float score=0;
         for(int i=0;i<BIT_SLOTS;i++)if(items.get(i).getItem() instanceof DrillBit bit
-                && bit.canMine(state)){
+                && !bitNeedsRetirement(items.get(i))&&bit.canMine(state)){
             float value=bit.miningSpeed()+enchantmentLevel(world,items.get(i),Enchantments.EFFICIENCY)*2;
             if(value>score){best=i;score=value;}
         }
@@ -469,7 +507,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
     private void damageBit(ServerLevel world,int slot,float multiplier){
         if(slot<0||slot>=BIT_SLOTS)return;
         ItemStack bit=items.get(slot);
-        if(!(bit.getItem() instanceof DrillBit))return;
+        if(!(bit.getItem() instanceof DrillBit)||bitNeedsRetirement(bit))return;
         int rolls=1+(world.getRandom().nextFloat()<(multiplier-1.0f)?1:0);
         int unbreaking=enchantmentLevel(world,bit,Enchantments.UNBREAKING);
         for(int j=0;j<rolls;j++){
@@ -546,6 +584,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         if(completedLayers>=computer.depth() ||
                 (drillingDirection()==Direction.DOWN&&worldPosition.getY()-1<world.getMinY()))
             return ComputerEntity.Status.DONE;
+        retireWornBits(world);
         if(!layerBitsRequested){
             // Exactly one missing-slot scan at the start of each layer. Supply
             // flights run independently from excavation and fluid/wall phases.
@@ -567,8 +606,9 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         // Refill supply even if the output buffer is full or all three bits
         // are on their way. Once the blockage clears, mining resumes primed.
         sealing.maintainSupply(world,this,computer);
-        if(!hasWorkingBits())return hardware.awaitingReplacement()&&!hardware.waitExpired()
-            ?ComputerEntity.Status.RUNNING:ComputerEntity.Status.OUT_OF_BITS;
+        if(!hasWorkingBits())return hasWornBitsWaiting()
+            ||hardware.awaitingReplacement()&&!hardware.waitExpired()
+                ?ComputerEntity.Status.RUNNING:ComputerEntity.Status.OUT_OF_BITS;
         if(freeStorage()==0)return ComputerEntity.Status.FULL;
         // Horizontal tunnels need a temporary forward pressure bulkhead
         // BEFORE touching their perimeter or mining the near slice. The
@@ -590,6 +630,10 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         // fluid barriers; only then may any worker cut its assigned cells.
         if(!computer.mayExcavateGroup(this))return ComputerEntity.Status.FILLING;
         if(!initialized){startY=worldPosition.getY();initialized=true;}
+        // Preparing immutable next-slice targets now prevents a sudden
+        // full-footprint geometry calculation when the drill descends.
+        // Actual block and fluid states are ALWAYS checked when reached.
+        sealing.precomputeNextLayer(this,computer);
         // Replace mode excavates its one-block perimeter in the Wall step.
         // Core mining ALWAYS scans the selected footprint and all requested
         // depth layers, regardless of wall fallback.
@@ -597,7 +641,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         int active=0;
         for(int lane=0;lane<BIT_SLOTS;lane++){
             ItemStack bit=items.get(lane);
-            if(!(bit.getItem() instanceof DrillBit drillBit)) {
+            if(!(bit.getItem() instanceof DrillBit drillBit)||bitNeedsRetirement(bit)) {
                 if(assigned[lane]>=0){cursor=Math.min(cursor,assigned[lane]);assigned[lane]=-1;}
                 progress[lane]=0;continue;
             }
@@ -644,8 +688,9 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
             }
             setChanged();
         }
-        if(active==0)return hardware.awaitingReplacement()&&!hardware.waitExpired()
-            ?ComputerEntity.Status.RUNNING:ComputerEntity.Status.OUT_OF_BITS;
+        if(active==0)return hasWornBitsWaiting()
+            ||hardware.awaitingReplacement()&&!hardware.waitExpired()
+                ?ComputerEntity.Status.RUNNING:ComputerEntity.Status.OUT_OF_BITS;
         if(cursor>=total){
             for(int lane=0;lane<BIT_SLOTS;lane++)if(assigned[lane]>=0)return ComputerEntity.Status.RUNNING;
             // Group workers all finish a slice before ANY member advances.
@@ -711,6 +756,7 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         moved.linkConfirmed=linkConfirmed;
         moved.lastControllerTick=lastControllerTick;
         moved.lastWallMode=lastWallMode;
+        moved.nextWornBitOutputProbe=nextWornBitOutputProbe;
         moved.lastCuttingAudioTick=lastCuttingAudioTick;
         moved.placementCharge=placementCharge;
         moved.placementBit=placementBit;
