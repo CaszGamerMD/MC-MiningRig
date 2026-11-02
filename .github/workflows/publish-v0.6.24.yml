@@ -1,0 +1,46 @@
+name: Publish Mining Rig v0.6.24 JAR
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-v0.6.24.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.7.0'
+      - name: Confirm release version
+        run: grep -q '^version=0.6.24$' gradle.properties
+      - name: Check incremental pre-planning and worn-bit retirement
+        run: python3 scripts/next_layer_and_bit_retirement_smoke.py
+      - name: Build Fabric 26.2 JAR
+        run: gradle build --stacktrace
+      - name: Verify standalone JAR
+        run: |
+          test -s build/libs/caszual-mining-rig-0.6.24.jar
+          unzip -t build/libs/caszual-mining-rig-0.6.24.jar | tail -1
+      - name: Publish GitHub Release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.6.24 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload v0.6.24 build/libs/caszual-mining-rig-0.6.24.jar --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create v0.6.24 build/libs/caszual-mining-rig-0.6.24.jar \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "Caszual Mining Rig v0.6.24 — Next-layer pre-planning and 3% bit retirement" \
+              --notes "Fabric Minecraft 26.2. Incremental next-layer group geometry preparation while mining, automatic lossless transfer of drill bits at <=3% durability to CC output storage with hardware replacement, and all 39 mining lanes preserved for 13 simultaneous drills. Minecraft terrain and fluids are always checked live before interaction."
+          fi

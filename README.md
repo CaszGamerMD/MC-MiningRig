@@ -1,10 +1,17 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.23 — Full 39-bit mining throughput with cached fluid and wall scans**
+**Version 0.6.24 — Next-layer pre-planning and 3% drill-bit retirement**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to sixteen drills independently**.
 
 > The in-game mod name and Gradle artifact name are **Caszual Mining Rig**. The original resource namespace `miningrig` is deliberately retained so existing saves, recipes and placed machines remain recognizable.
+
+## v0.6.24 — Prepare future work while drilling + save worn drill bits
+
+- **Next-layer geometry is planned gradually while the current layer is mined.** A grouped downward drill precomputes up to 96 static owned positions per tick for its next fluid-scan zone and exterior wall ring (zero speculative world block reads). When it descends, the completed next-layer plan is promoted instead of re-scanning its full 43×43 footprint in one tick. If a layer completes before its next plan is finished, existing safe one-time calculation remains as fallback. Every current-layer bit continues cutting each tick, and the next layer's actual blocks/fluids are checked LIVE: no stale terrain assumptions, no pre-emptive block updates, no new threads.
+- **Bit retirement at 3% durability remaining:** On active mining ticks, any bit with at most 3% of its maximum durability left is stopped and offered to the CC network's existing Output storage route. The full item (including damage, name, enchantments, metadata) transfers only when CC storage accepts it, then the drill empties that bit slot and automatically requests replacement hardware. If storage cannot accept the bit, the original bit stays intact in the drill; it is not mined with or deleted, and the drill retries the return once per second. Other healthy bit lanes continue at full speed. The Hardware input ignores nearly depleted bits so they do not get sent back as replacements.
+- **No mining throttle:** 13 group drills can still run all **39 bit lanes** every server tick, subject to bit speed/block hardness. The performance goal is to distribute the one-time planning work over current-layer ticks and eliminate a layer-transition workload spike, **not to reduce drilling throughput**. Real performance must be confirmed using TPS and MSPT on a live 9,000-block hole.
+- The existing 0.6.23 group ownership, wall/fluid, chunk, and network optimizations remain. The new static geometry is transient and regenerated on world load, preventing stale cached block/fluid states.
 
 ## v0.6.23 — Restore full multi-drill throughput; retain smart performance work
 
