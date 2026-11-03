@@ -23,6 +23,7 @@ public final class DrillIndicatorRenderer implements BlockEntityRenderer<DrillEn
     @Override public void extractRenderState(DrillEntity drill,DrillIndicatorRenderState state,float partialTick,
              Vec3 cameraPos,@Nullable ModelFeatureRenderer.CrumblingOverlay overlay){
         BlockEntityRenderer.super.extractRenderState(drill,state,partialTick,cameraPos,overlay);
+        state.selected=drill.controllerSelected();
         for(int i=0;i<3;i++){
             Item item=drill.getItem(i).getItem();
             state.colors[i]=item==MiningRig.WOOD_BIT?0xffb88a50
@@ -53,6 +54,19 @@ public final class DrillIndicatorRenderer implements BlockEntityRenderer<DrillEn
                     state.lightCoords,state.colors[lane],0,0);
             }
             pose.popPose();
+            if(state.selected){
+                // Full-bright cyan star on every visible side of the head.
+                // It is a render-only locator: no extra block or entity.
+                pose.pushPose();
+                pose.translate(x[side],.955,z[side]);
+                pose.mulPose(Axis.YP.rotationDegrees(rotations[side]));
+                pose.scale(.027f,.027f,.027f);
+                String marker="✦";
+                queue.submitText(pose,-font.width(marker)/2f,-font.lineHeight/2f,
+                    Component.literal(marker).getVisualOrderText(),false,Font.DisplayMode.NORMAL,
+                    15728880,0xff55f4ff,0,0);
+                pose.popPose();
+            }
         }
     }
 }
