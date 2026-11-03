@@ -12,9 +12,12 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.core.Direction;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.network.chat.Component;
 
@@ -24,12 +27,14 @@ import net.minecraft.network.chat.Component;
  */
 public final class DrillUpperBlock extends Block {
     public static final EnumProperty<Direction> FACING=BlockStateProperties.FACING;
+    /** Pulses red while the paired computer reports a drill fault. */
+    public static final BooleanProperty ALARM=BooleanProperty.create("alarm");
     public DrillUpperBlock(Properties properties){
-        super(properties);
-        registerDefaultState(stateDefinition.any().setValue(FACING,Direction.DOWN));
+        super(properties.lightLevel(state->state.getValue(ALARM)?8:0));
+        registerDefaultState(stateDefinition.any().setValue(FACING,Direction.DOWN).setValue(ALARM,false));
     }
     @Override protected void createBlockStateDefinition(StateDefinition.Builder<Block,BlockState> builder){
-        builder.add(FACING);
+        builder.add(FACING,ALARM);
     }
     @Override protected MapCodec<? extends Block> codec(){return simpleCodec(DrillUpperBlock::new);}
     @Override protected RenderShape getRenderShape(BlockState state){return RenderShape.MODEL;}
@@ -42,6 +47,25 @@ public final class DrillUpperBlock extends Block {
         if(level.getBlockEntity(head) instanceof DrillEntity drill
                 &&drill.drillingDirection()==state.getValue(FACING))return drill;
         return null;
+    }
+    @Override public ItemStack getCloneItemStack(BlockState state,LevelReader level,BlockPos pos,Player player){
+        BlockPos head=headPosition(pos,state);
+        ItemStack stack=new ItemStack(MiningRig.DRILL.asItem());
+        if(level.getBlockEntity(head) instanceof DrillEntity drill)drill.copyBindingTo(stack);
+        return stack;
+    }
+    /** Either half is the same machine: breaking the housing removes the head,
+     * which is the sole item/loot source. During normal drill movement the old
+     * housing is also removed, but its owner is marked relocating. */
+    @Override protected void affectNeighborsAfterRemoval(BlockState state,ServerLevel level,
+            BlockPos pos,boolean moved){
+        if(!moved){
+            DrillEntity drill=owner(level,pos,state);
+            BlockPos head=headPosition(pos,state);
+            if(drill!=null&&!drill.relocating()&&level.getBlockState(head).is(MiningRig.DRILL))
+                level.destroyBlock(head,true);
+        }
+        super.affectNeighborsAfterRemoval(state,level,pos,moved);
     }
     @Override protected InteractionResult useItemOn(ItemStack stack,BlockState state,Level level,
             BlockPos pos,Player player,InteractionHand hand,BlockHitResult hit){
@@ -74,16 +98,5 @@ public final class DrillUpperBlock extends Block {
             if(drill!=null)player.openMenu(drill);
         }
         return InteractionResult.SUCCESS;
-    }
-    @Override public BlockState playerWillDestroy(Level level,BlockPos pos,BlockState state,Player player){
-        if(level instanceof ServerLevel server){
-            BlockPos head=headPosition(pos,state);
-            DrillEntity drill=owner(server,pos,state);
-            if(server.getBlockState(head).is(MiningRig.DRILL)&&drill!=null){
-                drill.dropInventory();
-                server.destroyBlock(head,!player.getAbilities().instabuild);
-            }
-        }
-        return super.playerWillDestroy(level,pos,state,player);
     }
 }
