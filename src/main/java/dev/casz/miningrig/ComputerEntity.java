@@ -1010,7 +1010,19 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         }
     }
     @Override public void setRemoved(){
-        if(level instanceof ServerLevel server)RigChunkTickets.release(server,worldPosition);
+        if(level instanceof ServerLevel server){
+            // Do not leave stale locator stars or a flashing fault lamp behind
+            // when the controlling computer is actually removed.
+            for(int i=0;i<MAX_DRILLS;i++){
+                if(positions[i]==null||tokens[i].isEmpty()||!server.hasChunkAt(positions[i]))continue;
+                if(server.getBlockEntity(positions[i]) instanceof DrillEntity drill
+                        &&drill.matchesLink(tokens[i])){
+                    drill.setControllerSelected(false);
+                    drill.setAlarmLight(false);
+                }
+            }
+            RigChunkTickets.release(server,worldPosition);
+        }
         super.setRemoved();
     }
     @Override public Component getDisplayName(){return Component.literal("Caszual Mining Rig Computer");}
