@@ -470,6 +470,31 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         }
     }
     public int selected(){return selected;}
+    private void setSelectedDrill(ServerLevel world,int slot,boolean value){
+        if(slot<0||slot>=MAX_DRILLS||positions[slot]==null||!world.hasChunkAt(positions[slot]))return;
+        if(world.getBlockEntity(positions[slot]) instanceof DrillEntity drill
+                &&drill.matchesLink(tokens[slot]))drill.setControllerSelected(value);
+    }
+    /** Reconcile selection after chunk loads, drill relocation, or computer reload. */
+    private void syncSelectedDrill(ServerLevel world){
+        for(int i=0;i<MAX_DRILLS;i++)setSelectedDrill(world,i,i==selected);
+    }
+    private static boolean drillHasError(Status status){
+        return switch(status){
+            case READY,RUNNING,STOPPED,DONE,WAITING,WALLING,FILLING -> false;
+            default -> true;
+        };
+    }
+    /** Blink only the housing belonging to a real, linked drill with a fault. */
+    private void updateDrillAlarmLights(ServerLevel world,long now){
+        boolean pulse=((now/5)&1L)==0L;
+        for(int i=0;i<MAX_DRILLS;i++){
+            if(positions[i]==null||tokens[i].isEmpty()||!world.hasChunkAt(positions[i]))continue;
+            if(world.getBlockEntity(positions[i]) instanceof DrillEntity drill
+                    &&drill.matchesLink(tokens[i]))
+                drill.setAlarmLight(drillHasError(statuses[i])&&pulse);
+        }
+    }
     /** Changing depth or wall mode on a member updates every group worker. */
     private void syncGroupSettings(){
         if(groupMarker(selected)<0)return;
@@ -586,7 +611,13 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         return circle()?x*x+z*z<=r*r:Math.max(Math.abs(x),Math.abs(z))<=r;
     }
     public void select(int slot){
-        if(slot>=0&&slot<MAX_DRILLS){selected=slot;activeSlot=slot;setChanged();}
+        if(slot>=0&&slot<MAX_DRILLS){
+            if(level instanceof ServerLevel server){
+                if(selected!=slot)setSelectedDrill(server,selected,false);
+                setSelectedDrill(server,slot,true);
+            }
+            selected=slot;activeSlot=slot;setChanged();
+        }
     }
     public void setRadius(int value){
         if(groupMarker(selected)>=0)return;
@@ -853,7 +884,11 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             computer.autoDiscover(server);
             computer.discoverGroupMembers(server);
             computer.drawGroupMarkers(server);
+            computer.syncSelectedDrill(server);
         }
+        // Five-tick pulses create a clear warning blink without per-tick
+        // blockstate churn. Normal operation leaves the lens dark.
+        if(now%5==0)computer.updateDrillAlarmLights(server,now);
         // The old implementation rebuilt and re-synced the ENTIRE CC
         // graph + every 41x41 drill footprint TWICE per server tick. Chunk
         // coverage changes on start/stop immediately through syncIfServer(),
@@ -940,6 +975,15 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
             BlockPos selectedPos=computer.positions[computer.selected];
             if(selectedPos!=null&&server.hasChunkAt(selectedPos)
                     &&server.getBlockEntity(selectedPos) instanceof DrillEntity displayed){
+                // A subtle cyan particle halo reinforces the block-entity
+                // locator glyph, including the attached housing half.
+                for(BlockPos marker:java.util.List.of(selectedPos,displayed.housingPosition())){
+                    if(!server.hasChunkAt(marker))continue;
+                    for(int dx=0;dx<=1;dx++)for(int dz=0;dz<=1;dz++)
+                        server.sendParticles(ParticleTypes.END_ROD,
+                            marker.getX()+.15+dx*.7,marker.getY()+.18,
+                            marker.getZ()+.15+dz*.7,1,0,0,0,0);
+                }
                 int rad=computer.radius();
                 // Each tick displays one quarter of the outline. Cycling
                 // the phase keeps all edges visible over four refreshes,
