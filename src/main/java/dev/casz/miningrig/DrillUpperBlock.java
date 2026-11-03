@@ -53,6 +53,16 @@ public final class DrillUpperBlock extends Block {
         if(level.getBlockEntity(head) instanceof DrillEntity drill)drill.copyBindingTo(stack);
         return stack;
     }
+    @Override public BlockState playerWillDestroy(Level level,BlockPos pos,BlockState state,Player player){
+        if(level instanceof ServerLevel server){
+            BlockPos head=headPosition(pos,state);
+            DrillEntity drill=owner(server,pos,state);
+            if(drill!=null&&!drill.relocating()&&server.getBlockState(head).is(MiningRig.DRILL))
+                // Respect creative mode: the head is the sole item/loot source.
+                server.destroyBlock(head,!player.getAbilities().instabuild);
+        }
+        return super.playerWillDestroy(level,pos,state,player);
+    }
     /** Either half is the same machine: breaking the housing removes the head,
      * which is the sole item/loot source. During normal drill movement the old
      * housing is also removed, but its owner is marked relocating. */
