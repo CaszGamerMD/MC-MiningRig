@@ -1,29 +1,54 @@
 {
   "variants": {
-    "facing=down": {
+    "alarm=false,facing=down": {
       "model": "miningrig:block/mining_drill_upper"
     },
-    "facing=north": {
+    "alarm=true,facing=down": {
+      "model": "miningrig:block/mining_drill_upper_alarm"
+    },
+    "alarm=false,facing=north": {
       "model": "miningrig:block/mining_drill_upper",
       "x": 90
     },
-    "facing=east": {
+    "alarm=true,facing=north": {
+      "model": "miningrig:block/mining_drill_upper_alarm",
+      "x": 90
+    },
+    "alarm=false,facing=east": {
       "model": "miningrig:block/mining_drill_upper",
       "x": 90,
       "y": 90
     },
-    "facing=south": {
+    "alarm=true,facing=east": {
+      "model": "miningrig:block/mining_drill_upper_alarm",
+      "x": 90,
+      "y": 90
+    },
+    "alarm=false,facing=south": {
       "model": "miningrig:block/mining_drill_upper",
       "x": 90,
       "y": 180
     },
-    "facing=west": {
+    "alarm=true,facing=south": {
+      "model": "miningrig:block/mining_drill_upper_alarm",
+      "x": 90,
+      "y": 180
+    },
+    "alarm=false,facing=west": {
       "model": "miningrig:block/mining_drill_upper",
       "x": 90,
       "y": 270
     },
-    "facing=up": {
+    "alarm=true,facing=west": {
+      "model": "miningrig:block/mining_drill_upper_alarm",
+      "x": 90,
+      "y": 270
+    },
+    "alarm=false,facing=up": {
       "model": "miningrig:block/mining_drill_upper"
+    },
+    "alarm=true,facing=up": {
+      "model": "miningrig:block/mining_drill_upper_alarm"
     }
   }
 }
