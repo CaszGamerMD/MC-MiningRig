@@ -47,7 +47,7 @@ public final class DrillUpperBlock extends Block {
                 &&drill.drillingDirection()==state.getValue(FACING))return drill;
         return null;
     }
-    @Override public ItemStack getCloneItemStack(BlockState state,LevelReader level,BlockPos pos,Player player){
+    @Override protected ItemStack getCloneItemStack(LevelReader level,BlockPos pos,BlockState state,boolean includeData){
         BlockPos head=headPosition(pos,state);
         ItemStack stack=new ItemStack(MiningRig.DRILL.asItem());
         if(level.getBlockEntity(head) instanceof DrillEntity drill)drill.copyBindingTo(stack);
