@@ -77,7 +77,7 @@ public final class DrillBlock extends BaseEntityBlock {
                 computer.placedFresh(link.token(),pos);
         }
     }
-    @Override public ItemStack getCloneItemStack(LevelReader level,BlockPos pos,BlockState state){
+    @Override protected ItemStack getCloneItemStack(LevelReader level,BlockPos pos,BlockState state,boolean includeData){
         ItemStack stack=new ItemStack(MiningRig.DRILL.asItem());
         if(level.getBlockEntity(pos) instanceof DrillEntity drill)drill.copyBindingTo(stack);
         return stack;
