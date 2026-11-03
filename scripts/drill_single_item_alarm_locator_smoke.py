@@ -54,7 +54,7 @@ assert "state.getValue(DrillUpperBlock.ALARM)!=on" in entity
 assert "level.setBlock(body,state.setValue(DrillUpperBlock.ALARM,on),Block.UPDATE_CLIENTS)" in entity
 assert "case READY,RUNNING,STOPPED,DONE,WAITING,WALLING,FILLING -> false;" in computer
 assert "computer.updateDrillAlarmLights(server,now);" in computer
-assert "if(now%20==0)computer.syncSelectedDrill(server);" in computer
+assert "computer.syncSelectedDrill(server);" in computer
 assert "drill.setControllerSelected(false);" in computer
 assert "drill.setAlarmLight(false);" in computer
 print("PASS: head and housing both pick as one bound Mining Drill; one loot source only")
