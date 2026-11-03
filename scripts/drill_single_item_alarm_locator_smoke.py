@@ -20,7 +20,7 @@ assert 'DRILL_UPPER = machinePart("mining_drill_upper"' in rig
 assert "private static Block machinePart(" in rig
 machine_part=rig[rig.index("private static Block machinePart("):rig.index("private static Item item(")]
 assert "BuiltInRegistries.ITEM" not in machine_part
-assert "Block.UPDATE_CLIENTS" in drill and "MiningRig.DRILL_UPPER" in drill
+assert "Block.UPDATE_ALL" in drill and "MiningRig.DRILL_UPPER" in drill
 assert "level.destroyBlock(head,true)" in upper
 assert "!drill.relocating()" in upper
 assert "drill.dropInventory()" in drill
