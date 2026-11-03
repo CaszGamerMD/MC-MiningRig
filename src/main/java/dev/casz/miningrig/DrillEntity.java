@@ -130,6 +130,34 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         if(hardwareIdentity.isBlank()){hardwareIdentity=java.util.UUID.randomUUID().toString();setChanged();}
         return hardwareIdentity;
     }
+    /** The selected outline is a blockstate so it synchronizes without a BE packet. */
+    public boolean controllerSelected(){
+        BlockState state=getBlockState();
+        return state.hasProperty(DrillBlock.SELECTED)&&state.getValue(DrillBlock.SELECTED);
+    }
+    public void setControllerSelected(boolean selected){
+        if(level==null||level.isClientSide())return;
+        BlockState state=level.getBlockState(worldPosition);
+        if(state.is(MiningRig.DRILL)&&state.hasProperty(DrillBlock.SELECTED)
+                &&state.getValue(DrillBlock.SELECTED)!=selected)
+            level.setBlock(worldPosition,state.setValue(DrillBlock.SELECTED,selected),Block.UPDATE_CLIENTS);
+    }
+    /** Update the warning lamp on the housing half. */
+    public void setAlarmLight(boolean on){
+        if(!(level instanceof ServerLevel server))return;
+        BlockPos body=housingPosition();
+        if(!server.hasChunkAt(body))return;
+        BlockState state=server.getBlockState(body);
+        if(state.is(MiningRig.DRILL_UPPER)
+                &&state.getValue(DrillUpperBlock.FACING)==drillingDirection()
+                &&state.getValue(DrillUpperBlock.ALARM)!=on)
+            server.setBlock(body,state.setValue(DrillUpperBlock.ALARM,on),Block.UPDATE_CLIENTS);
+    }
+    /** Middle-clicking either half returns one item with the same CC pairing. */
+    public void copyBindingTo(ItemStack stack){
+        if(!linkedToken.isBlank()&&computerPos!=null&&!computerDimension.isBlank())
+            DrillBinding.write(stack,computerDimension,computerPos,linkedToken);
+    }
     public boolean waitingForHardware(){return hardware.awaitingReplacement()&&!hardware.waitExpired();}
     public int emptyBitSlots(){
         int n=0;for(int i=0;i<BIT_SLOTS;i++)if(items.get(i).isEmpty())n++;
@@ -155,6 +183,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         setChanged();
     }
     public void detachController(){
+        setControllerSelected(false);
+        setAlarmLight(false);
         linkedToken="";computerPos=null;computerDimension="";linkConfirmed=false;
         setChanged();
     }
@@ -295,6 +325,8 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         lastCuttingAudioTick=Long.MIN_VALUE;
         for(int i=0;i<BIT_SLOTS;i++){assigned[i]=-1;progress[i]=0;}
         relocating=false;contentsDropped=false;
+        setControllerSelected(false);
+        setAlarmLight(false);
         // Binding comes exclusively from the newly placed item's pairing
         // component. Never retain a prior block entity's old supervisor.
         linkedToken="";computerPos=null;computerDimension="";
@@ -729,8 +761,10 @@ public final class DrillEntity extends BlockEntity implements Container, MenuPro
         // Minecraft's replacement callbacks nor the drill's own drop path can
         // duplicate tools or mined items during the downward move.
         relocating=true;
-        if(!world.setBlock(next,MiningRig.DRILL.defaultBlockState()
-                .setValue(DrillBlock.FACING,travel),Block.UPDATE_CLIENTS)){
+        BlockState nextHead=MiningRig.DRILL.defaultBlockState()
+            .setValue(DrillBlock.FACING,travel)
+            .setValue(DrillBlock.SELECTED,controllerSelected());
+        if(!world.setBlock(next,nextHead,Block.UPDATE_CLIENTS)){
             relocating=false;return ComputerEntity.Status.BLOCKED;
         }
         if(!(world.getBlockEntity(next) instanceof DrillEntity moved)) {
