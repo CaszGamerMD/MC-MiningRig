@@ -16,7 +16,7 @@ rig=(java/"MiningRig.java").read_text()
 assert "new ItemStack(MiningRig.DRILL.asItem())" in drill
 assert "new ItemStack(MiningRig.DRILL.asItem())" in upper
 assert "drill.copyBindingTo(stack)" in drill and "drill.copyBindingTo(stack)" in upper
-assert 'DRILL_UPPER=machinePart("mining_drill_upper"' in rig
+assert 'DRILL_UPPER = machinePart("mining_drill_upper"' in rig
 assert "private static Block machinePart(" in rig
 machine_part=rig[rig.index("private static Block machinePart("):rig.index("private static Item item(")]
 assert "BuiltInRegistries.ITEM" not in machine_part
