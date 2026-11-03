@@ -487,7 +487,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
     }
     /** Blink only the housing belonging to a real, linked drill with a fault. */
     private void updateDrillAlarmLights(ServerLevel world,long now){
-        boolean pulse=((now/5)&1L)==0L;
+        boolean pulse=((now/10)&1L)==0L;
         for(int i=0;i<MAX_DRILLS;i++){
             if(positions[i]==null||tokens[i].isEmpty()||!world.hasChunkAt(positions[i]))continue;
             if(world.getBlockEntity(positions[i]) instanceof DrillEntity drill
@@ -888,7 +888,7 @@ public final class ComputerEntity extends BlockEntity implements MenuProvider {
         }
         // Five-tick pulses create a clear warning blink without per-tick
         // blockstate churn. Normal operation leaves the lens dark.
-        if(now%5==0)computer.updateDrillAlarmLights(server,now);
+        if(now%10==0)computer.updateDrillAlarmLights(server,now);
         // The old implementation rebuilt and re-synced the ENTIRE CC
         // graph + every 41x41 drill footprint TWICE per server tick. Chunk
         // coverage changes on start/stop immediately through syncIfServer(),
