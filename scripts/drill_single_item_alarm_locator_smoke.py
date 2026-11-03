@@ -51,7 +51,7 @@ assert normal["textures"]["lamp"]=="minecraft:block/black_concrete"
 assert alarm["textures"]["lamp"]=="minecraft:block/redstone_block"
 assert "lightLevel(state->state.getValue(ALARM)?8:0)" in upper
 assert "state.getValue(DrillUpperBlock.ALARM)!=on" in entity
-assert "level.setBlock(body,state.setValue(DrillUpperBlock.ALARM,on),Block.UPDATE_CLIENTS)" in entity
+assert "server.setBlock(body,state.setValue(DrillUpperBlock.ALARM,on),Block.UPDATE_CLIENTS)" in entity
 assert "case READY,RUNNING,STOPPED,DONE,WAITING,WALLING,FILLING -> false;" in computer
 assert "computer.updateDrillAlarmLights(server,now);" in computer
 assert "computer.syncSelectedDrill(server);" in computer
