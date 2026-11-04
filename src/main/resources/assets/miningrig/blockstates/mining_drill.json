@@ -1,28 +1,53 @@
 {
   "variants": {
-    "facing=down": {
+    "facing=down,selected=false": {
       "model": "miningrig:block/mining_drill"
     },
-    "facing=north": {
+    "facing=down,selected=true": {
+      "model": "miningrig:block/mining_drill"
+    },
+    "facing=north,selected=false": {
       "model": "miningrig:block/mining_drill",
       "x": 270
     },
-    "facing=east": {
+    "facing=north,selected=true": {
+      "model": "miningrig:block/mining_drill",
+      "x": 270
+    },
+    "facing=east,selected=false": {
       "model": "miningrig:block/mining_drill",
       "x": 270,
       "y": 90
     },
-    "facing=south": {
+    "facing=east,selected=true": {
+      "model": "miningrig:block/mining_drill",
+      "x": 270,
+      "y": 90
+    },
+    "facing=south,selected=false": {
       "model": "miningrig:block/mining_drill",
       "x": 270,
       "y": 180
     },
-    "facing=west": {
+    "facing=south,selected=true": {
+      "model": "miningrig:block/mining_drill",
+      "x": 270,
+      "y": 180
+    },
+    "facing=west,selected=false": {
       "model": "miningrig:block/mining_drill",
       "x": 270,
       "y": 270
     },
-    "facing=up": {
+    "facing=west,selected=true": {
+      "model": "miningrig:block/mining_drill",
+      "x": 270,
+      "y": 270
+    },
+    "facing=up,selected=false": {
+      "model": "miningrig:block/mining_drill"
+    },
+    "facing=up,selected=true": {
       "model": "miningrig:block/mining_drill"
     }
   }

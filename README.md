@@ -1,6 +1,17 @@
 # Caszual Mining Rig — Fabric 26.2
 
-**Version 0.6.24 — Next-layer pre-planning and 3% drill-bit retirement**
+**Version 0.6.25 — Single-item drills, fault lamp and selected-drill locator**
+
+## v0.6.25 — Make the two-block drill behave as one machine
+
+- **One item for both physical halves:** the drill head and yellow housing now both middle-click as the same single `mining_drill` item. The upper housing still has no separately registered BlockItem or loot. Breaking either half removes the complete two-block machine and produces exactly one drill item from the head's loot table; inventory/hardware is dropped by the one owning block entity. Removing the old housing during normal drill movement is explicitly ignored while the owner is relocating, so the drill does not destroy itself. Pick-blocking either half preserves the drill's existing computer pairing token.
+- **Flashing fault lamp:** a small indicator lens has been added to the housing. It stays dark during normal operation and flashes red (with a small light emission) when the computer reports a fault such as missing CC/output/input, no bits, full storage, a blocked drill, failed repair, or reconnection. The warning pulse updates only on a short interval and the computer clears it when the machine is unlinked or the computer is removed.
+- **Selected-drill locator:** the existing **SELECT** button in the computer now adds a full-bright cyan locator glyph to that drill, plus a small particle halo around its head and housing. The selection follows the drill as it descends, is restored after chunk reload, and moves to the newly selected drill. It is a render/blockstate indicator only—no extra entities or permanent marker blocks.
+- The 0.6.24 next-layer preparation and lossless 3% bit retirement remain unchanged. No mining-speed throttle was added.
+
+## v0.6.24 — Prepare future work while drilling + save worn drill bits
+
+**Version 0.6.25 — Single-item drills, fault lamp and selected-drill locator**
 
 Caszual Mining Rig is a layer-by-layer mining mod with three interchangeable tool-grade bits per drill, bundle-sized item storage, animated wireless Collection Coordinators, and a single computer capable of running **up to sixteen drills independently**.
 

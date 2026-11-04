@@ -24,11 +24,16 @@ public final class DrillBinding {
         return new Link(token,BlockPos.of(tag.getLongOr("CaszualRigComputer",0)),dimension);
     }
     public static void write(ItemStack stack,ServerLevel level,BlockPos computer,String token){
+        write(stack,level.dimension().identifier().toString(),computer,token);
+    }
+    /** Clone/pick-block can preserve the computer pairing on either drill half. */
+    public static void write(ItemStack stack,String dimension,BlockPos computer,String token){
+        if(dimension==null||dimension.isBlank()||computer==null||token==null||token.isBlank())return;
         CustomData current=stack.get(DataComponents.CUSTOM_DATA);
         CompoundTag tag=current==null?new CompoundTag():current.copyTag();
         tag.putString("CaszualRigToken",token);
         tag.putLong("CaszualRigComputer",computer.asLong());
-        tag.putString("CaszualRigDimension",level.dimension().identifier().toString());
+        tag.putString("CaszualRigDimension",dimension);
         stack.set(DataComponents.CUSTOM_DATA,CustomData.of(tag));
     }
 }

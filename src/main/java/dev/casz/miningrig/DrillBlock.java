@@ -5,6 +5,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
@@ -17,6 +18,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -27,12 +29,14 @@ import org.jetbrains.annotations.Nullable;
 
 public final class DrillBlock extends BaseEntityBlock {
     public static final EnumProperty<Direction> FACING=BlockStateProperties.FACING;
+    /** Set by the paired computer to mark its currently selected drill. */
+    public static final BooleanProperty SELECTED=BooleanProperty.create("selected");
     public DrillBlock(Properties properties){
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(FACING,Direction.DOWN));
+        registerDefaultState(stateDefinition.any().setValue(FACING,Direction.DOWN).setValue(SELECTED,false));
     }
     @Override protected void createBlockStateDefinition(StateDefinition.Builder<Block,BlockState> builder){
-        builder.add(FACING);
+        builder.add(FACING,SELECTED);
     }
     @Override protected MapCodec<? extends BaseEntityBlock> codec(){return simpleCodec(DrillBlock::new);}
     @Override protected RenderShape getRenderShape(BlockState state){return RenderShape.MODEL;}
@@ -73,6 +77,11 @@ public final class DrillBlock extends BaseEntityBlock {
                 computer.placedFresh(link.token(),pos);
         }
     }
+    @Override protected ItemStack getCloneItemStack(LevelReader level,BlockPos pos,BlockState state,boolean includeData){
+        ItemStack stack=new ItemStack(MiningRig.DRILL.asItem());
+        if(level.getBlockEntity(pos) instanceof DrillEntity drill)drill.copyBindingTo(stack);
+        return stack;
+    }
     @Nullable @Override public BlockEntity newBlockEntity(BlockPos pos,BlockState state){return new DrillEntity(pos,state);}
     @Override protected InteractionResult useItemOn(ItemStack stack,BlockState state,Level level,BlockPos pos,
                                             Player player,InteractionHand hand,BlockHitResult hit){
@@ -98,17 +107,6 @@ public final class DrillBlock extends BaseEntityBlock {
             player.openMenu(drill);
         }
         return InteractionResult.SUCCESS;
-    }
-    @Override public BlockState playerWillDestroy(Level level,BlockPos pos,BlockState state,Player player) {
-        if(!level.isClientSide()){
-            if(level.getBlockEntity(pos) instanceof DrillEntity entity)entity.dropInventory();
-            BlockPos body=pos.relative(state.getValue(FACING).getOpposite());
-            if(level.getBlockState(body).is(MiningRig.DRILL_UPPER)
-                    &&level.getBlockState(body).getValue(DrillUpperBlock.FACING)
-                        ==state.getValue(FACING))
-                level.removeBlock(body,false);
-        }
-        return super.playerWillDestroy(level,pos,state,player);
     }
     @Override protected void affectNeighborsAfterRemoval(BlockState state,ServerLevel level,BlockPos pos,boolean moved){
         if(level.getBlockEntity(pos) instanceof DrillEntity drill)drill.dropInventory();
