@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression checks for one-item drill multiblocks, fault lamps and selection locator."""
+"""Regression checks for one-item drill multiblocks, fault lamps and selection outline."""
 from pathlib import Path
 import json
 root=Path(__file__).resolve().parents[1]
@@ -11,6 +11,7 @@ upper=(java/"DrillUpperBlock.java").read_text()
 entity=(java/"DrillEntity.java").read_text()
 computer=(java/"ComputerEntity.java").read_text()
 renderer=(java/"client/DrillIndicatorRenderer.java").read_text()
+render_state=(java/"client/DrillIndicatorRenderState.java").read_text()
 rig=(java/"MiningRig.java").read_text()
 # Both halves resolve to the ONE obtainable item; the housing has no BlockItem.
 assert "new ItemStack(MiningRig.DRILL.asItem())" in drill
@@ -37,8 +38,15 @@ for facing in ("down","north","east","south","west","up"):
 assert "BooleanProperty SELECTED=BooleanProperty.create(\"selected\")" in drill
 assert "state.setValue(DrillBlock.SELECTED,selected)" in entity
 assert ".setValue(DrillBlock.SELECTED,controllerSelected())" in entity
+# The block entity is outlined as one combined cuboid, with the always-on-top
+# gizmo phase providing the familiar through-wall selection treatment.
 assert "state.selected=drill.controllerSelected();" in renderer
-assert 'String marker="✦";' in renderer and "15728880" in renderer
+assert "DrawableGizmoPrimitives" in renderer
+assert "outline.submit(queue,camera,true);" in renderer
+assert "outline.addLine" in renderer and "SELECTED_COLOR=0xff55f4ff" in renderer
+assert "state.housingOffsetX=bodyOffset.getStepX();" in renderer
+assert "int housingOffsetX,housingOffsetY,housingOffsetZ;" in render_state
+assert 'String marker="✦";' not in renderer
 # Housing warning lamp uses an off model and red flashing model; light emission follows state.
 upper_states=json.loads((assets/"blockstates/mining_drill_upper.json").read_text())["variants"]
 assert len(upper_states)==12
@@ -59,4 +67,4 @@ assert "drill.setControllerSelected(false);" in computer
 assert "drill.setAlarmLight(false);" in computer
 print("PASS: head and housing both pick as one bound Mining Drill; one loot source only")
 print("PASS: housing warning lamp blinks red and emits light only for fault statuses")
-print("PASS: computer SELECT highlights the drill with a synced full-bright locator")
+print("PASS: computer SELECT outlines the complete two-block drill in cyan through walls")
